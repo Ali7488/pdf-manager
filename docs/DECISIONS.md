@@ -104,6 +104,7 @@ Decisions made by the project owner, in their own direction (summarized, not quo
 | F41 | 2026-11-23 | **Few colours per scheme:** each theme defines only base colours (band, accent, paper, canvas, ink, line, alert, and text on band/accent); every other shade is derived from them. |
 | F42 | 2026-11-23 | **Font:** Segoe UI (what Office used) where Windows already provides it, since it's proprietary and can't be bundled; otherwise bundled **Open Sans** (OFL), the closest freely licensed match (same designer). All text weights one step heavier (500 body, 600 emphasis). Supersedes IBM Plex Sans in F6. |
 | F43 | 2026-11-23 | **Three tones per scheme, high contrast, complementary** (refines F41): base, text, accent. Dark: near-black and gold (warm white text). Light: white and gold (near-black text). Burgundy: burgundy and bright pink (white text). Green: forest green and coral (cream text). The accent is the side pane, main buttons and lines; hovers are tints of the same tones. **Buttons have soft rounded corners (6px); borders are 2px.** |
+| F44 | 2026-11-23 | **Muted colours, clearly distinct neighbours** (supersedes F43's colours; soft rounded buttons and 2px borders stay). Each scheme has a **background, a foreground (side pane, panels, tiles, controls), a text colour and at most one accent** (main buttons, current item, links, focus). Dark: charcoal with gold; light: warm off-white and beige with gold; burgundy: muted burgundy with pink; green: muted forest with coral. |
 
 ## Open questions
 

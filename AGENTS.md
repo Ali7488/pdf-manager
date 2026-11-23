@@ -42,7 +42,7 @@ Use **uv** for everything (`uv add`, `uv run`, `uv sync`). Never use pip or requ
 ## Rules
 
 - **Generic only.** No personal names, no specific person's workflow, and no domain-specific wording (such as a particular course or subject) in code, UI text, tests, docs or commit messages. Test fixtures use neutral sample text.
-- **Windows first.** Windows is the target platform. Prefer correct Windows behaviour over Linux convenience, but keep the converter runnable on Linux for development and tests.
+- **Windows first, portable always.** v1 targets Windows 11; prefer correct Windows behaviour. Linux packages (`.deb`, Arch `PKGBUILD`) and Qt/GNOME versions come later (decision P14), so keep the service and API layers portable: guard Windows-only code (COM, registry, `os.startfile`) with platform checks and working fallbacks, and never hard-code Windows paths.
 - **Originals are never modified.** Inputs are only read. All work happens in a scratch folder, and results are copied out with collision-safe names (`converter.output.safe_destination`).
 - **No speaker notes.** The speaker-notes appendix was removed on purpose. Don't re-add it.
 - **Documentation.** Every function gets a Google-style docstring (summary, Args, Returns, Raises). Add inline comments for non-obvious lines, and flag known issues where they occur.

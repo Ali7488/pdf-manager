@@ -136,4 +136,11 @@ A short, summarized record of each request made to the coding agent, and what ca
     - [x] Inventory, notices, docs and tests.
     - [x] Windows build, checks and smoke tests (run 45225451223; missing runtime simulated only); CI (45221559952).
     - [x] Draft pull request #1; vault audit note (`75 Home Lab and System/BOTH DEVICES/Audits/2026-11-23 - PDF Manager Visual C++ Runtime Prerequisite.md`).
-    - [ ] Clean-machine test without the redistributable; owner review and merge.
+    - [x] Owner asked to finish and merge PR #1 (item 41).
+    - [ ] Clean-machine test without the redistributable (carried over to the Windows 11 acceptance test, R10).
+41. **Browser-window app (branch `migrate/browser-app`).** Answers given: the original code can stay MIT, but the distributed app must be AGPL-3.0 while it includes PyMuPDF (or needs Artifex's commercial licence). Brave gets app mode like Edge and Chrome. Firefox has no app mode, so it gets a normal window or tab. Drag and drop works in a browser, but as file uploads, because browsers never reveal file paths. Requests: finish PR #1. Convert the app from a pywebview window to a local web app on 127.0.0.1, opened as a separate app-mode window (no tabs) in Edge or another Chromium-based browser (Chrome, Brave, Chromium). Otherwise open a normal tab in the default browser, and say so explicitly in the documentation. Do it on a separate migration branch for the owner to test and review before it is merged into main. Checklist:
+    - [ ] Merge PR #1.
+    - [ ] Local server, browser launcher, native dialogs, upload for drag and drop; pywebview, Qt and WebView2 removed.
+    - [ ] Frontend transport; tests; packaging, licence inventory and checks; docs and decisions.
+    - [ ] CI and Windows build; draft pull request for review.
+

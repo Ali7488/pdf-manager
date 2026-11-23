@@ -265,9 +265,7 @@ def test_duplicate_manifest_license_paths_fail(monkeypatch):
     component = next(c for c in manifest["components"] if c["name"] == "pywin32")
     component["files"].append(component["files"][0])
     monkeypatch.setattr(check, "load_manifest", lambda: manifest)
-    assert any(
-        "duplicate licence paths" in failure for failure in _failures(check.check_repo)
-    )
+    assert any("duplicate licence paths" in failure for failure in _failures(check.check_repo))
 
 
 def test_pywin32_source_uses_fixed_upstream_commit():
@@ -283,10 +281,7 @@ def test_pywin32_source_uses_fixed_upstream_commit():
 def test_cpython_source_archive_has_pinned_sha256():
     item = check.load_manifest()["sources"]["python_runtime"]
     assert item["url"].endswith("Python-3.13.17.tar.xz")
-    assert item["sha256"] == (
-        "6020bd10aff3bf4821be16f088ebb159"
-        "1beb7b811dcd8fab1da8f7c22a7b27e7"
-    )
+    assert item["sha256"] == ("6020bd10aff3bf4821be16f088ebb1591beb7b811dcd8fab1da8f7c22a7b27e7")
 
 
 def test_every_bundled_python_package_has_a_source_location():

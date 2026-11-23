@@ -8,7 +8,6 @@ from pathlib import Path
 
 import fitz
 from pptx import Presentation
-from reportlab.pdfgen.canvas import Canvas
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from converter import (FLATTEN, FLATTEN_MERGE, MERGE, find_tesseract,
@@ -20,10 +19,10 @@ def sha(path):
 
 
 def make_pdf(path):
-    c = Canvas(str(path), pagesize=(480, 300))
-    c.setFont("Helvetica", 24)
-    c.drawString(30, 220, "Quarterly summary document")
-    c.save()
+    with fitz.open() as doc:
+        page = doc.new_page(width=480, height=300)
+        page.insert_text((30, 80), "Quarterly summary document", fontsize=24)
+        doc.save(str(path))
 
 
 def make_pptx(path):

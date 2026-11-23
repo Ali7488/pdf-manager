@@ -11,7 +11,6 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 import fitz
-from reportlab.pdfgen.canvas import Canvas
 import sys
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from converter import FLATTEN, FLATTEN_MERGE, process_files, find_tesseract
@@ -26,10 +25,10 @@ def main() -> None:
     with tempfile.TemporaryDirectory() as d:
         work = Path(d)
         src = work / 'source.pdf'
-        pdf = Canvas(str(src), pagesize=(420, 280))
-        pdf.setFont('Helvetica', 18)
-        pdf.drawString(20, 200, 'Sample document: searchable text check')
-        pdf.save()
+        with fitz.open() as pdf:
+            page = pdf.new_page(width=420, height=280)
+            page.insert_text((20, 80), 'Sample document: searchable text check', fontsize=18)
+            pdf.save(str(src))
         original_checksum = checksum(src)
         real_unlink = Path.unlink
         def refuse_ocr_temp_unlink(self: Path, *args, **kwargs):

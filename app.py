@@ -49,7 +49,12 @@ CONF_PATH = CONF_DIR / "settings.json"
 def _rounded(
     canvas: tk.Canvas, width: int, height: int, radius: int, color: str, border: str | None = None
 ):
-    """Draw a rounded pill using native Tk polygons; no third-party GUI library."""
+    """Draw a rounded rectangle filling the canvas, using a smoothed Tk polygon.
+
+    Used for the custom buttons and mode cards, so no third-party GUI library is needed.
+    The shape is inset 2 px from the canvas edges, and the corner radius is capped at
+    half the height (giving a pill shape for short buttons).
+    """
     x, y = 2, 2
     r = min(radius, (height - 4) / 2)
     points = [
@@ -89,9 +94,30 @@ def _rounded(
 
 
 class SoftButton(tk.Canvas):
+    """A rounded, custom-drawn button.
+
+    Tk's built-in buttons can't be rounded or fully recoloured on Windows, so this
+    draws one on a canvas. It supports hover and pressed states, a disabled state,
+    and keyboard activation with Enter or Space when focused.
+
+    Tones: ``"primary"`` (pink, main actions), ``"danger"`` and ``"secondary"``
+    (the default, card-coloured).
+    """
+
     def __init__(
         self, master, title: str, command, width=150, height=42, tone="secondary", enabled=True
     ):
+        """Create the button and wire up mouse and keyboard events.
+
+        Args:
+            master: Parent widget; its background colour is reused around the button.
+            title: Label text.
+            command: Function called with no arguments when the button is activated.
+            width: Width in pixels.
+            height: Height in pixels.
+            tone: ``"primary"``, ``"danger"`` or ``"secondary"``.
+            enabled: Whether the button starts enabled.
+        """
         super().__init__(
             master,
             width=width,
@@ -115,6 +141,11 @@ class SoftButton(tk.Canvas):
         self.bind("<FocusOut>", lambda event: self.render())
 
     def render(self):
+        """Redraw the button for its current state (disabled, pressed, hover, normal).
+
+        Called on every state change. Focus events also trigger a redraw, but no
+        focus outline is drawn yet, so keyboard focus isn't visible.
+        """
         self.delete("all")
         if not self.enabled:
             bg, fg, border = "#44333d", "#887784", "#493541"
@@ -131,26 +162,34 @@ class SoftButton(tk.Canvas):
         self.create_text(self.w / 2, self.h / 2, text=self.label, fill=fg, font=(FONT, 10, "bold"))
 
     def set_enabled(self, value):
+        """Enable or disable the button and update its cursor and look."""
         self.enabled = bool(value)
         self.configure(cursor="hand2" if self.enabled else "arrow")
         self.render()
 
     def on_enter(self, event):
+        """Mouse entered: show the hover state."""
         self.hover = True
         self.render()
 
     def on_leave(self, event):
+        """Mouse left: clear hover and cancel any press in progress."""
         self.hover = False
         self.pressed = False
         self.render()
 
     def on_press(self, event):
+        """Mouse button pressed: take keyboard focus and show the pressed state."""
         if self.enabled:
             self.focus_set()
             self.pressed = True
             self.render()
 
     def on_release(self, event):
+        """Mouse button released: run the command if the pointer is still over the button.
+
+        Releasing outside the button cancels the click, like a native button.
+        """
         if self.pressed and self.enabled:
             self.pressed = False
             self.render()
@@ -158,12 +197,30 @@ class SoftButton(tk.Canvas):
                 self.perform()
 
     def perform(self):
+        """Run the button's command, unless the button is disabled."""
         if self.enabled and self.command:
             self.command()
 
 
 class ModeCard(tk.Canvas):
+    """A selectable card for one conversion mode (Flatten, Flatten + Merge, Merge).
+
+    The three cards behave like radio buttons: clicking one, or pressing Enter or
+    Space while it has focus, calls ``callback(mode)``. The dashboard then marks
+    that card selected and repaints all of them.
+    """
+
     def __init__(self, master, title: str, subtitle: str, mode: str, selected, callback):
+        """Create the card.
+
+        Args:
+            master: Parent widget.
+            title: Mode name shown in bold.
+            subtitle: One-line explanation under the title.
+            mode: Mode constant passed to ``callback`` when chosen.
+            selected: Whether this card starts selected.
+            callback: Called with ``mode`` when the card is chosen.
+        """
         super().__init__(
             master,
             width=217,
@@ -184,10 +241,15 @@ class ModeCard(tk.Canvas):
         self.bind("<space>", lambda event: self.callback(self.mode))
 
     def hovered(self, state):
+        """Set the hover state and repaint."""
         self.hover = state
         self.paint()
 
     def paint(self):
+        """Redraw the card: background, border, texts and the radio circle.
+
+        The selected card gets a pink border and a filled radio dot.
+        """
         self.delete("all")
         active = self.is_selected
         background = CARD_ACTIVE if active else CARD_HOVER if self.hover else CARD
@@ -208,7 +270,21 @@ class ModeCard(tk.Canvas):
 
 
 class Dashboard:
+    """The main application window.
+
+    Holds the list of chosen files and the selected mode, and runs conversions
+    on a background thread so the window stays responsive.
+
+    Threading model: background threads never touch Tk widgets. They put
+    messages on ``self.events`` (a thread-safe queue), and :meth:`poll` reads that
+    queue on the Tk main thread every 100 ms and updates the UI.
+
+    While ``self.busy`` is true (a conversion or OCR install is running), every
+    action that would change the inputs is ignored and closing is refused.
+    """
+
     def __init__(self):
+        """Build the window, load saved settings and start the event polling loop."""
         self.root = tk.Tk()
         self.root.title(APP_NAME)
         self.root.geometry("735x540")
@@ -236,16 +312,33 @@ class Dashboard:
 
     @staticmethod
     def load_config():
+        """Read saved settings from ``settings.json``.
+
+        Returns:
+            The settings dictionary, or an empty one if the file is missing or invalid.
+            Currently the only setting is ``tesseract_path``.
+        """
         try:
             return json.loads(CONF_PATH.read_text(encoding="utf-8"))
         except (FileNotFoundError, OSError, json.JSONDecodeError):
             return {}
 
     def save_config(self):
+        """Write the current settings to ``settings.json``, creating its folder if needed.
+
+        Raises:
+            OSError: The settings folder or file couldn't be written.
+        """
         CONF_DIR.mkdir(parents=True, exist_ok=True)
         CONF_PATH.write_text(json.dumps(self.config, indent=2), encoding="utf-8")
 
     def layout(self):
+        """Create every widget, top to bottom.
+
+        Sections: title, mode cards, file buttons and list (with Move up/down),
+        hint text, the Create button with OCR status and buttons, the progress bar,
+        and the status line.
+        """
         wrapper = tk.Frame(self.root, bg=BG)
         wrapper.pack(fill="both", expand=True, padx=21, pady=(12, 9))
 
@@ -372,11 +465,17 @@ class Dashboard:
         ).pack(fill="x", pady=(2, 0))
 
     def _section(self, master, title: str, top: int = 12):
+        """Add a small uppercase section heading, such as "FILES"."""
         tk.Label(master, text=title, fg=PINK_HOVER, bg=BG, font=(FONT, 9, "bold")).pack(
             anchor="w", pady=(top, 5)
         )
 
     def refresh_engine(self):
+        """Check for Tesseract and update the "OCR ready / OCR not found" label.
+
+        The Install OCR button is only enabled when Tesseract is missing and nothing
+        is running. If Tesseract is found, its path is remembered for this session.
+        """
         engine = find_tesseract(self.ocr_path)
         self.engine_text.set("OCR ready" if engine else "OCR not found")
         self.install.set_enabled(engine is None and not self.busy)
@@ -384,6 +483,10 @@ class Dashboard:
             self.ocr_path = str(engine)
 
     def change_mode(self, value: str):
+        """Select a conversion mode, repaint the cards and show a one-line explanation.
+
+        Ignored while a job is running.
+        """
         if self.busy:
             return
         self.mode = value
@@ -400,6 +503,11 @@ class Dashboard:
         )
 
     def add_files(self):
+        """Open a file picker and append the chosen PDF/PPTX/PPT files to the list.
+
+        Unsupported extensions and files already in the list (compared
+        case-insensitively) are skipped. Ignored while busy.
+        """
         if self.busy:
             return
         chosen = filedialog.askopenfilenames(
@@ -418,6 +526,11 @@ class Dashboard:
         self.draw_list()
 
     def draw_list(self, select: int | None = None):
+        """Redraw the numbered file list and update the Create button.
+
+        Args:
+            select: Optional index to select and scroll into view (clamped to the list).
+        """
         self.listbox.delete(0, tk.END)
         for index, file in enumerate(self.files, 1):
             self.listbox.insert(tk.END, f"{index:02d}   {file.name}")
@@ -428,6 +541,7 @@ class Dashboard:
         self.convert.set_enabled(bool(self.files) and not self.busy)
 
     def remove_selected(self):
+        """Remove the selected file(s) from the list. Ignored while busy."""
         if self.busy:
             return
         indices = self.listbox.curselection()
@@ -437,11 +551,17 @@ class Dashboard:
             self.draw_list()
 
     def clear_files(self):
+        """Empty the file list. Ignored while busy."""
         if not self.busy:
             self.files.clear()
             self.draw_list()
 
     def move(self, offset: int):
+        """Move the selected file one place up or down, which changes the merge order.
+
+        Args:
+            offset: ``-1`` to move up, ``1`` to move down.
+        """
         if self.busy:
             return
         indices = self.listbox.curselection()
@@ -455,6 +575,12 @@ class Dashboard:
         self.draw_list(select=new)
 
     def locate_ocr(self):
+        """Let the user pick ``tesseract.exe`` manually and save that path to settings.
+
+        Used when automatic detection fails. Rejects any file not named
+        ``tesseract.exe`` (Windows naming). If the settings can't be saved, the path
+        is still used for this session.
+        """
         if self.busy:
             return
         path = filedialog.askopenfilename(
@@ -484,6 +610,12 @@ class Dashboard:
         )
 
     def install_ocr(self):
+        """Install Tesseract OCR.
+
+        On Windows with winget available, asks for confirmation and then runs the
+        install on a background thread (:meth:`ocr_worker`). Otherwise opens the
+        Tesseract download page in the browser.
+        """
         if self.busy:
             return
         if os.name != "nt" or shutil.which("winget") is None:
@@ -507,6 +639,11 @@ class Dashboard:
         threading.Thread(target=self.ocr_worker, daemon=True).start()
 
     def ocr_worker(self):
+        """Background thread: run ``winget install`` for Tesseract.
+
+        Posts an ``("ocr_done", success, error_text)`` event for :meth:`poll` to handle.
+        Allows up to 20 minutes for the install.
+        """
         try:
             options = {"capture_output": True, "text": True, "timeout": 1200}
             if os.name == "nt":
@@ -538,6 +675,11 @@ class Dashboard:
             self.events.put(("ocr_done", False, str(exc)))
 
     def set_busy(self, active: bool):
+        """Enter or leave the busy state.
+
+        While busy, the Create and Install OCR buttons are disabled and the progress
+        bar animates. Leaving busy stops and resets the progress bar.
+        """
         self.busy = active
         self.convert.set_enabled(bool(self.files) and not active)
         self.install.set_enabled(not active and find_tesseract(self.ocr_path) is None)
@@ -549,6 +691,12 @@ class Dashboard:
             self.progress.configure(mode="determinate", value=0)
 
     def begin(self):
+        """Start a conversion when the Create button is pressed.
+
+        Checks first that OCR is available (flatten modes only) and that every input
+        file still exists. Then creates a temporary scratch folder and runs
+        :meth:`worker` on a background thread with a snapshot of the file list.
+        """
         if self.busy or not self.files:
             return
         if self.mode != MERGE and not find_tesseract(self.ocr_path):
@@ -579,6 +727,12 @@ class Dashboard:
         ).start()
 
     def worker(self, files, mode, scratch, engine):
+        """Background thread: run the conversion and post the outcome.
+
+        Progress messages are forwarded as ``("status", message)`` events. The end is
+        posted as ``("complete", results, None)`` on success or
+        ``("complete", None, error_message)`` on failure.
+        """
         try:
             results = process_files(
                 files, mode, scratch, lambda msg: self.events.put(("status", msg)), engine=engine
@@ -588,6 +742,17 @@ class Dashboard:
             self.events.put(("complete", None, str(exc)))
 
     def poll(self):
+        """Handle all queued events from background threads, then reschedule itself.
+
+        Runs on the Tk main thread every 100 ms. Event types:
+
+        * ``status``: show a progress message.
+        * ``ocr_done``: an OCR install finished; refresh detection and report.
+        * ``complete``: a conversion finished; see :meth:`complete`.
+
+        Note: if handling an event raises, the next poll is never scheduled and the
+        window stops updating.
+        """
         try:
             while True:
                 event, *payload = self.events.get_nowait()
@@ -620,6 +785,17 @@ class Dashboard:
         self.root.after(100, self.poll)
 
     def complete(self, results, error):
+        """Finish a conversion: report an error, or ask where to save and copy the results.
+
+        Results are copied from the scratch folder with names from
+        :func:`converter.safe_destination`, so nothing is overwritten. The scratch
+        folder is always deleted afterwards, which means cancelling the folder
+        picker discards the converted files and the job must be run again.
+
+        Args:
+            results: ``(suggested name, path)`` pairs from ``process_files``, or ``None``.
+            error: Error message if the conversion failed, otherwise ``None``.
+        """
         try:
             if error is not None:
                 self.status.set("Conversion failed. Original files were not changed.")
@@ -663,6 +839,7 @@ class Dashboard:
                 self.refresh_engine()
 
     def close(self):
+        """Close the window, unless a job is running (then show a warning instead)."""
         if self.busy:
             messagebox.showwarning(
                 "Operation in progress",

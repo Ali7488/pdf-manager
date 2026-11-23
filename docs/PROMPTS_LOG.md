@@ -65,4 +65,8 @@ A short, summarized record of each request made to the coding agent, and what ca
     - [x] Write `docs/PORTABILITY.md`.
     - [ ] Service layer: move platform-specific code into `converter/platforms/` (Windows and POSIX modules behind one small interface).
     - [ ] API layer: after merging its branch, move Windows-specific parts (opening folders, OCR install, settings paths) behind the same kind of interface.
+21. **Documentation for a post-build review.** Keep accurate, proportional documentation of architecture decisions, dependencies, execution flows, non-obvious choices, significant bugs, tests and CI, so the owner can understand, debug, modify and defend the app; never claim unreviewed code was reviewed. Checklist:
+    - [x] Record decision P16 and add the rule to `AGENTS.md`.
+    - [ ] Write `docs/ARCHITECTURE.md` once `run_action` is implemented.
+    - [ ] Update `docs/ENGINEERING_REVIEW.md` with the bugs found and their status, plus a review-status section.
 

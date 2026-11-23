@@ -308,7 +308,8 @@ def test_concurrency_is_bounded(app):
 
 
 def test_quit_stops_the_app(client, app):
-    assert client.result("POST", "/api/quit") is None
+    result = client.result("POST", "/api/quit")
+    assert result == {"quit": True, "running": False, "unsavedResults": 0}
     assert app.stopped.is_set()
 
 
@@ -638,6 +639,118 @@ def test_activity_and_busy(client, app, tmp_path):
     assert app.busy()
     app.run.release.set()
     wait_finished(client, job_id)
+
+
+# ----- Unsaved results: idle shutdown, Quit and reloads (P35, P36) -----
+
+
+def finished_job(client, app, tmp_path, name="a.pdf") -> str:
+    ids = [f["path"] for f in upload(client, make_pdf(tmp_path / name))]
+    job_id = start(client, ids, f"request-{name}")["jobId"]
+    wait_finished(client, job_id)
+    return job_id
+
+
+def run_idle_wait(app, limit=0.05):
+    """launch.wait_for_stop on a thread; returns (thread, result list)."""
+    result = []
+    stop = threading.Event()
+    thread = threading.Thread(
+        target=lambda: result.append(launch.wait_for_stop(app, stop, limit, poll=0.01)),
+        daemon=True,
+    )
+    thread.start()
+    return thread, result, stop
+
+
+def test_a_finished_unsaved_job_survives_the_idle_deadline(client, app, tmp_path):
+    job_id = finished_job(client, app, tmp_path)
+    assert app.ctx.workflow.jobs.unsaved_jobs() == [job_id] and app.busy()
+    thread, result, stop = run_idle_wait(app)
+    time.sleep(0.4)  # Eight times the idle limit, with no requests.
+    assert thread.is_alive() and result == []
+    assert client.result("GET", f"/api/jobs/{job_id}")["finished"]["status"] == "succeeded"
+    client.result("POST", f"/api/jobs/{job_id}/discard")  # Nothing unsaved any more.
+    thread.join(2)
+    assert result == ["idle"]
+
+
+def test_idle_shutdown_after_a_folder_save_or_a_download(client, app, tmp_path, monkeypatch):
+    out = tmp_path / "out"
+    out.mkdir()
+    monkeypatch.setattr(platforms, "ask_folder", lambda start: out)
+    saved = finished_job(client, app, tmp_path, "a.pdf")
+    client.result("POST", f"/api/jobs/{saved}/save", {"folder": None, "asZip": False})
+    downloaded = finished_job(client, app, tmp_path, "b.pdf")
+    client.result("POST", f"/api/jobs/{downloaded}/download", {"asZip": False})
+    assert app.ctx.workflow.jobs.unsaved_jobs() == []  # Owner question O5: downloads count.
+    thread, result, stop = run_idle_wait(app)
+    thread.join(2)
+    assert result == ["idle"]
+
+
+def test_stop_ends_the_wait_at_once(client, app, tmp_path):
+    finished_job(client, app, tmp_path)
+    thread, result, stop = run_idle_wait(app)
+    stop.set()
+    thread.join(2)
+    assert result == ["stopped"]
+
+
+def test_quit_asks_before_discarding_unsaved_results(client, app, tmp_path):
+    job_id = finished_job(client, app, tmp_path)
+    held = client.result("POST", "/api/quit")
+    assert held == {"quit": False, "running": False, "unsavedResults": 1}
+    assert not app.stopped.is_set()
+    assert client.result("GET", f"/api/jobs/{job_id}")["finished"]["outputs"]
+    confirmed = client.result("POST", "/api/quit", {"discardUnsaved": True})
+    assert confirmed["quit"] is True and app.stopped.is_set()
+
+
+def test_quit_also_asks_while_a_job_is_running(client, app, tmp_path):
+    ids = [f["path"] for f in upload(client, make_pdf(tmp_path / "a.pdf"))]
+    app.run.release.clear()
+    job_id = start(client, ids)["jobId"]
+    assert client.result("POST", "/api/quit") == {
+        "quit": False,
+        "running": True,
+        "unsavedResults": 0,
+    }
+    app.run.release.set()
+    wait_finished(client, job_id)
+
+
+def test_a_job_saved_to_a_folder_comes_back_saved_after_a_reload(
+    client, app, tmp_path, monkeypatch
+):
+    out = tmp_path / "out"
+    out.mkdir()
+    monkeypatch.setattr(platforms, "ask_folder", lambda start: out)
+    job_id = finished_job(client, app, tmp_path)
+    saved = client.result("POST", f"/api/jobs/{job_id}/save", {"folder": None, "asZip": False})
+    assert saved["savedPaths"] == [str(out / "Result 0.pdf")]
+    # The reloaded page asks for the newest job: it is saved, not waiting for a Save.
+    latest = client.result("GET", "/api/jobs/latest")["job"]
+    assert latest["jobId"] == job_id and latest["saved"] == saved
+    assert client.result("GET", f"/api/jobs/{job_id}")["saved"] == saved
+    # Its results are gone from the app, so a Save would fail; the page never offers it.
+    again = client.result("POST", f"/api/jobs/{job_id}/save", {"folder": None, "asZip": False})
+    assert again["issue"]["code"] == "SAVE_FAILED"
+    client.result("POST", f"/api/jobs/{job_id}/discard")  # Done.
+    assert client.result("GET", "/api/jobs/latest")["job"] is None
+
+
+def test_a_downloaded_job_keeps_download_again_across_reloads_until_done(client, app, tmp_path):
+    job_id = finished_job(client, app, tmp_path)
+    client.result("POST", f"/api/jobs/{job_id}/download", {"asZip": True})
+    for _ in range(2):  # Two reloads.
+        latest = client.result("GET", "/api/jobs/latest")["job"]
+        assert latest["saved"]["downloaded"] is True and latest["savedAsZip"] is True
+        assert latest["saved"]["savedPaths"][0].endswith(".zip")
+        again = client.result("POST", f"/api/jobs/{job_id}/download", {"asZip": True})
+        assert again["issue"] is None and again["downloads"]
+    client.result("POST", f"/api/jobs/{job_id}/discard")  # Done.
+    assert client.result("GET", "/api/jobs/latest")["job"] is None
 
 
 # ----- Launch -----

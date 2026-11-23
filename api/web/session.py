@@ -290,26 +290,47 @@ class Session:
         with self._lock:
             return self._started.get(request_id)
 
-    def job_status(self, job_id: str) -> dict[str, Any] | None:
-        """``{progress, finished}`` of a job this session started, or ``None``."""
+    def job_saved(self, job_id: str, outcome: dict[str, Any], as_zip: bool) -> None:
+        """Remember how a job's results were saved, for a page that is reloaded (P36).
+
+        Args:
+            job_id: The job.
+            outcome: Its ``SaveOutcome`` (saved to a folder, or ``downloaded``).
+            as_zip: Whether they were saved as one zip (so Download again does the same).
+        """
         with self._lock:
             job = self._jobs.get(job_id)
-            if job is None:
-                return None
-            return {"jobId": job_id, "progress": job["progress"], "finished": job["finished"]}
+            if job is not None:
+                job["saved"] = outcome
+                job["savedAsZip"] = as_zip
+
+    def _status(self, job_id: str, job: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "jobId": job_id,
+            "progress": job["progress"],
+            "finished": job["finished"],
+            "saved": job.get("saved"),
+            "savedAsZip": bool(job.get("savedAsZip")),
+        }
+
+    def job_status(self, job_id: str) -> dict[str, Any] | None:
+        """``{jobId, progress, finished, saved, savedAsZip}`` of a job this session started."""
+        with self._lock:
+            job = self._jobs.get(job_id)
+            return None if job is None else self._status(job_id, job)
 
     def latest_job(self) -> dict[str, Any] | None:
-        """The newest job not yet discarded, for a page that was refreshed."""
+        """The newest job not yet discarded, for a page that was refreshed.
+
+        It includes how its results were saved (``saved``), so a job already
+        saved to a folder comes back as saved, never with a Save button whose
+        results are gone, and a downloaded one keeps Download again (P36).
+        """
         with self._lock:
             if not self._jobs:
                 return None
             job_id, job = next(reversed(self._jobs.items()))
-            return {
-                "jobId": job_id,
-                "action": job.get("action"),
-                "progress": job["progress"],
-                "finished": job["finished"],
-            }
+            return {**self._status(job_id, job), "action": job.get("action")}
 
     def forget_job(self, job_id: str) -> None:
         """Drop a job's status once its results are discarded."""

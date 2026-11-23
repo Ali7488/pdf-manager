@@ -42,6 +42,14 @@ export interface ConvertModalProps {
    * running or finished, instead of checking the tools and starting a new one.
    */
   resumeJobId?: string;
+  /**
+   * How the resumed job's results were already saved. A job saved to a folder shows where
+   * (its results are no longer in the app, so Save isn't offered); a download keeps
+   * Download again until Done.
+   */
+  resumeSaved?: SaveOutcome | null;
+  /** Whether that save was one .zip. */
+  resumeSavedAsZip?: boolean;
 }
 
 /** Where the modal is in the flow. */
@@ -79,16 +87,27 @@ type JobEvent = { kind: "progress"; payload: JobProgress } | { kind: "finished";
  * Results are never lost by accident: while they're unsaved the modal can only
  * be left with Save or Discard (which asks to confirm).
  */
-export function ConvertModal({ action, settings, files, autoSaveFolder, onClose, resumeJobId }: ConvertModalProps) {
+export function ConvertModal({
+  action,
+  settings,
+  files,
+  autoSaveFolder,
+  onClose,
+  resumeJobId,
+  resumeSaved = null,
+  resumeSavedAsZip = false,
+}: ConvertModalProps) {
   const { api, onEvent, dispatch, ocrInstall, ocrVersion, bumpOcrVersion } = useApp();
   const [phase, setPhase] = useState<Phase>(() =>
     resumeJobId
       ? { name: "running", check: null, jobId: resumeJobId, progress: null, cancelling: false }
       : { name: "checking" },
   );
-  const [save, setSave] = useState<SaveState>({ status: "idle" });
+  const [save, setSave] = useState<SaveState>(() =>
+    resumeSaved ? { status: "saved", outcome: resumeSaved } : { status: "idle" },
+  );
   const [confirmDiscard, setConfirmDiscard] = useState(false);
-  const [lastAsZip, setLastAsZip] = useState(false);
+  const [lastAsZip, setLastAsZip] = useState(resumeSavedAsZip);
   const [popupIssue, setPopupIssue] = useState<Issue | null>(null);
   const jobIdRef = useRef<string | null>(resumeJobId ?? null);
   const earlyEvents = useRef<JobEvent[]>([]);

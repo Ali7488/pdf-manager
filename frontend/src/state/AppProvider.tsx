@@ -63,7 +63,13 @@ export function AppProvider({ children, api = defaultApi, onEvent = defaultOnEve
       (job) => {
         const action = job?.action;
         if (active && job && action && ALL_ACTIONS.includes(action)) {
-          dispatch({ type: "jobRecovered", jobId: job.jobId, action });
+          dispatch({
+            type: "jobRecovered",
+            jobId: job.jobId,
+            action,
+            saved: job.saved ?? null,
+            savedAsZip: job.savedAsZip === true,
+          });
         }
       },
       () => undefined, // The app isn't answering; that is reported separately.

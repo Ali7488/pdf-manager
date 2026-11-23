@@ -90,7 +90,7 @@ export function createBridgeApi(): PdfManagerApi {
     // Python sends job events by itself.
     watchJob: () => undefined,
     // The window's close button quits the desktop app.
-    quit: () => Promise.resolve(),
+    quit: () => Promise.resolve({ quit: true, running: false, unsavedResults: 0 }),
     getAppInfo: () => callPython<AppInfo>("get_app_info"),
     getSettings: () => callPython<Settings>("get_settings"),
     saveSettings: (patch: Partial<Settings>) => callPython<SaveSettingsResult>("save_settings", patch),

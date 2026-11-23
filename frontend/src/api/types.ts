@@ -248,6 +248,23 @@ export interface RecoveredJob {
   action: Action | null;
   progress: JobProgress | null;
   finished: JobFinished | null;
+  /**
+   * How its results were already saved (to a folder, or sent to the browser's downloads), or
+   * null if they weren't. A job saved to a folder no longer has results to save again.
+   */
+  saved: SaveOutcome | null;
+  /** Whether that save was one .zip (so Download again does the same). */
+  savedAsZip: boolean;
+}
+
+/** What `quit` did. */
+export interface QuitResult {
+  /** True if the app is closing. */
+  quit: boolean;
+  /** A conversion was running (it is cancelled if the quit goes ahead). */
+  running: boolean;
+  /** Finished results that aren't saved yet (deleted if the quit goes ahead). */
+  unsavedResults: number;
 }
 
 /**
@@ -268,8 +285,12 @@ export interface PdfManagerApi {
   latestJob(): Promise<RecoveredJob | null>;
   /** Start (again) delivering `jobProgress`/`jobFinished` for a job. Browser mode polls; a no-op elsewhere. */
   watchJob(jobId: string): void;
-  /** Browser mode: quit the app. A no-op elsewhere (the window's close button quits). */
-  quit(): Promise<void>;
+  /**
+   * Browser mode: quit the app. It doesn't quit while a job runs or results are unsaved
+   * (`quit: false` says why) unless `discardUnsaved` confirms that. A no-op elsewhere (the
+   * window's close button quits).
+   */
+  quit(options?: { discardUnsaved?: boolean }): Promise<QuitResult>;
   getAppInfo(): Promise<AppInfo>;
   getSettings(): Promise<Settings>;
   /**

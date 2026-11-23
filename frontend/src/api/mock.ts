@@ -468,7 +468,7 @@ export function createMockApi(options: MockOptions = {}): MockApi {
     latestJob: () => Promise.resolve(null),
     // The mock sends job events by itself.
     watchJob: () => undefined,
-    quit: () => Promise.resolve(),
+    quit: () => Promise.resolve({ quit: true, running: false, unsavedResults: 0 }),
 
     setTools(next: Partial<MockTools>) {
       Object.assign(tools, next);

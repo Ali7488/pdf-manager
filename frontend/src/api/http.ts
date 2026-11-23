@@ -25,6 +25,7 @@ import type {
   OcrSearchResult,
   OcrStatus,
   PdfManagerApi,
+  QuitResult,
   RecoveredJob,
   SaveOptions,
   SaveOutcome,
@@ -280,7 +281,7 @@ export function createHttpApi(bootstrap: BrowserBootstrap): PdfManagerApi {
     addDroppedFiles,
     latestJob: async () => (await request<{ job: RecoveredJob | null }>("GET", "/api/jobs/latest")).job,
     watchJob,
-    quit: () => request<void>("POST", "/api/quit"),
+    quit: (options) => request<QuitResult>("POST", "/api/quit", { discardUnsaved: options?.discardUnsaved === true }),
 
     getAppInfo: () => request<AppInfo>("GET", "/api/app-info"),
     getSettings: () => request<Settings>("GET", "/api/settings"),

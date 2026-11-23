@@ -3,8 +3,25 @@
  * saved settings, and each action tab's own choices (kept while switching tabs).
  */
 import { arrayMove } from "@dnd-kit/sortable";
-import { Action, type ActionSettings, type AppInfo, type InputFile, type Issue, type Settings } from "../api/types";
+import {
+  Action,
+  type ActionSettings,
+  type AppInfo,
+  type InputFile,
+  type Issue,
+  type SaveOutcome,
+  type Settings,
+} from "../api/types";
 import { defaultActionSettings } from "../lib/actions";
+
+/** Browser mode: a job found after a reload, shown again in its tab's Convert window. */
+export interface RecoveredJobState {
+  jobId: string;
+  action: Action;
+  /** How its results were already saved, or null. */
+  saved: SaveOutcome | null;
+  savedAsZip: boolean;
+}
 
 /** A sidebar destination. */
 export type Page = "home" | "settings" | Action;
@@ -37,7 +54,7 @@ export interface AppState {
   /** Each tab's "Save to default folder" box. Starts ticked (F32). */
   saveToDefault: Record<Action, boolean>;
   /** Browser mode, after a reload: a job to show again in its tab's Convert window. */
-  recoveredJob: { jobId: string; action: Action } | null;
+  recoveredJob: RecoveredJobState | null;
   /** Browser mode: the user quit PDF Manager from Settings. */
   closed: boolean;
 }
@@ -56,7 +73,7 @@ export type AppEvent =
   | { type: "appInfoLoaded"; appInfo: AppInfo }
   | { type: "actionSettingsChanged"; action: Action; patch: Partial<ActionSettings> }
   | { type: "saveToDefaultChanged"; action: Action; value: boolean }
-  | { type: "jobRecovered"; jobId: string; action: Action }
+  | { type: "jobRecovered"; jobId: string; action: Action; saved: SaveOutcome | null; savedAsZip: boolean }
   | { type: "recoveredJobClosed" }
   | { type: "appClosed" };
 
@@ -138,7 +155,11 @@ export function appReducer(state: AppState, event: AppEvent): AppState {
     case "saveToDefaultChanged":
       return { ...state, saveToDefault: { ...state.saveToDefault, [event.action]: event.value } };
     case "jobRecovered":
-      return { ...state, page: event.action, recoveredJob: { jobId: event.jobId, action: event.action } };
+      return {
+        ...state,
+        page: event.action,
+        recoveredJob: { jobId: event.jobId, action: event.action, saved: event.saved, savedAsZip: event.savedAsZip },
+      };
     case "recoveredJobClosed":
       return { ...state, recoveredJob: null };
     case "appClosed":

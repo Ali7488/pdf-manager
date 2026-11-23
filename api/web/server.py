@@ -196,11 +196,21 @@ class AppServer(ThreadingHTTPServer):
             return time.monotonic() - self._last_activity
 
     def busy(self) -> bool:
-        """Whether there is work the app mustn't stop in the middle of."""
+        """Whether idle shutdown must wait: work in progress, or results not yet saved.
+
+        Requests in progress, a running job, an OCR install, and finished
+        results that exist only in the app (decision P35) all keep the app
+        running past the idle limit.
+        """
         workflow = self.ctx.workflow
         with self._lock:
             in_flight = self._in_flight
-        return bool(in_flight or workflow.jobs.running_job() or workflow.installing_ocr)
+        return bool(
+            in_flight
+            or workflow.jobs.running_job()
+            or workflow.installing_ocr
+            or workflow.jobs.unsaved_jobs()
+        )
 
     def enter(self) -> None:
         with self._lock:

@@ -186,6 +186,8 @@ class _Job:
     state: str = RUNNING
     drop_requested: bool = False  # Delete the results as soon as the save ends.
     abort: threading.Event = field(default_factory=threading.Event)  # Stop saving now.
+    # A copy was delivered (browser mode's downloads) while the results were kept.
+    delivered: bool = False
 
 
 def _remove_tree(path: Path) -> None:
@@ -233,6 +235,24 @@ class JobManager:
         """Return the id of the running job, or ``None`` if none is running."""
         with self._lock:
             return next((j.id for j in self._jobs.values() if j.status == RUNNING), None)
+
+    def unsaved_jobs(self) -> list[str]:
+        """Ids of finished jobs whose results exist only in scratch (decision P35).
+
+        A succeeded job counts until its results are saved to a folder (which
+        removes them) or a copy was delivered as a browser download (kept for
+        Download again, but no longer only here; owner question O5), or until
+        they are discarded. Failed and cancelled jobs have nothing to lose.
+        """
+        with self._lock:
+            return [
+                job.id
+                for job in self._jobs.values()
+                if job.status == dto.SUCCEEDED
+                and job.outputs
+                and job.state in (READY, SAVING)
+                and not job.delivered
+            ]
 
     def start(self, action: Action, settings: ActionSettings, data: ActionData) -> str:
         """Start a job on a worker thread.
@@ -422,6 +442,7 @@ class JobManager:
         """
         with self._changed:
             drop = (saved and not keep) or job.drop_requested
+            job.delivered = job.delivered or (saved and keep)
             job.state = GONE if drop else READY
             if drop and self._jobs.get(job.id) is job:
                 del self._jobs[job.id]

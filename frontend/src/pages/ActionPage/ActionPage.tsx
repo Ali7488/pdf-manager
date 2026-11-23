@@ -132,6 +132,8 @@ export function ActionPage({ action }: ActionPageProps) {
           files={[]}
           autoSaveFolder={null}
           resumeJobId={recovered.jobId}
+          resumeSaved={recovered.saved}
+          resumeSavedAsZip={recovered.savedAsZip}
           onClose={() => dispatch({ type: "recoveredJobClosed" })}
         />
       )}

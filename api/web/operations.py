@@ -238,6 +238,8 @@ def save_results(ctx: Context, body: Any, job_id: str) -> dict[str, Any]:
             options = {"folder": str(folder), "asZip": as_zip}
         outcome = ctx.workflow.save_results(job_id, options, ctx.ask_folder)
         ctx.session.know_folder(outcome.get("folder"), OPEN)
+        if outcome.get("savedPaths") and not outcome.get("issue"):
+            ctx.session.job_saved(job_id, outcome, bool(as_zip))
         return outcome
 
     return ctx.workflow.guard("save_results", lambda i: dto.save_outcome_json(issue=i), run)
@@ -258,7 +260,12 @@ def prepare_download(ctx: Context, body: Any, job_id: str) -> dict[str, Any]:
         if not isinstance(as_zip, bool):
             raise dto.invalid_request("asZip must be true or false")
         written = ctx.workflow.jobs.save(job_id, ctx.session.download_folder(), as_zip, keep=True)
-        return {"downloads": [ctx.session.add_download(p) for p in written], "issue": None}
+        downloads = [ctx.session.add_download(p) for p in written]
+        # How a reloaded page shows it: sent to downloads, with Download again (P36).
+        outcome = dto.save_outcome_json(saved=[], folder=None)
+        outcome.update(savedPaths=[d["name"] for d in downloads], downloaded=True)
+        ctx.session.job_saved(job_id, outcome, as_zip)
+        return {"downloads": downloads, "issue": None}
 
     return ctx.workflow.guard(
         "prepare_download",
@@ -308,11 +315,26 @@ def ocr_install_status(ctx: Context, body: Any) -> dict[str, Any]:
 # ----- The app -----
 
 
-def quit_app(ctx: Context, body: Any) -> None:
-    """Quit PDF Manager (after this answer is sent)."""
-    log.info("Quit requested from the page")
+def quit_app(ctx: Context, body: Any) -> dict[str, Any]:
+    """Quit PDF Manager (after this answer is sent), unless that would lose work.
+
+    A running job or finished results that aren't saved yet (decision P35)
+    stop the quit unless the page confirms with ``discardUnsaved: true``.
+
+    Returns:
+        ``{quit, running, unsavedResults}``: whether the app is quitting, and
+        what held it back otherwise.
+    """
+    confirmed = isinstance(body, dict) and body.get("discardUnsaved") is True
+    running = ctx.workflow.jobs.running_job() is not None
+    unsaved = len(ctx.workflow.jobs.unsaved_jobs())
+    if (running or unsaved) and not confirmed:
+        log.info("Quit held back: running=%s, unsaved results=%d", running, unsaved)
+        return {"quit": False, "running": running, "unsavedResults": unsaved}
+    log.info("Quit requested from the page (running=%s, unsaved results=%d)", running, unsaved)
     if ctx.request_stop is not None:
         ctx.request_stop()
+    return {"quit": True, "running": running, "unsavedResults": unsaved}
 
 
 def upload(ctx: Context, name: str, size: int, read) -> list[dict[str, Any]]:

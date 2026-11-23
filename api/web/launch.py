@@ -9,7 +9,8 @@
    Chromium, otherwise as a normal tab through the system's URL opener.
    PDF Manager never installs, chooses or forces another browser.
 4. Run until the page's Quit button, Ctrl+C / a termination signal, or an
-   hour without requests while no job or OCR install is running. Closing the
+   hour without requests while no job or OCR install is running and no
+   finished result is unsaved (decision P35). Closing the
    browser window alone doesn't stop the app: a browser can hand the window to
    an already running process or keep running itself, so the app doesn't rely
    on it. Starting the app again reopens the same instance.
@@ -174,13 +175,34 @@ def main(argv: list[str] | None = None) -> int:
         elif open_in_browser(url) == "none":
             print(f"Open this link in your browser: {url}", flush=True)
         _stop_on_signals(stop)
-        while not stop.wait(1.0):
-            if server.idle_for() > IDLE_SHUTDOWN_SEC and not server.busy():
-                log.info("No activity for an hour; closing")
-                break
+        wait_for_stop(server, stop)
         return 0
     finally:
         _shut_down(server, workflow, session, state, instance_key)
+
+
+def wait_for_stop(
+    server: AppServer,
+    stop: threading.Event,
+    idle_limit: float = IDLE_SHUTDOWN_SEC,
+    poll: float = 1.0,
+) -> str:
+    """Block until the app should close.
+
+    The app closes when ``stop`` is set (Quit, a signal), or after
+    ``idle_limit`` seconds without requests, but only while nothing is
+    running and no finished result is unsaved (decision P35): such results
+    exist only in the app, so idle shutdown waits for them to be saved or
+    discarded.
+
+    Returns:
+        ``"stopped"`` or ``"idle"``.
+    """
+    while not stop.wait(poll):
+        if server.idle_for() > idle_limit and not server.busy():
+            log.info("No activity for %.0f seconds and nothing unsaved; closing", idle_limit)
+            return "idle"
+    return "stopped"
 
 
 def _stop_on_signals(stop: threading.Event) -> None:

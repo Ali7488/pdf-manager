@@ -11,13 +11,14 @@ import { PageHeader, Section } from "../../components/Page/Page";
 import { useApp } from "../../state/AppContext";
 import { NumberSetting } from "./NumberSetting";
 import { OcrSection } from "./OcrSection";
+import { QuitSection } from "./QuitSection";
 import styles from "./SettingsPage.module.css";
 import { ThemePicker } from "./ThemePicker";
 import { APP_LICENSE, COPYRIGHT, SOURCE_URL, sourceUrlFor } from "../../lib/about";
 
 /** The Settings page. */
 export function SettingsPage() {
-  const { api, state, dispatch, updateSettings } = useApp();
+  const { api, state, updateSettings } = useApp();
   const { settings, appInfo, settingsSaveIssue } = state;
 
   const chooseFolder = async () => {
@@ -114,19 +115,7 @@ export function SettingsPage() {
         </div>
       </Section>
 
-      {api.mode === "browser" && (
-        <Section title="Close PDF Manager">
-          <div className={styles.folderRow}>
-            <p className={styles.help}>
-              PDF Manager keeps running after you close this window, so it opens again quickly. Quit it here when
-              you're done.
-            </p>
-            <Button onClick={() => void api.quit().then(() => dispatch({ type: "appClosed" }), () => undefined)}>
-              Quit PDF Manager
-            </Button>
-          </div>
-        </Section>
-      )}
+      {api.mode === "browser" && <QuitSection />}
 
       <Section title="About">
         <p>

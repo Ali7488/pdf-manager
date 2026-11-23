@@ -716,3 +716,42 @@ def test_no_new_job_after_shutdown(make_manager, recorder, tmp_path):
         manager.start(Action.FLATTEN, ActionSettings(), DATA)
     assert "closing" in info.value.issue.details
     assert not scratch_folders(tmp_path)
+
+
+def test_unsaved_jobs_are_succeeded_results_not_yet_saved_or_delivered(make_manager, recorder):
+    """Decision P35: what idle shutdown and Quit must not silently lose."""
+    manager = make_manager(succeeding("a.pdf"))
+    assert manager.unsaved_jobs() == []
+    first = manager.start(Action.FLATTEN, ActionSettings(), DATA)
+    recorder.finish()
+    assert manager.unsaved_jobs() == [first]
+    # A failed save keeps them unsaved.
+    with pytest.raises(service.ConversionError):
+        manager.save(first, Path("/no/such/folder"), False)
+    assert manager.unsaved_jobs() == [first]
+
+
+def test_a_folder_save_or_a_delivered_copy_ends_unsaved(make_manager, recorder, tmp_path):
+    manager = make_manager(succeeding("a.pdf"))
+    out = tmp_path / "out"
+    out.mkdir()
+    saved = manager.start(Action.FLATTEN, ActionSettings(), DATA)
+    recorder.finish()
+    recorder.finished.clear()
+    manager.save(saved, out, False)
+    assert manager.unsaved_jobs() == []
+    delivered = manager.start(Action.FLATTEN, ActionSettings(), DATA)
+    recorder.finish()
+    manager.save(delivered, out, False, keep=True)  # A browser download's copy.
+    assert manager.unsaved_jobs() == []
+    assert manager.save(delivered, out, False, keep=True)  # Download again still works.
+
+
+def test_failed_and_cancelled_jobs_are_never_unsaved(make_manager, recorder):
+    def failing(action, settings, data, *, scratch, progress=None, cancel=None):
+        raise service.ConversionError(service.unexpected_error("boom"))
+
+    manager = make_manager(failing)
+    manager.start(Action.FLATTEN, ActionSettings(), DATA)
+    recorder.finish()
+    assert manager.unsaved_jobs() == []

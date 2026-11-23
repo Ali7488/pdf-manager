@@ -56,7 +56,14 @@ describe("ConvertModal in browser mode", () => {
     const watch = vi.spyOn(api, "watchJob");
     const start = vi.spyOn(api, "startJob");
     const jobId = "f".repeat(32);
-    vi.spyOn(api, "latestJob").mockResolvedValue({ jobId, action: Action.Split, progress: null, finished: null });
+    vi.spyOn(api, "latestJob").mockResolvedValue({
+      jobId,
+      action: Action.Split,
+      progress: null,
+      finished: null,
+      saved: null,
+      savedAsZip: false,
+    });
     await renderWith(api, { page: "home" });
     await screen.findByRole("heading", { name: "Converting" });
     expect(watch).toHaveBeenCalledWith(jobId);
@@ -91,5 +98,61 @@ describe("ConvertModal in browser mode", () => {
     expect(await within(dialog()).findByText(/Sent to your browser's downloads/)).toBeInTheDocument();
     await user.click(within(dialog()).getByRole("button", { name: "Download again" }));
     expect(save).toHaveBeenCalledTimes(2);
+  });
+
+  const finished = (jobId: string) => ({
+    jobId,
+    status: "succeeded" as const,
+    outputs: [{ name: "Report - Merged.pdf", sizeBytes: 10, pageCount: 1 }],
+    warnings: [],
+    error: null,
+  });
+
+  it("after a reload, a job already saved to a folder shows where it went and never offers Save", async () => {
+    const api: PdfManagerApi = { ...createMockApi({ tickMs: 1 }), mode: "browser", saveMode: "folder" };
+    const jobId = "a".repeat(32);
+    const outcome = { cancelled: false, savedPaths: ["/out/Report - Merged.pdf"], folder: "/out", issue: null };
+    vi.spyOn(api, "latestJob").mockResolvedValue({
+      jobId,
+      action: Action.Merge,
+      progress: null,
+      finished: finished(jobId),
+      saved: outcome,
+      savedAsZip: false,
+    });
+    const save = vi.spyOn(api, "saveResults");
+    const discard = vi.spyOn(api, "discardResults");
+    const user = await renderWith(api, { page: "home" });
+    act(() => emitEvent("jobFinished", finished(jobId)));
+    await screen.findByRole("heading", { name: "Done" });
+    expect(within(dialog()).getByText("/out")).toBeInTheDocument();
+    expect(within(dialog()).queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
+    expect(within(dialog()).getByRole("button", { name: "Open folder" })).toBeInTheDocument();
+    await user.click(within(dialog()).getByRole("button", { name: "Done" }));
+    expect(save).not.toHaveBeenCalled();
+    expect(discard).toHaveBeenCalledWith(jobId);
+  });
+
+  it("after a reload, a downloaded job keeps Download again (as one .zip) until Done", async () => {
+    const mock = createMockApi({ tickMs: 1 });
+    const api: PdfManagerApi = { ...mock, mode: "browser", saveMode: "download" };
+    const jobId = "b".repeat(32);
+    const outcome = { cancelled: false, savedPaths: ["Report - Split.zip"], folder: null, issue: null, downloaded: true };
+    vi.spyOn(api, "latestJob").mockResolvedValue({
+      jobId,
+      action: Action.Split,
+      progress: null,
+      finished: finished(jobId),
+      saved: outcome,
+      savedAsZip: true,
+    });
+    const save = vi.spyOn(api, "saveResults").mockResolvedValue(outcome);
+    const user = await renderWith(api, { page: "home" });
+    act(() => emitEvent("jobFinished", finished(jobId)));
+    await screen.findByRole("heading", { name: "Done" });
+    expect(within(dialog()).getByText(/Sent to your browser's downloads/)).toBeInTheDocument();
+    await user.click(within(dialog()).getByRole("button", { name: "Download again" }));
+    expect(save).toHaveBeenCalledWith(jobId, { folder: null, asZip: true });
+    expect(within(dialog()).getByRole("button", { name: "Done" })).toBeInTheDocument();
   });
 });

@@ -414,3 +414,37 @@ def test_quit_closes_the_app(page, server):
     page.get_by_role("button", name="Quit PDF Manager").click()
     page.get_by_role("heading", name="PDF Manager has closed").wait_for()
     assert server.proc.wait(15) == 0
+
+
+def test_a_download_keeps_download_again_across_reloads_until_done(page, inputs, tmp_path):
+    go(page, "Merge")
+    add(page, inputs["a"], inputs["b"])
+    convert(page)
+    download(page, tmp_path)
+    for _ in range(2):
+        page.reload()
+        dialog = page.get_by_role("dialog")
+        dialog.get_by_text("Sent to your browser's downloads", exact=False).wait_for()
+        (again,) = download(page, tmp_path, button="Download again")
+        assert pages(again) == pages(inputs["a"]) + pages(inputs["b"])
+    done(page)
+    page.reload()
+    page.get_by_role("navigation", name="Main").wait_for()
+    page.wait_for_timeout(500)  # The page has asked for a job to recover by now.
+    assert page.get_by_role("dialog").count() == 0
+
+
+def test_quit_asks_before_deleting_unsaved_results(page, inputs, server):
+    other = page.context.new_page()  # A second window, opened before the job ends.
+    other.goto(server.origin + "/")
+    go(other, "Settings")
+    go(page, "Flatten")
+    add(page, inputs["b"])
+    convert(page)  # Finished, not saved.
+    other.get_by_role("button", name="Quit PDF Manager").click()
+    alert = other.get_by_role("alert")
+    alert.get_by_text("One finished result isn't saved yet.", exact=False).wait_for()
+    assert server.proc.poll() is None  # Still running.
+    alert.get_by_role("button", name="Quit anyway").click()
+    other.get_by_role("heading", name="PDF Manager has closed").wait_for()
+    assert server.proc.wait(15) == 0

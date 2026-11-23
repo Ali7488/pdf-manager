@@ -37,11 +37,19 @@ To try the bundled app without installing it, run `dist\PDF Manager\PDF Manager.
 
 ## Build on GitHub Actions
 
-The workflow runs only when started by hand, because Actions minutes cost money on a private repository:
+The workflow runs only when started by hand (the repository is public, so standard runners are free; decision P24):
 
 1. On GitHub, open **Actions** > **Build Windows installer**.
 2. Click **Run workflow**, choose the branch, and click **Run workflow** again.
 3. When it finishes (about 10 minutes), open the run and download **PDF-Manager-Setup** under **Artifacts**. It's a zip that contains the installer. Artifacts are kept for 14 days.
+
+The run also checks licensing. `scripts/check_licenses.py` fails the build if any file in the bundle or in the installed app belongs to no component listed in `THIRD_PARTY_NOTICES.md`, or if the installed licence files differ from the repository's. A second job uploads **PDF-Manager-third-party-sources**, the third-party source code to attach to the release (see `LICENSING.md`). Nothing is published.
+
+## Releasing (only with the owner's approval)
+
+1. Bump the version in `pyproject.toml`; regenerate the notices if dependencies changed (`uv run --with pip python scripts/collect_licenses.py`) and commit.
+2. Tag the commit (`v<version>`) and run the workflow on the tag.
+3. Create the GitHub pre-release from the tag and attach the installer, `SHA256SUMS.txt` (the installer's SHA-256) and the source bundle (as one archive).
 
 ## What the install wizard does
 

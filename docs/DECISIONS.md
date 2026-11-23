@@ -24,7 +24,7 @@ Decisions made by the project owner, in their own direction (summarized, not quo
 | P17 | 2026-11-23 | **Linux now (run from source):** refactor the API layer's platform-specific code into `api/platforms/` (Windows and Linux) and make the app run from source on Linux now. Still no Linux packages. |
 | P18 | 2026-11-23 | **"Qt, then GNOME" (was O9)** means pywebview **window backends**, not separate native UIs: one React UI everywhere; Qt backend first (fits KDE), then GTK/WebKitGTK (fits GNOME). |
 | P19 | 2026-11-23 | **Linux Qt backend uses PySide6** (LGPL, via `pywebview[pyside6]`), not PyQt6 (GPL), so no licence is forced on PDF Manager. |
-| P20 | 2026-11-23 | **Licence: MIT.** |
+| P20 | 2026-11-23 | **Licence: MIT.** *Superseded in part by P31:* MIT covers the original source code only; the distributed app is under the AGPL-3.0 because it includes PyMuPDF. |
 | P21 | 2026-11-23 | After the Linux work, continue overnight with small open items that need no new decisions (platform-aware troubleshooting text, cleaning up merged agent worktrees and branches). |
 | P22 | 2026-11-23 | **Don't run the manual Windows installer build workflow** (`build-windows.yml`); the owner will trigger it. Keep CI minute use low by pushing in small batches rather than after every commit. |
 | P23 | 2026-11-23 | **Public repository.** Make `Ali7488/pdf-manager` public now. Commit author emails stay as they are. The reference to the owner's private notes in `ENGINEERING_REVIEW.md` is removed. |
@@ -56,7 +56,7 @@ Decisions made by the project owner, in their own direction (summarized, not quo
 | C14 | 2026-11-23 | **Untrusted presentations (audit R1):** never strip Windows Mark-of-the-Web. Presentations that came from the internet or email are rendered with **LibreOffice** (headless, macros not run), not PowerPoint automation, with a warning explaining why the slides may look slightly different. Trusted local files still use PowerPoint. |
 | C15 | 2026-11-23 | **Linux logs (was O10):** `~/.local/state/pdf-manager/logs` (XDG state folder) for an installed app; when run from source during development, logs stay in the repo's `logs/` folder. Windows keeps logs next to the app (C4). |
 | C16 | 2026-11-23 | **Linux "Install OCR":** show a simple popup with the exact command for the user's distribution (Ubuntu/Debian: `sudo apt install tesseract-ocr tesseract-ocr-eng`; Arch: `sudo pacman -S tesseract tesseract-data-eng`) with a Copy button, then "Search for OCR". The app never runs `sudo` itself. |
-| P30 | 2026-11-23 | **Licences shipped with the app:** a copyright line ("© 2026 Mohannad Ali · MIT License") at the bottom of the side pane and an About section in Settings; `THIRD_PARTY_NOTICES.md` and a `licenses/` folder (generated from the bundled packages by `scripts/collect_licenses.py`) installed next to the app. Because PyMuPDF is AGPL-3.0, the distributed app is under the AGPL-3.0's terms and the app points to its public source code. The owner will look into the licensing further. |
+| P30 | 2026-11-23 | **Licences shipped with the app:** a copyright line at the bottom of the side pane (now "© 2026 Mohannad Ali / Free software (GNU AGPL-3.0)", per P31) and an About section in Settings; `THIRD_PARTY_NOTICES.md` and a `licenses/` folder (generated from the bundled packages by `scripts/collect_licenses.py`) installed next to the app. Because PyMuPDF is AGPL-3.0, the distributed app is under the AGPL-3.0's terms and the app points to its public source code. The owner will look into the licensing further. |
 | P31 | 2026-11-23 | **AGPL-3.0 route for PyMuPDF.** The project is free, public and open source (personal use, sharing, portfolio; no paid or proprietary version). Keep PyMuPDF; don't migrate to other PDF libraries to avoid the AGPL. The distributed app is conveyed under the AGPL-3.0 with complete corresponding source, build instructions, copyright attribution, third-party notices and licence files in the installer. The original code stays MIT where compatible; the combined app is never described as MIT-only. PySide6 stays Linux-only (P19); no Qt in the Windows installer. Releases are not published without the owner's approval. |
 
 ## Frontend and packaging
@@ -113,4 +113,10 @@ Decisions made by the project owner, in their own direction (summarized, not quo
 
 ## Open questions
 
-None right now. Add new ones here as they come up, and never assume their answers.
+Add new ones here as they come up, and never assume their answers. Details and evidence for O1–O3: `docs/LICENSING_AUDIT_2026-11-23.md`.
+
+| # | Raised | Question |
+| --- | --- | --- |
+| O1 | 2026-11-23 | **Microsoft binaries in the AGPL-3.0 Windows app.** The WebView2 SDK files (BSD-3-Clause-style licence, no published source) and the Visual C++ runtime (Visual Studio "Distributable Code") ship inside the app. Is that acceptable for an AGPL-3.0 distribution of PyMuPDF? Options: ask Artifex for written confirmation; get legal advice; or change the packaging (for example rely on the system Visual C++ Redistributable). Not decided; needs the owner. |
+| O2 | 2026-11-23 | **Visual C++ runtime redistribution rights.** Microsoft limits redistribution of those files to licensed Visual Studio users. Does the owner hold (or want) a Visual Studio Community licence, or should the installer use Microsoft's redistributable instead of bundling the DLLs? |
+| O3 | 2026-11-23 | **App icon provenance.** `PDF Manager.ico` and `assets/icon-preview.png` came with the imported baseline; the repository has no record of who made them. The owner must confirm the right to distribute them, or they should be replaced. |

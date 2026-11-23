@@ -4,11 +4,15 @@ Significant bugs found since the v1.1.1 baseline was imported, their status, and
 
 ## Review status (read this first)
 
-- **Source-of-truth snapshot:** post-merge, 2026-11-22. React frontend (`frontend/`), Python API bridge (`api/`), conversion engine (`converter/`), and Windows packaging source (`packaging/`) are on `main`. The new desktop entry point is `main.py`. The legacy Tkinter `app.py`, `INSTALL.bat`, `OPEN.bat`, and `install_windows.ps1` have been removed from the repository; the owner retains a separate local backup.
-- **Human review:** a *targeted read-only source risk audit* has been performed, with findings tracked below. This is **not** a complete line-by-line human review of the generated application and is not a release sign-off.
-- **Automated checks:** the latest development-agent handoff reported **317 passing Python tests** plus passing frontend type-check, tests, lint/build checks. These numbers have **not been independently reproduced** in this review. An earlier documented local Linux run recorded **163 tests**, together with Ruff lint/format, Tesseract 5.5.4, LibreOffice and PyMuPDF 1.28.2; it is historical evidence, not the current suite count.
-- **Windows status:** Microsoft PowerPoint automation (COM), registry lookups, `taskkill`, PyInstaller output, Inno Setup wizard, Windows WebView2/pywebview startup, installation and uninstallation have **not been verified on a real Windows 11 machine**. PowerPoint tests use fakes.
-- **CI status:** `.github/workflows/build-windows.yml` exists but is **manual (`workflow_dispatch`) only**; no automatic PR test workflow was observed. A source audit is not a passing Windows build.
+Current as of **2026-11-23**:
+
+- **Human review:** none of the generated code has had a complete line-by-line human review. A targeted read-only source risk audit (R1–R10, below) and an AI-agent licensing audit (`docs/LICENSING_AUDIT_2026-11-23.md`) have been done. Neither is a release sign-off.
+- **Automated checks (CI):** `.github/workflows/ci.yml` runs on every push: Python on Linux (with Tesseract and LibreOffice) and on Windows, the frontend checks, and a Linux start-up check. The licence inventory check (`tests/test_licensing.py`) is part of the Python suite. Latest local run: Python 483 passed, 5 skipped; frontend 95 passed.
+- **Windows build (CI, manual trigger):** `build-windows.yml` builds the installer, checks the bundle against the licence notices, installs it silently, checks the installed licence files, and starts the installed app in smoke-test mode. Last green run: [45202300026](https://github.com/Ali7488/pdf-manager/actions/runs/45202300026) (commit `fcd8531`). That's a GitHub virtual machine, **not a real Windows 11 PC**.
+- **Not verified on a real Windows 11 machine (R10):** PowerPoint automation (COM), native dialogs, drag and drop, the wizard's optional installs, upgrade and uninstall.
+- **Licensing:** the strategy (P31) is coherent. Open questions O1–O3 in `docs/DECISIONS.md` need the owner.
+
+Historical counts from earlier snapshots (163 and 317 tests, the pre-CI state) are kept in the fix log below for the record only.
 
 ## Bugs and their status
 
@@ -48,7 +52,7 @@ These are **source-review findings**, not necessarily reproduced defects. Priori
 | **R7** | **P2: quality gate** | Fixed: `.github/workflows/ci.yml`; first green run linked in the fix log below. | **No automatic test CI is configured.** Existing `.github/workflows/build-windows.yml` is manual packaging only; agent-reported 317 Python passes have not been independently rerun in this audit. | Add PR/push jobs running Python lint/tests and frontend lint/typecheck/test/build, including Windows-appropriate checks; retain distinct Windows packaging job. Verify run links and configure required checks once stable. |
 | **R8** | **P3: cleanup** | Fixed: fallback removed; a test checks `api/service.py` has no `try`. | **Transitional legacy-layout fallback** remains in `api/service.py`, catching `ImportError` broadly and potentially masking a broken new-layout import. | Remove fallback after confirming the new `converter/` imports and running backend/bridge tests. |
 | **R9** | **P3: docs** | Fixed for this snapshot: ARCHITECTURE, PORTABILITY and SOURCE_INVENTORY updated with measured counts (see fix log). | **Stale docs.** `docs/ARCHITECTURE.md` says frontend/API unmerged; previous edition of this review cited 163 tests and unmerged layers. README and agent instructions were updated. | Update architecture flow, frontend/API sections and source inventory against the actual merged code. Capture exact current test counts/results with platform/commit reference. |
-| **R10** | **P1: release blocker** | Open, Windows verification required | **Real Windows application and installer are unverified.** WebView2, native dialogs/drag/drop, COM, OCR, installing optional dependencies, startup, upgrade and uninstall cannot be certified by Linux/frontend checks. | Run Windows build; install as standard user; launch packaged UI; exercise all six actions with synthetic samples; test OCR on/off, COM/LibreOffice fallback, cancellation, saving, settings restart, upgrade/uninstall. Record exact outcomes and logs. |
+| **R10** | **P1: release blocker** | Open, Windows verification required. Partly covered on a GitHub Windows VM: the installer builds, installs silently and the app starts (run 45202300026). | **Real Windows application and installer are unverified.** WebView2, native dialogs/drag/drop, COM, OCR, installing optional dependencies, startup, upgrade and uninstall cannot be certified by Linux/frontend checks. | Run Windows build; install as standard user; launch packaged UI; exercise all six actions with synthetic samples; test OCR on/off, COM/LibreOffice fallback, cancellation, saving, settings restart, upgrade/uninstall. Record exact outcomes and logs. |
 
 ### Fix log (2026-11-23)
 
@@ -75,7 +79,7 @@ Implementation of the fixes above, by AI agents (not a human review). Evidence:
 3. Implement automated Python/frontend pull-request CI **R7** and record actual run results, not just agent-reported test counts.
 4. Remove transitional import fallback **R8** and update `docs/ARCHITECTURE.md`, `docs/SOURCE_INVENTORY.md` and any obsolete references in `docs/PORTABILITY.md` (**R9**).
 5. ~~Make Windows-specific troubleshooting text platform-aware.~~ Done 2026-11-23 for the service layer's messages (`os_family()`, tested); the API layer's Linux OCR-install message is being added with the Linux work.
-6. Public release requirements: choose a license and versioning policy, validate third-party licenses, and decide whether/when to sign the installer (unsigned accepted for initial private testing, F17).
+6. Public release requirements: licence chosen (P31) and third-party licences validated with automated checks (`docs/LICENSING_AUDIT_2026-11-23.md`); open questions O1–O3 remain. Decide whether and when to sign the installer (unsigned accepted for initial private testing, F17).
 7. Complete a line-by-line human code ownership review and actual-user acceptance before resume/release claims.
 
 Historical originals of the imported baseline are in `.migration/` locally (Git-ignored).

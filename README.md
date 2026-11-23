@@ -23,8 +23,10 @@ Also: drag and drop, drag to reorder, optional **OCR** (Tesseract) on every tool
 
 ### Windows 11
 
-1. Open the [Releases page](https://github.com/Ali7488/pdf-manager/releases) and download **`PDF-Manager-Setup-<version>.exe`** from the latest pre-release.
-2. **Double-click it.** Because the installer isn't signed yet, Windows SmartScreen may say "Windows protected your PC": click **More info → Run anyway**.
+> No release has been published yet; the first testing pre-release (v0.5) is being prepared. Until then, see [Development](#development) to run it from source.
+
+1. Open the [Releases page](https://github.com/Ali7488/pdf-manager/releases) and download **`PDF-Manager-Setup-<version>.exe`** from the latest pre-release. Optionally, check it in PowerShell with `Get-FileHash` against the SHA-256 shown next to the file.
+2. **Double-click it.** Because the installer isn't signed yet, Windows SmartScreen may say "Windows protected your PC". Only for a file from this repository's Releases page: click **More info → Run anyway**.
 3. Follow the short wizard. It installs for your user only (no administrator rights needed) and can optionally install:
    - **Tesseract OCR**, to make pages searchable (Windows may ask for permission);
    - **LibreOffice**, only needed if Microsoft PowerPoint isn't installed.

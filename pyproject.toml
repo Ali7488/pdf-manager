@@ -3,6 +3,8 @@ name = "pdf-manager"
 version = "0.5.0"
 description = "A lightweight desktop tool for converting PowerPoint presentations and PDFs into flattened, searchable documents, with OCR and merging."
 readme = "README.md"
+# MIT covers this repository's original source code. The distributed app bundles
+# PyMuPDF and is under the AGPL-3.0 as a whole; see LICENSING.md.
 license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.11"

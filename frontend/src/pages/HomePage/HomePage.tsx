@@ -19,7 +19,7 @@ export function HomePage() {
       <PageHeader title="Welcome to PDF Manager" />
 
       <div className={styles.dropZone}>
-        <Icon name="upload" size={36} className={styles.dropIcon} />
+        <Icon name="upload" size={28} className={styles.dropIcon} />
         <p className={styles.dropTitle}>Drop files here, or click Add files</p>
         <div className={styles.dropButtons}>
           <AddFilesButton kind="all" variant="primary" />

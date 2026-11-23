@@ -14,15 +14,15 @@
   background: var(--color-background);
 }
 
+/* Left-aligned next to the side pane (no centred margins); a cap keeps long lines readable. */
 .page {
   max-width: var(--content-max-width);
-  margin: 0 auto;
-  padding: var(--space-6) var(--space-8) 0;
+  padding: var(--space-5) var(--space-6) 0;
 }
 
 /* Bottom breathing room, so pages without a sticky bar don't end flush. */
 .page::after {
   content: "";
   display: block;
-  height: var(--space-6);
+  height: var(--space-4);
 }

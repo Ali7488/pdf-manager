@@ -433,7 +433,10 @@ class JobManager:
         raise RuntimeError(f"Could not choose a unique name for {zip_name}.")
 
     def discard(self, job_id: str) -> None:
-        """Delete a finished job's results. Unknown or running jobs are ignored.
+        """Delete a finished job's results.
+
+        Safe to call more than once and after :meth:`save` (which already removed
+        the results): unknown ids are a no-op. A running job is left alone.
 
         Args:
             job_id: The job.

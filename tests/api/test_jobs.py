@@ -394,6 +394,32 @@ def test_discard(make_manager, recorder, tmp_path):
     manager.discard("unknown")
 
 
+def test_discard_after_save_is_a_no_op(make_manager, recorder, tmp_path):
+    """The UI discards when the results are closed, even after saving: that must be safe."""
+    out = tmp_path / "out"
+    out.mkdir()
+    manager, job_id = finished_job(make_manager, recorder, "a.pdf")
+    saved = manager.save(job_id, out, as_zip=False)
+    manager.discard(job_id)
+    manager.discard(job_id)
+    assert saved[0].is_file()  # Saved files are never touched by discard.
+
+
+def test_new_stage_values_pass_through(make_manager, recorder):
+    """Stage values are sent as their strings, so new service stages need no API change."""
+
+    def run(action, settings, data, *, scratch, progress=None, cancel=None):
+        stage = getattr(Stage, "CONVERTING_IMAGES", Stage.FINISHING)
+        progress(ProgressEvent(stage, 1, 1, None, None, 0.5, "Converting images"))
+        return JobResult(make_outputs(scratch, "a.pdf"))
+
+    manager = make_manager(run)
+    manager.start(Action.IMAGES_TO_PDF, ActionSettings(), DATA)
+    recorder.finish()
+    expected = getattr(Stage, "CONVERTING_IMAGES", Stage.FINISHING).value
+    assert recorder.named("jobProgress")[-1]["stage"] == expected
+
+
 def test_shutdown_cancels_and_cleans_up(make_manager, recorder, tmp_path):
     """shutdown cancels the running job and removes every scratch folder."""
     manager, _ = finished_job(make_manager, recorder, "a.pdf")

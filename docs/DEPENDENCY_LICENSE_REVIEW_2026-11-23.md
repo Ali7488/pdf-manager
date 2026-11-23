@@ -68,13 +68,13 @@ PySide6 and Qt WebEngine are Linux-only in this app. Qt's [LGPL obligations](htt
 | cmark-gfm | from MuPDF 1.28.2 | Compiled into PyMuPDF by MuPDF | BSD-2-Clause and others (see COPYING) | [upstream](https://github.com/github/cmark-gfm) | [`COPYING`](../licenses/mupdf/cmark-gfm/COPYING) |
 | extract (Artifex) | from MuPDF 1.28.2 | Compiled into PyMuPDF by MuPDF | AGPL-3.0 | [upstream](https://mupdf.com/) | [`COPYING`](../licenses/mupdf/extract/COPYING) |
 | FreeType | from MuPDF 1.28.2 | Compiled into PyMuPDF by MuPDF | FTL OR GPL-2.0-or-later | [upstream](https://freetype.org/) | [`LICENSE.TXT`](../licenses/mupdf/freetype/LICENSE.TXT), [`FTL.TXT`](../licenses/mupdf/freetype/docs/FTL.TXT) |
-| Gumbo HTML parser | from MuPDF 1.28.2 | Compiled into PyMuPDF by MuPDF | Apache-2.0 | [upstream](https://mupdf.com/) | [`COPYING`](../licenses/mupdf/gumbo-parser/COPYING) |
+| Gumbo HTML parser | from MuPDF 1.28.2 | Compiled into PyMuPDF by MuPDF | Apache-2.0 | [upstream](https://github.com/google/gumbo-parser) | [`COPYING`](../licenses/mupdf/gumbo-parser/COPYING) |
 | HarfBuzz | from MuPDF 1.28.2 | Compiled into PyMuPDF by MuPDF | MIT ("Old MIT") | [upstream](https://harfbuzz.github.io/) | [`COPYING`](../licenses/mupdf/harfbuzz/COPYING) |
 | jbig2dec (Artifex) | from MuPDF 1.28.2 | Compiled into PyMuPDF by MuPDF | AGPL-3.0-or-later | [upstream](https://github.com/ArtifexSoftware/jbig2dec) | [`LICENSE`](../licenses/mupdf/jbig2dec/LICENSE), [`COPYING`](../licenses/mupdf/jbig2dec/COPYING) |
 | Little CMS (lcms2mt) | from MuPDF 1.28.2 | Compiled into PyMuPDF by MuPDF | MIT | [upstream](https://www.littlecms.com/) | [`LICENSE`](../licenses/mupdf/lcms2/LICENSE) |
 | Leptonica | from MuPDF 1.28.2 | Compiled into PyMuPDF by MuPDF | BSD-2-Clause | [upstream](https://github.com/DanBloomberg/leptonica) | [`leptonica-license.txt`](../licenses/mupdf/leptonica/leptonica-license.txt) |
-| IJG libjpeg | from MuPDF 1.28.2 | Compiled into PyMuPDF by MuPDF | IJG (see LEGAL ISSUES in README) | [upstream](https://mupdf.com/) | [`README`](../licenses/mupdf/libjpeg/README) |
-| MuJS (Artifex) | from MuPDF 1.28.2 | Compiled into PyMuPDF by MuPDF | ISC | [upstream](https://mupdf.com/) | [`COPYING`](../licenses/mupdf/mujs/COPYING) |
+| IJG libjpeg | from MuPDF 1.28.2 | Compiled into PyMuPDF by MuPDF | IJG (see LEGAL ISSUES in README) | [upstream](https://www.ijg.org/) | [`README`](../licenses/mupdf/libjpeg/README) |
+| MuJS (Artifex) | from MuPDF 1.28.2 | Compiled into PyMuPDF by MuPDF | ISC | [upstream](https://mujs.com/) | [`COPYING`](../licenses/mupdf/mujs/COPYING) |
 | OpenJPEG | from MuPDF 1.28.2 | Compiled into PyMuPDF by MuPDF | BSD-2-Clause | [upstream](https://www.openjpeg.org/) | [`LICENSE`](../licenses/mupdf/openjpeg/LICENSE) |
 | Tesseract OCR engine (library) | from MuPDF 1.28.2 | Compiled into PyMuPDF by MuPDF | Apache-2.0 | [upstream](https://github.com/tesseract-ocr/tesseract) | [`LICENSE`](../licenses/mupdf/tesseract/LICENSE) |
 | Zint barcode library (backend) | from MuPDF 1.28.2 | Compiled into PyMuPDF by MuPDF | BSD-3-Clause | [upstream](https://zint.org.uk/) | [`LICENSE`](../licenses/mupdf/zint/LICENSE) |

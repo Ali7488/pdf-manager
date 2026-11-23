@@ -140,6 +140,11 @@ export interface ToolCheckResult {
   issues: Issue[];
 }
 
+export interface OcrStatus {
+  present: boolean;
+  path: string | null;
+}
+
 export interface OcrSearchResult {
   found: boolean;
   path: string | null;
@@ -161,6 +166,7 @@ export type JobStage =
   | "merging"
   | "splitting"
   | "compressing"
+  | "converting_images"
   | "finishing";
 
 export interface JobProgress {
@@ -220,10 +226,13 @@ export interface PdfManagerApi {
   getAppInfo(): Promise<AppInfo>;
   getSettings(): Promise<Settings>;
   saveSettings(patch: Partial<Settings>): Promise<Settings>;
-  pickFiles(kind: "documents" | "images"): Promise<InputFile[]>;
+  /** Native file picker. "all" accepts every supported type (PDF, PPTX, PPT, PNG, JPG). */
+  pickFiles(kind: "all" | "documents" | "images"): Promise<InputFile[]>;
   pickFolder(): Promise<string | null>;
   /** Tool check for the Convert modal; checks only what this action needs. */
   checkTools(action: Action, settings: ActionSettings, data: ActionData): Promise<ToolCheckResult>;
+  /** Whether Tesseract OCR is installed, and where (for Settings). */
+  getOcrStatus(): Promise<OcrStatus>;
   getOcrLanguages(): Promise<string[]>;
   searchOcr(): Promise<OcrSearchResult>;
   installOcr(): Promise<void>;

@@ -9,9 +9,10 @@ conversions on synthetic files, real uploads and downloads.
     uv run pytest tests/e2e
 
 ``PDF_MANAGER_E2E_BROWSER`` can point at another Chromium-family browser
-(Edge, Chrome, Brave). The tests skip when Playwright or the built interface
-(``frontend/dist``) is missing; the OCR and PowerPoint cases also need
-Tesseract and LibreOffice.
+(Edge, Chrome, Brave). ``PDF_MANAGER_E2E_APP`` runs the tests against a built
+browser-mode app (``dist/PDF Manager (browser)/PDF Manager``) instead of the
+source. The tests skip when Playwright or the built interface (``frontend/dist``)
+is missing; the OCR and PowerPoint cases also need Tesseract and LibreOffice.
 """
 
 from __future__ import annotations
@@ -57,8 +58,12 @@ class Server:
         url_file = self.home / "url.txt"
         url_file.unlink(missing_ok=True)
         env = {**os.environ, "XDG_CONFIG_HOME": str(self.home), "LOCALAPPDATA": str(self.home)}
+        # PDF_MANAGER_E2E_APP: a built browser-mode app (its PDF Manager executable) to
+        # test instead of the source.
+        built = os.environ.get("PDF_MANAGER_E2E_APP")
+        start = [built] if built else [sys.executable, "main.py", "--browser"]
         self.proc = subprocess.Popen(
-            [sys.executable, "main.py", "--browser", "--no-browser", "--url-file", str(url_file)],
+            [*start, "--no-browser", "--url-file", str(url_file)],
             cwd=ROOT,
             env=env,
             stdout=subprocess.DEVNULL,

@@ -8,6 +8,12 @@ Build from the repository root (``packaging/build.ps1`` does this)::
 
 Output: ``dist/PDF Manager/PDF Manager.exe`` plus its ``_internal`` folder.
 
+With ``PDF_MANAGER_BUILD=browser`` (``packaging/build-browser.ps1``) it builds the
+browser-mode app instead: ``dist/PDF Manager (browser)/``, started by
+``packaging/browser_main.py``, from an environment without the desktop group, and
+with the window toolkit excluded (pywebview, pythonnet, Qt). Everything else is
+shared, so both builds bundle the same engine the same way.
+
 Runtime layout (what the API layer relies on):
 
 * ``Path(sys._MEIPASS) / "frontend" / "dist" / "index.html"``: the built React app.
@@ -21,6 +27,7 @@ so this spec only adds what the hooks can't know: the frontend, the backend choi
 the exclusions and the Windows version resource.
 """
 
+import os
 import platform
 import re
 import struct
@@ -33,7 +40,12 @@ from PyInstaller.compat import is_win
 # SPECPATH is injected by PyInstaller: the folder that holds this spec (packaging/).
 REPO = Path(SPECPATH).resolve().parent
 APP_NAME = "PDF Manager"
-ENTRY = REPO / "main.py"
+BUILD = os.environ.get("PDF_MANAGER_BUILD", "desktop")
+if BUILD not in ("desktop", "browser"):
+    raise SystemExit(f"[pdf-manager.spec] PDF_MANAGER_BUILD must be desktop or browser, not {BUILD}")
+BROWSER = BUILD == "browser"
+ENTRY = REPO / ("packaging/browser_main.py" if BROWSER else "main.py")
+DIST_NAME = f"{APP_NAME} (browser)" if BROWSER else APP_NAME
 FRONTEND_DIST = REPO / "frontend" / "dist"
 ICON = REPO / "PDF Manager.ico"
 
@@ -52,7 +64,7 @@ def _require(path: Path, hint: str) -> None:
         raise SystemExit(f"[pdf-manager.spec] Missing {path}. {hint}")
 
 
-_require(ENTRY, "The pywebview entry point main.py must be at the repository root.")
+_require(ENTRY, "The entry script (main.py, or packaging/browser_main.py) is missing.")
 _require(
     FRONTEND_DIST / "index.html",
     "Build the frontend first: cd frontend; npm ci; npm run build",
@@ -137,11 +149,11 @@ def _windows_version_info(version: str):
 
 # pywebview picks its GUI backend at runtime. On Windows that is WinForms with the
 # Edge WebView2 (Chromium) renderer, both driven through pythonnet ("clr").
-hiddenimports = [
-    "webview.platforms.winforms",
-    "webview.platforms.edgechromium",
-    "clr",
-]
+hiddenimports = (
+    []
+    if BROWSER
+    else ["webview.platforms.winforms", "webview.platforms.edgechromium", "clr"]
+)
 
 # Keep the bundle small (low overhead): no Tk, no test frameworks, and none of
 # pywebview's non-Windows backends (they would pull in Qt/GTK if installed).
@@ -173,6 +185,10 @@ excludes = [
     "cefpython3",
     "jnius",
 ]
+if BROWSER:
+    # The window toolkit: not installed in the browser build's environment, and kept
+    # out even if it is (scripts/check_licenses.py --build browser checks the result).
+    excludes += ["webview", "clr", "clr_loader", "pythonnet", "proxy_tools", "bottle"]
 
 
 def _webview_runtime_id() -> str:
@@ -236,7 +252,7 @@ def _unneeded(dest: str) -> bool:
 
 a = Analysis(
     [str(ENTRY)],
-    pathex=[str(REPO)],
+    pathex=[str(REPO)],  # Lets browser_main.py import the api package.
     binaries=[],
     # Copy the whole built frontend so it lands at <_MEIPASS>/frontend/dist/.
     datas=[(str(FRONTEND_DIST), "frontend/dist")],
@@ -276,7 +292,7 @@ coll = COLLECT(
     a.datas,
     strip=False,
     upx=False,
-    name=APP_NAME,
+    name=DIST_NAME,
 )
 
-print(f"[pdf-manager.spec] Built {APP_NAME} {VERSION} (WebView2 runtime: {_RID})", file=sys.stderr)
+print(f"[pdf-manager.spec] Built {DIST_NAME} {VERSION} (WebView2 runtime: {_RID})", file=sys.stderr)

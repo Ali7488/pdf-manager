@@ -17,7 +17,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-import fitz
+import pymupdf
 
 from ..core.context import JobContext
 from ..core.issues import ConversionError, empty_pdf, password_protected, unreadable_file
@@ -58,7 +58,7 @@ LEVEL_IMAGES: dict[CompressLevel, ImageSettings | None] = {
 }
 
 
-def _open_source(source: Path) -> fitz.Document:
+def _open_source(source: Path) -> pymupdf.Document:
     """Open the PDF to compress, turning low-level failures into user-facing errors.
 
     Args:
@@ -71,7 +71,7 @@ def _open_source(source: Path) -> fitz.Document:
         ConversionError: The file can't be read, needs a password, or has no pages.
     """
     try:
-        doc = fitz.open(str(source))
+        doc = pymupdf.open(str(source))
     except Exception as exc:  # MuPDF raises several types for damaged or missing files.
         raise ConversionError(unreadable_file(source.name, str(exc))) from exc
     if doc.needs_pass:
@@ -83,7 +83,7 @@ def _open_source(source: Path) -> fitz.Document:
     return doc
 
 
-def _rewriter_options(images: ImageSettings) -> fitz.mupdf.PdfImageRewriterOptions:
+def _rewriter_options(images: ImageSettings) -> pymupdf.mupdf.PdfImageRewriterOptions:
     """Build MuPDF image-rewriter options for one level.
 
     ``Document.rewrite_images`` is given these options instead of its simple
@@ -102,7 +102,7 @@ def _rewriter_options(images: ImageSettings) -> fitz.mupdf.PdfImageRewriterOptio
     Returns:
         The options object for ``rewrite_images(options=...)``.
     """
-    mupdf = fitz.mupdf
+    mupdf = pymupdf.mupdf
     opts = mupdf.PdfImageRewriterOptions()
     for kind in ("color_lossless", "color_lossy", "gray_lossless", "gray_lossy"):
         setattr(opts, f"{kind}_image_recompress_method", mupdf.FZ_RECOMPRESS_JPEG)
@@ -116,7 +116,7 @@ def _rewriter_options(images: ImageSettings) -> fitz.mupdf.PdfImageRewriterOptio
     return opts
 
 
-def _shrink_images(doc: fitz.Document, images: ImageSettings) -> None:
+def _shrink_images(doc: pymupdf.Document, images: ImageSettings) -> None:
     """Re-encode the document's images in memory at the given settings.
 
     If MuPDF can't rewrite the images (for example an unusual image type), the

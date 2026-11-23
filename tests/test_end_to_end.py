@@ -9,7 +9,7 @@ from __future__ import annotations
 import hashlib
 import shutil
 
-import fitz
+import pymupdf
 import pytest
 from pptx import Presentation
 
@@ -74,7 +74,7 @@ def test_flatten_with_ocr(tmp_path, inputs):
         "Document B - Flattened Searchable.pdf",
     ]
     for output in result.outputs:
-        with fitz.open(str(output.path)) as doc:
+        with pymupdf.open(str(output.path)) as doc:
             assert len(doc) == output.page_count == 1
             assert all(page.get_images() for page in doc)
     assert "Quarterly" in page_texts(result.outputs[0].path)[0]
@@ -104,7 +104,7 @@ def test_flatten_merge_keeps_order_and_adds_contents(tmp_path, inputs):
     texts = page_texts(output.path)
     assert len(texts) == 3 and "Contents" in texts[0]
     assert "overview" in texts[1].lower() and "Quarterly" in texts[2]
-    with fitz.open(str(output.path)) as doc:
+    with pymupdf.open(str(output.path)) as doc:
         # Top level: the contents page, then one bookmark per file in order. (LibreOffice adds
         # its own "Slide N" bookmarks to rendered slides; those are nested one level down.)
         top = [title for level, title, _ in doc.get_toc(simple=True) if level == 1]
@@ -119,7 +119,7 @@ def test_merge_keeps_original_text(tmp_path, inputs):
     result, _ = run(Action.MERGE, [pdf, pptx], tmp_path, "w")
     [output] = result.outputs
     assert output.name == "Document A + 1 more - Merged.pdf"
-    with fitz.open(str(output.path)) as doc:
+    with pymupdf.open(str(output.path)) as doc:
         assert len(doc) == 2
         assert not doc[0].get_images(), "Merge must not rasterize the PDF"
         assert "Quarterly" in doc[0].get_text()
@@ -198,7 +198,7 @@ def test_split_accepts_powerpoint(tmp_path, inputs):
 
 
 def png(path, text):
-    with fitz.open() as doc:
+    with pymupdf.open() as doc:
         page = doc.new_page(width=600, height=300)
         page.insert_text((40, 120), text, fontsize=30)
         page.get_pixmap(dpi=150).save(str(path))

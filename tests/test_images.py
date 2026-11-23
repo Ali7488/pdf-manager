@@ -5,7 +5,7 @@ from __future__ import annotations
 import struct
 from pathlib import Path
 
-import fitz
+import pymupdf
 import pytest
 
 from converter.actions.images import MAX_PAGE_SIDE_PT, images_to_pdf
@@ -18,7 +18,7 @@ BLUE = (0, 0, 255)
 GREEN = (0, 160, 0)
 
 
-def _two_tone(width: int, height: int, left=RED, right=BLUE) -> fitz.Pixmap:
+def _two_tone(width: int, height: int, left=RED, right=BLUE) -> pymupdf.Pixmap:
     """Build an RGB image whose left half is one colour and right half another.
 
     Args:
@@ -30,9 +30,9 @@ def _two_tone(width: int, height: int, left=RED, right=BLUE) -> fitz.Pixmap:
     Returns:
         The pixmap.
     """
-    pix = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, width, height), False)
-    pix.set_rect(fitz.IRect(0, 0, width // 2, height), left)
-    pix.set_rect(fitz.IRect(width // 2, 0, width, height), right)
+    pix = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, width, height), False)
+    pix.set_rect(pymupdf.IRect(0, 0, width // 2, height), left)
+    pix.set_rect(pymupdf.IRect(width // 2, 0, width, height), right)
     return pix
 
 
@@ -97,7 +97,7 @@ def _jpeg(path: Path, width: int, height: int, orientation: int | None = None) -
     return path
 
 
-def _colour_at(page: fitz.Page, fx: float, fy: float) -> tuple[int, int, int]:
+def _colour_at(page: pymupdf.Page, fx: float, fy: float) -> tuple[int, int, int]:
     """Render a page and return the colour at a relative position.
 
     Args:
@@ -154,7 +154,7 @@ def test_combined_keeps_order_and_names_after_first(tmp_path):
     assert output.name == "first + 2 more - Images.pdf"
     assert output.page_count == 3
     assert output.size_bytes == output.path.stat().st_size
-    with fitz.open(str(output.path)) as doc:
+    with pymupdf.open(str(output.path)) as doc:
         assert doc.page_count == 3
         assert _close(_colour_at(doc[0], 0.9, 0.5), RED)
         assert _close(_colour_at(doc[1], 0.9, 0.5), BLUE)
@@ -175,7 +175,7 @@ def test_per_image_outputs(tmp_path):
     for output in outputs:
         assert output.page_count == 1
         assert output.size_bytes == output.path.stat().st_size
-        with fitz.open(str(output.path)) as doc:
+        with pymupdf.open(str(output.path)) as doc:
             assert doc.page_count == 1
 
 
@@ -203,7 +203,7 @@ def test_empty_list_is_rejected(tmp_path):
 # --- Page size ------------------------------------------------------------------------
 
 
-def _page_rect(output) -> fitz.Rect:
+def _page_rect(output) -> pymupdf.Rect:
     """Return the first page's rectangle of an output PDF.
 
     Args:
@@ -212,7 +212,7 @@ def _page_rect(output) -> fitz.Rect:
     Returns:
         The page rectangle in points.
     """
-    with fitz.open(str(output.path)) as doc:
+    with pymupdf.open(str(output.path)) as doc:
         return doc[0].rect
 
 
@@ -235,7 +235,7 @@ def test_page_without_resolution_uses_96_dpi(tmp_path):
 def test_large_photo_is_capped_at_a4_long_side(tmp_path):
     # Like a phone photo: 2000 x 1500 pixels claiming 72 DPI would be a 70 cm
     # wide page; it is scaled down to A4's long side, keeping its shape.
-    pix = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 2000, 1500), False)
+    pix = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, 2000, 1500), False)
     pix.clear_with(200)  # Plain grey; much faster than set_rect at this size.
     pix.set_dpi(72, 72)
     photo = tmp_path / "photo.jpg"
@@ -249,7 +249,7 @@ def test_large_photo_is_capped_at_a4_long_side(tmp_path):
 def test_jpeg_is_embedded_without_recompression(tmp_path):
     image = _jpeg(tmp_path / "photo.jpg", 200, 100)
     (output,) = _convert([image], tmp_path, True)
-    with fitz.open(str(output.path)) as doc:
+    with pymupdf.open(str(output.path)) as doc:
         ((xref, *_),) = doc[0].get_images(full=True)
         extracted = doc.extract_image(xref)
     assert extracted["ext"] == "jpeg"
@@ -257,7 +257,7 @@ def test_jpeg_is_embedded_without_recompression(tmp_path):
 
 
 def test_png_with_transparency(tmp_path):
-    pix = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 20, 20), True)  # With alpha.
+    pix = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, 20, 20), True)  # With alpha.
     pix.set_rect(pix.irect, (0, 0, 255, 255))
     path = tmp_path / "clear.png"
     path.write_bytes(pix.tobytes("png"))
@@ -284,7 +284,7 @@ def test_exif_orientation_is_applied(tmp_path, orientation):
     portrait, first, second = ORIENTATIONS[orientation]
     image = _jpeg(tmp_path / f"photo{orientation}.jpg", 40, 20, orientation=orientation)
     (output,) = _convert([image], tmp_path, True)
-    with fitz.open(str(output.path)) as doc:
+    with pymupdf.open(str(output.path)) as doc:
         page = doc[0]
         assert (page.rect.height > page.rect.width) == portrait
         if portrait:

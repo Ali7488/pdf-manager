@@ -168,7 +168,7 @@ try {
 
     Write-Step 'Installing Python dependencies (uv sync --frozen --no-dev)'
     Invoke-Native 'uv sync' { & uv sync --frozen --no-dev }
-    & uv run --frozen --no-sync python -c 'import webview, fitz'
+    & uv run --frozen --no-sync python -c 'import webview, pymupdf'
     if ($LASTEXITCODE -ne 0) {
         throw 'pywebview or PyMuPDF is not installed in .venv. Both must be dependencies in pyproject.toml/uv.lock (pywebview is added with the API layer).'
     }

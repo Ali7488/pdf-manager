@@ -10,7 +10,7 @@ import shutil
 import threading
 import time
 
-import fitz
+import pymupdf
 import pytest
 from pptx import Presentation
 
@@ -50,7 +50,7 @@ def test_copy_for_rendering_leaves_original_untouched(tmp_path, pptx):
 
 def test_powerpoint_used_when_it_works(tmp_path, pptx, monkeypatch):
     def fake_export(source, output, timeout, cancel):
-        with fitz.open() as doc:
+        with pymupdf.open() as doc:
             doc.new_page()
             doc.save(str(output))
 

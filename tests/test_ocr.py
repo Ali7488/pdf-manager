@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import shutil
 
-import fitz
+import pymupdf
 import pytest
 
 from converter.core.context import JobContext
@@ -22,7 +22,7 @@ needs_tesseract = pytest.mark.skipif(
 def test_text_layer_added_only_to_image_pages(tmp_path):
     scanned = scanned_pdf(tmp_path / "scan.pdf", ["Quarterly summary"])
     texty = text_pdf(tmp_path / "text.pdf", ["Already searchable"])
-    with fitz.open(str(scanned)) as a, fitz.open(str(texty)) as b, fitz.open() as mixed:
+    with pymupdf.open(str(scanned)) as a, pymupdf.open(str(texty)) as b, pymupdf.open() as mixed:
         mixed.insert_pdf(a)
         mixed.insert_pdf(b)
         mixed.save(str(tmp_path / "mixed.pdf"))
@@ -33,7 +33,7 @@ def test_text_layer_added_only_to_image_pages(tmp_path):
     texts = page_texts(tmp_path / "out.pdf")
     assert "Quarterly" in texts[0]
     assert "Already searchable" in texts[1]
-    with fitz.open(str(tmp_path / "out.pdf")) as out:
+    with pymupdf.open(str(tmp_path / "out.pdf")) as out:
         assert out[0].get_images(), "the page should still look the same (image kept)"
 
 
@@ -41,12 +41,12 @@ def test_text_layer_added_only_to_image_pages(tmp_path):
 def test_text_layer_lines_up_on_rotated_page(tmp_path):
     src = scanned_pdf(tmp_path / "rot.pdf", ["Rotated sample page"], rotation=90)
     add_text_layer(src, tmp_path / "out.pdf", tmp_path / "w", JobContext(), "rot.pdf")
-    with fitz.open(str(tmp_path / "out.pdf")) as doc:
+    with pymupdf.open(str(tmp_path / "out.pdf")) as doc:
         page = doc[0]
         assert "Rotated" in page.get_text()
         # Every recognised word must sit inside the visible page area.
         for word in page.get_text("words"):
-            assert fitz.Rect(word[:4]).intersects(page.rect)
+            assert pymupdf.Rect(word[:4]).intersects(page.rect)
 
 
 def test_missing_tesseract_is_a_clear_issue(tmp_path, monkeypatch):

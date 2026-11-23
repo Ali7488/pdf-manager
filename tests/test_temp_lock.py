@@ -14,7 +14,7 @@ import shutil
 from pathlib import Path
 from unittest.mock import patch
 
-import fitz
+import pymupdf
 import pytest
 
 from converter import Action, ActionData, ActionSettings, run_action
@@ -41,7 +41,7 @@ def test_locked_temp_files_do_not_break_flattening(tmp_path, action):
             action, ActionSettings(use_ocr=True), ActionData([src]), scratch=tmp_path / "w"
         )
     [output] = result.outputs
-    with fitz.open(str(output.path)) as doc:
+    with pymupdf.open(str(output.path)) as doc:
         assert len(doc) == 1
         assert "searchable" in doc[0].get_text().lower()
         assert doc[0].get_images()

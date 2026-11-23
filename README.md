@@ -34,7 +34,7 @@ Python packages (`pyproject.toml`, locked in `uv.lock`):
 
 | Package | Used in | Why |
 | --- | --- | --- |
-| PyMuPDF (`fitz`) | `converter/actions/`, `converter/ocr/`, `converter/pdf/` | All PDF work: opening and validating, rendering pages to images, placing OCR text, merging, splitting, image conversion, compression, bookmarks, links and page labels. |
+| PyMuPDF (`pymupdf`) | `converter/actions/`, `converter/ocr/`, `converter/pdf/` | All PDF work: opening and validating, rendering pages to images, placing OCR text, merging, splitting, image conversion, compression, bookmarks, links and page labels. |
 | pywin32 (Windows only) | `converter/platforms/windows_powerpoint.py` | Optional: drives Microsoft PowerPoint through COM to export slides as PDF. |
 
 External programs:

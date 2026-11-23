@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import fitz
+import pymupdf
 
 
 def text_pdf(path: Path, pages: list[str], size=(600, 400), toc=None) -> Path:
     """Write a PDF with one line of real (extractable) text per page."""
-    with fitz.open() as doc:
+    with pymupdf.open() as doc:
         for text in pages:
             page = doc.new_page(width=size[0], height=size[1])
             page.insert_text((40, 120), text, fontsize=28)
@@ -21,9 +21,9 @@ def text_pdf(path: Path, pages: list[str], size=(600, 400), toc=None) -> Path:
 
 def scanned_pdf(path: Path, pages: list[str], size=(600, 400), rotation: int = 0) -> Path:
     """Write a PDF whose pages are *images* of text (like a scan): no extractable text."""
-    with fitz.open() as doc:
+    with pymupdf.open() as doc:
         for text in pages:
-            with fitz.open() as tmp:
+            with pymupdf.open() as tmp:
                 src = tmp.new_page(width=size[0], height=size[1])
                 src.insert_text((40, 120), text, fontsize=28)
                 png = src.get_pixmap(dpi=200).tobytes("png")
@@ -36,5 +36,5 @@ def scanned_pdf(path: Path, pages: list[str], size=(600, 400), rotation: int = 0
 
 
 def page_texts(path: Path) -> list[str]:
-    with fitz.open(str(path)) as doc:
+    with pymupdf.open(str(path)) as doc:
         return [page.get_text() for page in doc]

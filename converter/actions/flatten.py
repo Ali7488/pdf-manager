@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-import fitz
+import pymupdf
 
 from ..core.context import JobContext
 from ..core.issues import (
@@ -55,7 +55,7 @@ def flatten_pdf(source: Path, target: Path, work: Path, ctx: JobContext, file_la
     tesseract = require_ocr(ctx) if use_ocr else None
     work.mkdir(parents=True, exist_ok=True)
     try:
-        original = fitz.open(str(source))
+        original = pymupdf.open(str(source))
     except Exception as exc:
         raise ConversionError(unreadable_file(file_label, str(exc))) from exc
     with original:
@@ -64,7 +64,7 @@ def flatten_pdf(source: Path, target: Path, work: Path, ctx: JobContext, file_la
         count = len(original)
         if count == 0:
             raise ConversionError(empty_pdf(file_label))
-        with fitz.open() as finished:
+        with pymupdf.open() as finished:
             for index, page in enumerate(original):
                 ctx.check_cancel()
                 number = index + 1
@@ -86,7 +86,7 @@ def flatten_pdf(source: Path, target: Path, work: Path, ctx: JobContext, file_la
                         file_label=file_label,
                         page_number=number,
                     )
-                    with fitz.open(str(ocr_pdf)) as scanned:
+                    with pymupdf.open(str(ocr_pdf)) as scanned:
                         output.show_pdf_page(output.rect, scanned, 0, keep_proportion=False)
                 else:
                     output.insert_image(output.rect, filename=str(image), keep_proportion=False)
@@ -108,7 +108,7 @@ def verify_flattened(path: Path, expected_pages: int, file_label: str) -> None:
     Raises:
         ConversionError: ``FLATTEN_CHECK_FAILED`` describing what's wrong.
     """
-    with fitz.open(str(path)) as check:
+    with pymupdf.open(str(path)) as check:
         if len(check) != expected_pages:
             details = f"Expected {expected_pages} pages, found {len(check)}."
             raise ConversionError(flatten_check_failed(file_label, details))

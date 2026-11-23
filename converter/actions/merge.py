@@ -8,7 +8,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-import fitz
+import pymupdf
 
 from ..core.context import JobContext
 from ..core.issues import (
@@ -78,7 +78,7 @@ def merge_documents(
     """
     if not parts:
         raise ConversionError(merge_failed("No files to merge."))
-    with fitz.open() as out:
+    with pymupdf.open() as out:
         ranges: list[PartRange] = []
         toc: list[Bookmark] = []
         for index, part in enumerate(parts, 1):
@@ -86,7 +86,7 @@ def merge_documents(
             ctx.file_index = index
             ctx.report(Stage.MERGING, f"Combining {index} of {len(parts)}: {part.title}")
             try:
-                doc = fitz.open(str(part.path))
+                doc = pymupdf.open(str(part.path))
             except Exception as exc:
                 raise ConversionError(unreadable_file(part.title, str(exc))) from exc
             with doc:
@@ -117,7 +117,7 @@ def merge_documents(
             raise ConversionError(merge_failed(str(exc))) from exc
 
     expected = content_pages + lead
-    with fitz.open(str(target)) as result:
+    with pymupdf.open(str(target)) as result:
         if len(result) != expected:
             details = f"Expected {expected} pages, found {len(result)}."
             raise ConversionError(merge_failed(details))
@@ -130,7 +130,7 @@ def _pages_label(first: int, last: int) -> str:
     return f"Page {first + 1}" if first == last else f"Pages {first + 1}–{last + 1}"
 
 
-def _add_contents_pages(doc: fitz.Document, ranges: list[PartRange]) -> int:
+def _add_contents_pages(doc: pymupdf.Document, ranges: list[PartRange]) -> int:
     """Insert contents page(s) at the start of ``doc``, with a link per part.
 
     Pages are inserted first and drawn afterwards, so every link can target its
@@ -160,13 +160,15 @@ def _add_contents_pages(doc: fitz.Document, ranges: list[PartRange]) -> int:
         page = doc[index]
         top = MARGIN
         if index == 0:
-            title = fitz.Rect(MARGIN, MARGIN, width - MARGIN, MARGIN + TITLE_HEIGHT)
+            title = pymupdf.Rect(MARGIN, MARGIN, width - MARGIN, MARGIN + TITLE_HEIGHT)
             page.insert_htmlbox(title, "<b style='font-size:20px'>Contents</b>", css=CONTENTS_CSS)
             top += TITLE_HEIGHT
         for row, (number, part) in enumerate(entries):
             y = top + row * ROW_HEIGHT
-            name_box = fitz.Rect(MARGIN, y, width - MARGIN - PAGES_COLUMN, y + ROW_HEIGHT)
-            pages_box = fitz.Rect(width - MARGIN - PAGES_COLUMN, y, width - MARGIN, y + ROW_HEIGHT)
+            name_box = pymupdf.Rect(MARGIN, y, width - MARGIN - PAGES_COLUMN, y + ROW_HEIGHT)
+            pages_box = pymupdf.Rect(
+                width - MARGIN - PAGES_COLUMN, y, width - MARGIN, y + ROW_HEIGHT
+            )
             page.insert_htmlbox(name_box, f"{number}. {html.escape(part.title)}", css=CONTENTS_CSS)
             page.insert_htmlbox(
                 pages_box,
@@ -174,19 +176,19 @@ def _add_contents_pages(doc: fitz.Document, ranges: list[PartRange]) -> int:
                 css=CONTENTS_CSS,
             )
             # The whole row is clickable and jumps to the part's first page.
-            row_rect = fitz.Rect(MARGIN, y, width - MARGIN, y + ROW_HEIGHT)
+            row_rect = pymupdf.Rect(MARGIN, y, width - MARGIN, y + ROW_HEIGHT)
             page.insert_link(
                 {
-                    "kind": fitz.LINK_GOTO,
+                    "kind": pymupdf.LINK_GOTO,
                     "from": row_rect,
                     "page": part.first + lead,
-                    "to": fitz.Point(0, 0),
+                    "to": pymupdf.Point(0, 0),
                 }
             )
     return lead
 
 
-def _set_page_labels(doc: fitz.Document, lead: int) -> None:
+def _set_page_labels(doc: pymupdf.Document, lead: int) -> None:
     """Viewer page numbers: contents pages i, ii, …; content pages 1…N (decision C8)."""
     labels = [{"startpage": lead, "prefix": "", "style": "D", "firstpagenum": 1}]
     if lead:

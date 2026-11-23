@@ -5,7 +5,7 @@ from __future__ import annotations
 import random
 from pathlib import Path
 
-import fitz
+import pymupdf
 import pytest
 
 from converter.actions.compress import LEVEL_IMAGES, compress_pdf
@@ -17,10 +17,10 @@ SAMPLE_TEXT = "Sample text for searching"
 
 # Image placed on a 2 x 1.5 inch area: 800 x 600 pixels there is 400 DPI.
 IMAGE_PX = (800, 600)
-IMAGE_RECT = fitz.Rect(72, 150, 72 + 144, 150 + 108)
+IMAGE_RECT = pymupdf.Rect(72, 150, 72 + 144, 150 + 108)
 
 
-def _noise_pixmap(width: int, height: int, seed: int) -> fitz.Pixmap:
+def _noise_pixmap(width: int, height: int, seed: int) -> pymupdf.Pixmap:
     """Build a photo-like (hard to compress) RGB image from random pixels.
 
     Args:
@@ -32,10 +32,10 @@ def _noise_pixmap(width: int, height: int, seed: int) -> fitz.Pixmap:
         The pixmap.
     """
     samples = random.Random(seed).randbytes(width * height * 3)
-    return fitz.Pixmap(fitz.csRGB, width, height, samples, False)
+    return pymupdf.Pixmap(pymupdf.csRGB, width, height, samples, False)
 
 
-def _add_extras(doc: fitz.Document) -> None:
+def _add_extras(doc: pymupdf.Document) -> None:
     """Add text, links and bookmarks that compression must keep.
 
     Args:
@@ -43,8 +43,10 @@ def _add_extras(doc: fitz.Document) -> None:
     """
     for number, page in enumerate(doc, 1):
         page.insert_text((72, 72), f"{SAMPLE_TEXT} {number}")
-    doc[0].insert_link({"kind": fitz.LINK_GOTO, "from": fitz.Rect(72, 80, 200, 95), "page": 1})
-    web = {"kind": fitz.LINK_URI, "from": fitz.Rect(72, 100, 200, 115)}
+    doc[0].insert_link(
+        {"kind": pymupdf.LINK_GOTO, "from": pymupdf.Rect(72, 80, 200, 95), "page": 1}
+    )
+    web = {"kind": pymupdf.LINK_URI, "from": pymupdf.Rect(72, 100, 200, 115)}
     web["uri"] = "https://example.com/"
     doc[0].insert_link(web)
     doc.set_toc([[1, "First", 1], [2, "Second", 2]])
@@ -61,7 +63,7 @@ def image_pdf(tmp_path: Path) -> Path:
         Path to the saved PDF.
     """
     path = tmp_path / "Pictures.pdf"
-    with fitz.open() as doc:
+    with pymupdf.open() as doc:
         for _ in range(2):
             doc.new_page()
         # Page 1: lossless (PNG/Flate) image; page 2: JPEG at quality 95.
@@ -84,7 +86,7 @@ def text_pdf(tmp_path: Path) -> Path:
         Path to the saved PDF.
     """
     path = tmp_path / "Text.pdf"
-    with fitz.open() as doc:
+    with pymupdf.open() as doc:
         for _ in range(2):
             doc.new_page()
         _add_extras(doc)
@@ -115,13 +117,13 @@ def _check_kept(path: Path) -> None:
     Args:
         path: Compressed PDF.
     """
-    with fitz.open(str(path)) as doc:
+    with pymupdf.open(str(path)) as doc:
         assert doc.page_count == 2
         assert SAMPLE_TEXT in doc[0].get_text()
         assert doc[1].search_for(f"{SAMPLE_TEXT} 2")  # Still searchable.
         kinds = sorted(link["kind"] for link in doc[0].get_links())
-        assert kinds == sorted([fitz.LINK_GOTO, fitz.LINK_URI])
-        goto = next(link for link in doc[0].get_links() if link["kind"] == fitz.LINK_GOTO)
+        assert kinds == sorted([pymupdf.LINK_GOTO, pymupdf.LINK_URI])
+        goto = next(link for link in doc[0].get_links() if link["kind"] == pymupdf.LINK_GOTO)
         assert goto["page"] == 1
         assert doc.get_toc() == [[1, "First", 1], [2, "Second", 2]]
 
@@ -135,7 +137,7 @@ def _image_widths(path: Path) -> list[int]:
     Returns:
         One width per page.
     """
-    with fitz.open(str(path)) as doc:
+    with pymupdf.open(str(path)) as doc:
         return [page.get_images(full=True)[0][2] for page in doc]
 
 
@@ -154,7 +156,7 @@ def test_level_settings_are_ordered():
 
 def test_light_shrinks_uncompressed_pdf_losslessly(tmp_path):
     source = tmp_path / "Loose.pdf"
-    with fitz.open() as doc:
+    with pymupdf.open() as doc:
         for _ in range(2):
             doc.new_page()
         _add_extras(doc)
@@ -205,7 +207,7 @@ def test_text_only_pdf_never_grows(text_pdf, tmp_path, level):
 def test_no_gain_returns_exact_copy(tmp_path):
     # A PDF this small and tidy can't be made smaller; the original bytes come back.
     source = tmp_path / "Tiny.pdf"
-    with fitz.open() as doc:
+    with pymupdf.open() as doc:
         doc.new_page().insert_text((72, 72), SAMPLE_TEXT)
         doc.save(str(source), garbage=4, deflate=True, use_objstms=1)
     for level in CompressLevel:
@@ -277,9 +279,9 @@ def test_unreadable_file(tmp_path):
 
 def test_password_protected(tmp_path):
     locked = tmp_path / "Locked.pdf"
-    with fitz.open() as doc:
+    with pymupdf.open() as doc:
         doc.new_page()
-        doc.save(str(locked), encryption=fitz.PDF_ENCRYPT_AES_256, user_pw="pw", owner_pw="pw")
+        doc.save(str(locked), encryption=pymupdf.PDF_ENCRYPT_AES_256, user_pw="pw", owner_pw="pw")
     with pytest.raises(ConversionError) as info:
         _compress(locked, tmp_path, CompressLevel.LIGHT)
     assert info.value.issue.code == IssueCode.PASSWORD_PROTECTED

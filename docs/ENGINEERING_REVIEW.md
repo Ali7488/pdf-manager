@@ -29,8 +29,8 @@ Significant bugs found since the v1.1.1 baseline was imported, their status, and
 
 Found during implementation:
 
-- `fitz.image_profile` raises a `TypeError` in PyMuPDF 1.28.2; it isn't used.
-- `import fitz` prints a deprecation notice in PyMuPDF 1.28. Open cleanup: switch to `import pymupdf`.
+- `pymupdf.image_profile` raises a `TypeError` in PyMuPDF 1.28.2; it isn't used.
+- `import fitz` is deprecated in PyMuPDF 1.28; the code now imports `pymupdf` (done).
 
 ## Open work
 

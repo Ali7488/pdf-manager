@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-import fitz
+import pymupdf
 
 log = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ def normalize_toc(toc: list[Bookmark], page_count: int) -> list[Bookmark]:
     return cleaned
 
 
-def set_bookmarks(doc: fitz.Document, toc: list[Bookmark]) -> None:
+def set_bookmarks(doc: pymupdf.Document, toc: list[Bookmark]) -> None:
     """Set ``doc``'s bookmarks, repairing them first. Never fails the job.
 
     If PyMuPDF still rejects the list, the document is saved without
@@ -56,7 +56,7 @@ def set_bookmarks(doc: fitz.Document, toc: list[Bookmark]) -> None:
         log.warning("Couldn't set %d bookmarks; saving without them.", len(cleaned), exc_info=True)
 
 
-def read_bookmarks(doc: fitz.Document) -> list[Bookmark]:
+def read_bookmarks(doc: pymupdf.Document) -> list[Bookmark]:
     """Return ``doc``'s bookmarks as ``[level, title, page]``, or ``[]`` if unreadable."""
     try:
         return [list(entry[:3]) for entry in doc.get_toc(simple=True)]

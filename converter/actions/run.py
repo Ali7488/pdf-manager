@@ -19,7 +19,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-import fitz
+import pymupdf
 
 from ..core.context import CancelToken, JobContext
 from ..core.issues import (
@@ -128,7 +128,7 @@ def check_pdf(path: Path, label: str) -> int:
         ConversionError: Unreadable, password-protected or empty.
     """
     try:
-        doc = fitz.open(str(path))
+        doc = pymupdf.open(str(path))
     except Exception as exc:
         raise ConversionError(unreadable_file(label, str(exc))) from exc
     with doc:
@@ -160,7 +160,7 @@ def _with_ocr(pdf: Path, work: Path, ctx: JobContext, label: str) -> Path:
 
 def _output(name: str, path: Path) -> OutputFile:
     """Describe a finished output file."""
-    with fitz.open(str(path)) as doc:
+    with pymupdf.open(str(path)) as doc:
         pages = len(doc)
     return OutputFile(name, path, pages, path.stat().st_size)
 

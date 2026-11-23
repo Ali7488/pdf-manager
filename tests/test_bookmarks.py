@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import fitz
+import pymupdf
 
 from converter.pdf.bookmarks import normalize_toc, read_bookmarks, set_bookmarks
 
@@ -17,7 +17,7 @@ def test_normalize_fixes_levels_and_drops_bad_pages():
 
 
 def test_set_bookmarks_never_raises_and_round_trips():
-    with fitz.open() as doc:
+    with pymupdf.open() as doc:
         for _ in range(3):
             doc.new_page()
         set_bookmarks(doc, [[3, "A", 1], [1, "B", 3]])

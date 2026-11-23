@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import fitz
+import pymupdf
 import pytest
 
 from converter.actions.merge import Part, merge_documents
@@ -23,7 +23,7 @@ def test_order_text_and_nested_bookmarks(tmp_path, parts):
     assert merge_documents(parts, out, JobContext()) == 5
     texts = page_texts(out)
     assert "A one" in texts[0] and "B three" in texts[4]
-    with fitz.open(str(out)) as doc:
+    with pymupdf.open(str(out)) as doc:
         assert doc.get_toc(simple=True) == [
             [1, "Report", 1],
             [2, "A intro", 1],
@@ -36,14 +36,16 @@ def test_order_text_and_nested_bookmarks(tmp_path, parts):
 def test_contents_page_links_labels_and_unicode(tmp_path, parts):
     out = tmp_path / "m.pdf"
     assert merge_documents(parts, out, JobContext(), contents_page=True) == 6
-    with fitz.open(str(out)) as doc:
+    with pymupdf.open(str(out)) as doc:
         contents = doc[0]
         text = contents.get_text()
         assert (
             "Contents" in text and "Report" in text and "Pages 1–2" in text and "Pages 3–5" in text
         )
         assert "notes" in text
-        targets = [link["page"] for link in contents.get_links() if link["kind"] == fitz.LINK_GOTO]
+        targets = [
+            link["page"] for link in contents.get_links() if link["kind"] == pymupdf.LINK_GOTO
+        ]
         assert targets == [1, 3], "rows must jump to each part's first page"
         assert doc[0].get_label() == "i" and doc[1].get_label() == "1" and doc[5].get_label() == "5"
         toc = doc.get_toc(simple=True)
@@ -55,7 +57,7 @@ def test_contents_spills_onto_more_pages(tmp_path):
     many = [Part(f"Part {i}", src) for i in range(30)]
     out = tmp_path / "m.pdf"
     total = merge_documents(many, out, JobContext(), contents_page=True)
-    with fitz.open(str(out)) as doc:
+    with pymupdf.open(str(out)) as doc:
         lead = total - 30
         assert lead > 1
         links = [link["page"] for i in range(lead) for link in doc[i].get_links()]
@@ -65,9 +67,9 @@ def test_contents_spills_onto_more_pages(tmp_path):
 
 def test_locked_input_is_a_clear_issue(tmp_path):
     locked = tmp_path / "locked.pdf"
-    with fitz.open() as doc:
+    with pymupdf.open() as doc:
         doc.new_page()
-        doc.save(str(locked), encryption=fitz.PDF_ENCRYPT_AES_256, user_pw="pw", owner_pw="o")
+        doc.save(str(locked), encryption=pymupdf.PDF_ENCRYPT_AES_256, user_pw="pw", owner_pw="o")
     with pytest.raises(ConversionError) as err:
         merge_documents([Part("Locked", locked)], tmp_path / "o.pdf", JobContext())
     assert err.value.issue.code is IssueCode.PASSWORD_PROTECTED

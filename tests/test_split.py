@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import fitz
+import pymupdf
 import pytest
 
 from converter.actions.split import _fix_toc_levels, parse_page_ranges, plan_split, split_pdf
@@ -211,12 +211,12 @@ def sample_pdf(tmp_path: Path) -> Path:
         Path to the saved PDF.
     """
     path = tmp_path / "Sample.pdf"
-    with fitz.open() as doc:
+    with pymupdf.open() as doc:
         for number in range(1, PAGES + 1):
             page = doc.new_page()
             page.insert_text((72, 72), f"Sample page {number}")
-        goto = {"kind": fitz.LINK_GOTO, "from": fitz.Rect(72, 100, 200, 120), "page": 2}
-        web = {"kind": fitz.LINK_URI, "from": fitz.Rect(72, 130, 200, 150)}
+        goto = {"kind": pymupdf.LINK_GOTO, "from": pymupdf.Rect(72, 100, 200, 120), "page": 2}
+        web = {"kind": pymupdf.LINK_URI, "from": pymupdf.Rect(72, 130, 200, 150)}
         web["uri"] = "https://example.com/"
         doc[0].insert_link(goto)
         doc[0].insert_link(web)
@@ -252,7 +252,7 @@ def _page_text(path: Path, page: int = 0) -> str:
     Returns:
         The page text.
     """
-    with fitz.open(str(path)) as doc:
+    with pymupdf.open(str(path)) as doc:
         return doc[page].get_text().strip()
 
 
@@ -265,7 +265,7 @@ def _toc(path: Path) -> list[list]:
     Returns:
         ``[level, title, page]`` entries.
     """
-    with fitz.open(str(path)) as doc:
+    with pymupdf.open(str(path)) as doc:
         return doc.get_toc()
 
 
@@ -282,7 +282,7 @@ def test_split_ranges_names_counts_and_content(sample_pdf, tmp_path):
         assert output.path.is_file()
         assert output.path.parent == tmp_path / "out"
         assert output.size_bytes == output.path.stat().st_size
-        with fitz.open(str(output.path)) as doc:
+        with pymupdf.open(str(output.path)) as doc:
             assert doc.page_count == output.page_count
             assert doc.metadata["title"] == "Sample title"
     assert _page_text(outputs[1].path) == "Sample page 5"
@@ -331,14 +331,14 @@ def test_split_bookmarks_shifted_and_levels_fixed(sample_pdf, tmp_path):
 
 def test_split_bookmark_keeps_position_on_page(tmp_path):
     source = tmp_path / "Positioned.pdf"
-    with fitz.open() as doc:
+    with pymupdf.open() as doc:
         for _ in range(3):
             doc.new_page()
-        dest = {"kind": fitz.LINK_GOTO, "page": 2, "to": fitz.Point(0, 300), "zoom": 0}
+        dest = {"kind": pymupdf.LINK_GOTO, "page": 2, "to": pymupdf.Point(0, 300), "zoom": 0}
         doc.set_toc([[1, "Lower on page 3", 3, dest]])
         doc.save(str(source))
     (output,) = _split(source, tmp_path / "out", SplitSettings(ranges="2-3"))
-    with fitz.open(str(output.path)) as doc:
+    with pymupdf.open(str(output.path)) as doc:
         ((level, title, page, detail),) = doc.get_toc(simple=False)
     assert (level, title, page) == (1, "Lower on page 3", 2)
     assert detail["page"] == 1
@@ -353,23 +353,23 @@ def test_fix_toc_levels_keeps_structure():
 
 def test_split_keeps_links_and_annotations(sample_pdf, tmp_path):
     outputs = _split(sample_pdf, tmp_path / "out", SplitSettings(ranges="1-3, 2"))
-    with fitz.open(str(outputs[0].path)) as doc:
+    with pymupdf.open(str(outputs[0].path)) as doc:
         links = doc[0].get_links()
-        internal = [link for link in links if link["kind"] == fitz.LINK_GOTO]
-        external = [link for link in links if link["kind"] == fitz.LINK_URI]
+        internal = [link for link in links if link["kind"] == pymupdf.LINK_GOTO]
+        external = [link for link in links if link["kind"] == pymupdf.LINK_URI]
         assert [link["page"] for link in internal] == [2]  # Still points at "Sample page 3".
         assert [link["uri"] for link in external] == ["https://example.com/"]
         assert [annot.info["content"] for annot in doc[1].annots()] == ["A sample note"]
-    with fitz.open(str(outputs[1].path)) as doc:
+    with pymupdf.open(str(outputs[1].path)) as doc:
         assert [annot.info["content"] for annot in doc[0].annots()] == ["A sample note"]
 
 
 def test_split_drops_links_to_pages_outside_the_part(sample_pdf, tmp_path):
     (output,) = _split(sample_pdf, tmp_path / "out", SplitSettings(ranges="1-2"))
-    with fitz.open(str(output.path)) as doc:
+    with pymupdf.open(str(output.path)) as doc:
         kinds = [link["kind"] for link in doc[0].get_links()]
-    assert fitz.LINK_URI in kinds
-    assert fitz.LINK_GOTO not in kinds  # Page 3 isn't in this part.
+    assert pymupdf.LINK_URI in kinds
+    assert pymupdf.LINK_GOTO not in kinds  # Page 3 isn't in this part.
 
 
 def test_split_reports_progress(sample_pdf, tmp_path):
@@ -432,9 +432,9 @@ def test_split_unreadable_file(tmp_path):
 
 def test_split_password_protected(tmp_path):
     locked = tmp_path / "Locked.pdf"
-    with fitz.open() as doc:
+    with pymupdf.open() as doc:
         doc.new_page()
-        doc.save(str(locked), encryption=fitz.PDF_ENCRYPT_AES_256, user_pw="pw", owner_pw="pw")
+        doc.save(str(locked), encryption=pymupdf.PDF_ENCRYPT_AES_256, user_pw="pw", owner_pw="pw")
     with pytest.raises(ConversionError) as info:
         _split(locked, tmp_path / "out", SplitSettings(ranges="1"))
     assert info.value.issue.code == IssueCode.PASSWORD_PROTECTED

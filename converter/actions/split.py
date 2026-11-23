@@ -13,7 +13,7 @@ import re
 import time
 from pathlib import Path
 
-import fitz
+import pymupdf
 
 from ..core.context import JobContext
 from ..core.issues import (
@@ -240,7 +240,7 @@ def _toc_for_range(toc: list[list], start: int, end: int) -> list[list]:
         entry = [level, title, new_page]
         if rest and isinstance(rest[0], dict):
             dest = dict(rest[0])
-            if dest.get("kind") == fitz.LINK_GOTO:
+            if dest.get("kind") == pymupdf.LINK_GOTO:
                 # Keep the position on the page (and style); point it at the new page.
                 dest["page"] = new_page - 1  # Detailed destinations use 0-based pages.
                 entry.append(dest)
@@ -248,7 +248,7 @@ def _toc_for_range(toc: list[list], start: int, end: int) -> list[list]:
     return _fix_toc_levels(kept)
 
 
-def _open_source(source: Path) -> fitz.Document:
+def _open_source(source: Path) -> pymupdf.Document:
     """Open the PDF to split, turning low-level failures into user-facing errors.
 
     Args:
@@ -261,7 +261,7 @@ def _open_source(source: Path) -> fitz.Document:
         ConversionError: The file can't be read, needs a password, or has no pages.
     """
     try:
-        doc = fitz.open(str(source))
+        doc = pymupdf.open(str(source))
     except Exception as exc:  # MuPDF raises several types for damaged or missing files.
         raise ConversionError(unreadable_file(source.name, str(exc))) from exc
     if doc.needs_pass:
@@ -334,7 +334,7 @@ def split_pdf(
                 within_file=(index - 1) / len(ranges),
             )
             target = out_dir / f"part_{index:03d}.pdf"
-            with fitz.open() as part:
+            with pymupdf.open() as part:
                 # insert_pdf takes 0-based, inclusive page numbers. Links between
                 # pages inside the range are re-pointed; ones to other pages are dropped.
                 part.insert_pdf(doc, from_page=start - 1, to_page=end - 1, links=True, annots=True)

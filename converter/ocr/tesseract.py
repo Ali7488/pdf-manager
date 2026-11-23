@@ -15,7 +15,7 @@ import logging
 import subprocess
 from pathlib import Path
 
-import fitz
+import pymupdf
 
 from ..core.context import JobContext
 from ..core.issues import ConversionError, ocr_failed, ocr_missing, ocr_timeout, unreadable_file
@@ -33,14 +33,14 @@ def require_ocr(ctx: JobContext) -> Path:
     return tesseract
 
 
-def render_page(page: fitz.Page, dpi: int, target: Path) -> Path:
+def render_page(page: pymupdf.Page, dpi: int, target: Path) -> Path:
     """Draw a page (everything visible on it) as an RGB PNG image at ``dpi``.
 
     PDF units are 1/72 inch, so the page is scaled by ``dpi / 72``. There's no
     transparency: the page is drawn on white.
     """
     pixmap = page.get_pixmap(
-        matrix=fitz.Matrix(dpi / 72, dpi / 72), colorspace=fitz.csRGB, alpha=False
+        matrix=pymupdf.Matrix(dpi / 72, dpi / 72), colorspace=pymupdf.csRGB, alpha=False
     )
     pixmap.save(str(target))
     return target
@@ -101,7 +101,7 @@ def ocr_image_to_pdf(
     return pdf
 
 
-def page_needs_ocr(page: fitz.Page) -> bool:
+def page_needs_ocr(page: pymupdf.Page) -> bool:
     """True if a page has no extractable text, i.e. it is an image of text (or blank)."""
     return not page.get_text().strip()
 
@@ -127,7 +127,7 @@ def add_text_layer(source: Path, target: Path, work: Path, ctx: JobContext, file
     tesseract = require_ocr(ctx)
     work.mkdir(parents=True, exist_ok=True)
     try:
-        doc = fitz.open(str(source))
+        doc = pymupdf.open(str(source))
     except Exception as exc:
         raise ConversionError(unreadable_file(file_label, str(exc))) from exc
     with doc:
@@ -149,7 +149,7 @@ def add_text_layer(source: Path, target: Path, work: Path, ctx: JobContext, file
                 page_number=number,
                 text_only=True,
             )
-            with fitz.open(str(text_pdf)) as text_doc:
+            with pymupdf.open(str(text_pdf)) as text_doc:
                 # The rendered image (and so the text layer) shows the page as
                 # displayed, including rotation; undo the rotation so the text
                 # lands on the right spot in the page's own coordinates.

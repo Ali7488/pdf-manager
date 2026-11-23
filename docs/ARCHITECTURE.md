@@ -81,7 +81,7 @@ Errors: fatal problems raise `ConversionError(issue)`; a user cancel raises `Can
 
 Runtime: **PyMuPDF** (all PDF work), **pywin32** (Windows only, optional PowerPoint). External programs: **Tesseract** (OCR, optional), **LibreOffice** (slides; required on Linux, backup on Windows), **Microsoft PowerPoint** (optional, Windows). The API layer will add **pywebview**. Details and per-platform package names: [`../README.md`](../README.md), [`PORTABILITY.md`](PORTABILITY.md). Python ≥ 3.11 (uses `StrEnum`); pinned to 3.13.
 
-Known dependency notes: `import fitz` prints a deprecation notice in PyMuPDF 1.28 (switching to `import pymupdf` is an open cleanup); `fitz.image_profile` raises a `TypeError` in the installed 1.28.2, so it isn't used.
+Known dependency notes: the code imports `pymupdf` (the old `fitz` name is deprecated in 1.28); `pymupdf.image_profile` raises a `TypeError` in the installed 1.28.2, so it isn't used.
 
 ## Tests
 

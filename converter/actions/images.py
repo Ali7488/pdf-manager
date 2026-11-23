@@ -18,7 +18,7 @@ import time
 from collections.abc import Sequence
 from pathlib import Path
 
-import fitz
+import pymupdf
 
 from ..core.context import JobContext
 from ..core.issues import ConversionError, unreadable_file
@@ -31,7 +31,7 @@ log = logging.getLogger(__name__)
 MAX_PAGE_SIDE_PT = 842.0
 
 
-def _image_as_pdf(image: Path) -> fitz.Document:
+def _image_as_pdf(image: Path) -> pymupdf.Document:
     """Turn one image file into a one-page PDF held in memory.
 
     MuPDF applies the EXIF orientation while converting, so the page shows the
@@ -49,10 +49,10 @@ def _image_as_pdf(image: Path) -> fitz.Document:
             (``unreadable_file``).
     """
     try:
-        with fitz.open(str(image)) as picture:
+        with pymupdf.open(str(image)) as picture:
             # MuPDF opens images lazily: a damaged file only fails here.
             data = picture.convert_to_pdf()
-        pdf = fitz.open("pdf", data)
+        pdf = pymupdf.open("pdf", data)
     except Exception as exc:  # MuPDF raises several error types for unusable files.
         raise ConversionError(unreadable_file(image.name, str(exc))) from exc
     if pdf.page_count < 1:
@@ -61,7 +61,7 @@ def _image_as_pdf(image: Path) -> fitz.Document:
     return pdf
 
 
-def _page_size(natural: fitz.Rect) -> tuple[float, float]:
+def _page_size(natural: pymupdf.Rect) -> tuple[float, float]:
     """Choose the page size for an image.
 
     Args:
@@ -76,7 +76,7 @@ def _page_size(natural: fitz.Rect) -> tuple[float, float]:
     return natural.width * scale, natural.height * scale
 
 
-def _add_image_page(output: fitz.Document, image: Path) -> None:
+def _add_image_page(output: pymupdf.Document, image: Path) -> None:
     """Append one image as a new page at the end of ``output``.
 
     Args:
@@ -103,7 +103,7 @@ def _add_image_page(output: fitz.Document, image: Path) -> None:
     )
 
 
-def _save(doc: fitz.Document, target: Path) -> int:
+def _save(doc: pymupdf.Document, target: Path) -> int:
     """Save a finished PDF and return its size.
 
     Args:
@@ -190,7 +190,7 @@ def images_to_pdf(
         )
 
     if combine:
-        with fitz.open() as output:
+        with pymupdf.open() as output:
             for index, image in enumerate(images, 1):
                 step(index, image)
                 _add_image_page(output, image)
@@ -202,7 +202,7 @@ def images_to_pdf(
         for index, image in enumerate(images, 1):
             step(index, image)
             target = out_dir / f"image_{index:03d}.pdf"
-            with fitz.open() as output:
+            with pymupdf.open() as output:
                 _add_image_page(output, image)
                 size = _save(output, target)
             outputs.append(OutputFile(f"{image.stem}.pdf", target, 1, size))

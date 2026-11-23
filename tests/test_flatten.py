@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import shutil
 
-import fitz
+import pymupdf
 import pytest
 
 from converter.actions.flatten import flatten_pdf, verify_flattened
@@ -30,7 +30,7 @@ def flatten(tmp_path, use_ocr, **kwargs):
 
 def test_without_ocr_pages_become_images_with_no_text(tmp_path):
     src, out = flatten(tmp_path, use_ocr=False, dpi=100)
-    with fitz.open(str(out)) as doc:
+    with pymupdf.open(str(out)) as doc:
         assert len(doc) == 3
         assert all(page.get_images() for page in doc)
     assert all(not text.strip() for text in page_texts(out)), "no OCR means no text layer"
@@ -41,13 +41,13 @@ def test_with_ocr_pages_are_images_and_searchable(tmp_path):
     _, out = flatten(tmp_path, use_ocr=True)
     texts = page_texts(out)
     assert "Alpha" in texts[0] and "Gamma" in texts[2]
-    with fitz.open(str(out)) as doc:
+    with pymupdf.open(str(out)) as doc:
         assert all(page.get_images() for page in doc)
 
 
 def test_bookmarks_are_kept(tmp_path):
     _, out = flatten(tmp_path, use_ocr=False, dpi=72)
-    with fitz.open(str(out)) as doc:
+    with pymupdf.open(str(out)) as doc:
         assert doc.get_toc(simple=True) == TOC
 
 
@@ -62,9 +62,9 @@ def test_source_is_not_modified(tmp_path):
 
 def test_password_protected_input_is_a_clear_issue(tmp_path):
     src = tmp_path / "locked.pdf"
-    with fitz.open() as doc:
+    with pymupdf.open() as doc:
         doc.new_page()
-        doc.save(str(src), encryption=fitz.PDF_ENCRYPT_AES_256, user_pw="secret", owner_pw="o")
+        doc.save(str(src), encryption=pymupdf.PDF_ENCRYPT_AES_256, user_pw="secret", owner_pw="o")
     with pytest.raises(ConversionError) as err:
         flatten_pdf(src, tmp_path / "o.pdf", tmp_path / "w", JobContext(), "locked.pdf")
     assert err.value.issue.code is IssueCode.PASSWORD_PROTECTED

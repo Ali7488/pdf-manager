@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
-import fitz
+import pymupdf
 
 from ..core.types import IMAGE_EXTENSIONS
 
@@ -65,7 +65,7 @@ def inspect_file(path: Path) -> FileInfo | None:
     page_count = None
     if kind is FileKind.PDF:
         try:
-            with fitz.open(str(path)) as doc:
+            with pymupdf.open(str(path)) as doc:
                 page_count = None if doc.needs_pass else len(doc)
         except Exception as exc:  # Damaged files are reported on Convert, not here.
             log.debug("Couldn't count pages of %s: %s", path, exc)

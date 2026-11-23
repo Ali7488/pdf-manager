@@ -159,7 +159,8 @@ def rotated_photo(path: Path) -> None:
         page = tmp.new_page(width=600, height=400)
         page.insert_text((40, 200), "UPRIGHT when shown correctly", fontsize=28)
         # Store the pixels rotated 90 degrees counter-clockwise; orientation 6 undoes it.
-        jpeg = page.get_pixmap(dpi=96, matrix=pymupdf.Matrix(1, 1).prerotate(-90)).tobytes("jpeg")
+        # Rotation goes in the matrix (get_pixmap ignores `matrix` when `dpi` is given).
+        jpeg = page.get_pixmap(matrix=pymupdf.Matrix(1, 1).prerotate(-90)).tobytes("jpeg")
     path.write_bytes(jpeg[:2] + _exif_orientation_segment(6) + jpeg[2:])
 
 

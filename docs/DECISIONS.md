@@ -30,6 +30,10 @@ Decisions made by the project owner, in their own direction (summarized, not quo
 | P23 | 2026-11-23 | **Public repository.** Make `Ali7488/pdf-manager` public now. Commit author emails stay as they are. The reference to the owner's private notes in `ENGINEERING_REVIEW.md` is removed. |
 | P24 | 2026-11-23 | **GitHub Actions runners may be used while free** (public repo, standard runners) to build and test, including the Windows installer build, re-running and fixing as needed. Supersedes P22 for the public repo. |
 | P25 | 2026-11-23 | **Release plan.** **v0.5**: Windows-only pre-release (installer built on GitHub runners), explicitly marked as a pre-release for testing, with a simple README of the features and install steps (Windows: double-click the installer). **v0.75** (also tonight): pre-release that fixes the Windows bugs found in v0.5 **and releases the Linux versions** (supersedes "no Linux packaging yet" in P15/P17). **v1.0**: full release only after the owner has manually verified the functionality, code and features. |
+| P26 | 2026-11-23 | **Linux packaging (v0.75):** a bundled PyInstaller build made on GitHub's Ubuntu runner, installed to `/opt/pdf-manager`, wrapped as an Ubuntu/Debian `.deb` and an Arch `PKGBUILD` that installs the same bundle. Tesseract and LibreOffice stay separate system packages. |
+| P27 | 2026-11-23 | **Arch:** a `PKGBUILD` attached to the release (and kept in the repo) that downloads the Linux bundle; installed with `makepkg -si`. Not published to the AUR. |
+| P28 | 2026-11-23 | **If the Windows installer can't be made to build or start tonight:** publish v0.5 anyway with what works, stating clearly in the notes what doesn't work and what's planned for v0.75. |
+| P29 | 2026-11-23 | **Version tags:** `v0.5.0` and `v0.75.0`, titled "v0.5 – pre-release for testing" and "v0.75 – pre-release for testing". |
 
 ## Converter (Python backend)
 

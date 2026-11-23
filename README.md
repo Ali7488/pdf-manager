@@ -23,11 +23,9 @@ Run `INSTALL.bat` once (it installs [uv](https://docs.astral.sh/uv/) if needed, 
 ## Development
 
 ```bash
-uv sync    # creates .venv with the pinned Python and all dependencies
-# Tesseract (English) and LibreOffice must be installed for the integration tests.
-uv run tests/smoke_test.py
-uv run tests/test_temp_lock.py
-uv run app.py
+uv sync          # creates .venv with the pinned Python and all dependencies
+uv run pytest    # all tests; ones needing Tesseract or LibreOffice skip if those are missing
+uv run app.py    # the old Tkinter UI, until the new desktop app replaces it
 ```
 
 ## Dependencies
@@ -36,37 +34,39 @@ Python packages (`pyproject.toml`, locked in `uv.lock`):
 
 | Package | Used in | Why |
 | --- | --- | --- |
-| PyMuPDF (`fitz`) | `flatten.py`, `merge.py`, `pipeline.py` | Opens and validates PDFs, renders pages to images, stamps OCR pages into the output, merges documents. |
-| pywin32 (Windows only) | `powerpoint.py` | Drives Microsoft PowerPoint through COM to export slides as PDF. |
+| PyMuPDF (`fitz`) | `converter/actions/`, `converter/ocr/`, `converter/pdf/` | All PDF work: opening and validating, rendering pages to images, placing OCR text, merging, splitting, image conversion, compression, bookmarks, links and page labels. |
+| pywin32 (Windows only) | `converter/platforms/windows_powerpoint.py` | Optional: drives Microsoft PowerPoint through COM to export slides as PDF. |
 
 External programs:
 
 | Program | Required for | Why |
 | --- | --- | --- |
-| Tesseract OCR (English) | Flatten, Flatten + Merge | Turns each page image back into searchable text. |
+| Tesseract OCR (English) | Any action with "Use OCR" ticked | Reads the text in page images so it can be searched and copied. |
 | Microsoft PowerPoint | PowerPoint inputs (preferred) | Gives the most faithful slide rendering on Windows. |
 | LibreOffice | PowerPoint inputs (fallback) | Converts slides to PDF when PowerPoint isn't available. |
 | winget | Optional | Lets the app and installer install Tesseract automatically. |
 
 The GUI uses only the standard library (Tkinter).
 
-Development only (the `dev` dependency group): python-pptx, which the tests use to build a sample PPTX file.
+Development only (the `dev` dependency group): pytest, and python-pptx (the tests use it to build a sample PPTX file).
 
 ## Layout
 
 - `app.py`: Tkinter dashboard and local settings.
-- `converter/`: the conversion engine, split by responsibility. `from converter import ...` exposes the public API.
-  - `common.py`: shared constants (modes, supported extensions, DPI) and the progress-callback type.
-  - `tools.py`: finding Tesseract and LibreOffice, and running external programs without a console window.
-  - `powerpoint.py`: rendering PPT/PPTX to PDF with Microsoft PowerPoint, falling back to LibreOffice.
-  - `flatten.py`: rasterizing pages and adding the OCR text layer.
-  - `merge.py`: combining PDFs in order.
-  - `pipeline.py`: preparing and validating each input, then running the chosen mode.
-  - `output.py`: collision-safe output filenames.
+- `converter/`: the conversion engine (service layer), in folders by responsibility. `from converter import ...` is the public API; `run_action(action, settings, data)` is the single entry point.
+  - `core/`: shared types (`types.py`), user-facing issues with troubleshooting steps (`issues.py`), per-job cancel/progress/warnings (`context.py`).
+  - `actions/`: `run.py` (the entry point) plus one module per action: flatten, merge, split, images, compress.
+  - `ocr/`: Tesseract OCR, including the text-layer-only mode.
+  - `slides/`: PowerPoint files to PDF (PowerPoint optional, LibreOffice fallback).
+  - `tools/`: running external programs (`process.py`), finding them (`locate.py`), the Convert tool check (`check.py`).
+  - `pdf/`: bookmark helpers. `files/`: describing inputs and choosing safe output names.
+  - `platforms/`: everything OS-specific (Windows, POSIX, the optional PowerPoint renderer).
+- `frontend/`: React UI (in progress). `api/`: the Python bridge between them (in progress).
+- `packaging/`: Windows build (PyInstaller), install wizard (Inno Setup), build script.
 - `PDF Manager.ico`: application icon (`app.py` loads it from the repository root).
 - `assets/`: preview images (not needed at runtime).
-- `tests/`: integration test and Windows file-lock regression test.
-- `docs/`: import provenance and review checklist.
+- `tests/`: pytest suite (unit, end-to-end and the Windows file-lock regression).
+- `docs/`: decisions, prompts log, API contract, portability, engineering review, source inventory.
 
 ## Privacy
 

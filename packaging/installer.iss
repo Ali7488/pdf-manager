@@ -175,7 +175,7 @@ begin
 end;
 
 { Whether Microsoft PowerPoint can be automated: the same registry key the app's
-  converter checks (converter.tools.powerpoint_installed), in both registry views. }
+  converter checks (converter.tools.locate.powerpoint_installed), in both registry views. }
 function IsPowerPointInstalled: Boolean;
 begin
   Result := RegKeyExists(HKCR32, 'PowerPoint.Application\CLSID');

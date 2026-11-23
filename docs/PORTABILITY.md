@@ -34,7 +34,7 @@ PDF Manager ships first on **Windows 11** (v1). The same code base must later su
 | `powerpoint_installed()` / `powerpoint_path()` | Registry checks for PowerPoint's automation class and executable. | Always `False` / `None`. |
 | `export_slides_with_powerpoint` | The optional COM-based renderer (`windows_powerpoint.py`). | `None`: LibreOffice renders slides. |
 
-The service layer's public functions (`find_tesseract`, `find_libreoffice`, `run_command`, `powerpoint_installed` and so on in `converter/tools.py`) stay the same on every platform.
+The service layer's public functions (`find_tesseract`, `find_libreoffice`, `run_command`, `powerpoint_installed` and so on in `converter/tools/`) stay the same on every platform.
 
 ## External programs per platform
 
@@ -64,6 +64,6 @@ To be done in a later release; not implemented now.
 | Where | What | Plan |
 | --- | --- | --- |
 | `app.py`, `INSTALL.bat`, `OPEN.bat`, `install_windows.ps1` | Old Tkinter app and Windows-only installer scripts | Delete once the new app works (F25); the new installer is under `packaging/`. |
-| `converter/issues.py` | Troubleshooting text mentions Windows-only fixes (default printer, Windows download page) | Make platform-aware before the Linux release. |
+| `converter/core/issues.py` | Troubleshooting text mentions Windows-only fixes (default printer, Windows download page) | Make platform-aware before the Linux release. |
 | `api/` (in progress) | Opening folders, OCR install via winget, settings path | Move behind an API-layer platform module when the branch is merged. |
 | `packaging/` (in progress) | Windows installer (PyInstaller + Inno Setup) | Windows only by design; Linux packaging is separate future work. |

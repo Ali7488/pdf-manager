@@ -43,7 +43,7 @@ Use **uv** for everything (`uv add`, `uv run`, `uv sync`). Never use pip or requ
 
 - **Generic only.** No personal names, no specific person's workflow, and no domain-specific wording (such as a particular course or subject) in code, UI text, tests, docs or commit messages. Test fixtures use neutral sample text.
 - **Windows first, portable always.** v1 targets Windows 11; prefer correct Windows behaviour. Linux packages (`.deb`, Arch `PKGBUILD`) and Qt/GNOME versions come later (decision P14), so keep the service and API layers portable: guard Windows-only code (COM, registry, `os.startfile`) with platform checks and working fallbacks, and never hard-code Windows paths. Platform-specific code lives only in `converter/platforms/` (and an equivalent API-layer module); see `docs/PORTABILITY.md`.
-- **Originals are never modified.** Inputs are only read. All work happens in a scratch folder, and results are copied out with collision-safe names (`converter.output.safe_destination`).
+- **Originals are never modified.** Inputs are only read. All work happens in a scratch folder, and results are copied out with collision-safe names (`converter.files.naming.safe_destination`).
 - **No speaker notes.** The speaker-notes appendix was removed on purpose. Don't re-add it.
 - **Documentation.** Every function gets a Google-style docstring (summary, Args, Returns, Raises). Add inline comments for non-obvious lines, and flag known issues where they occur.
 - **Commits.** Make small, meaningful commits as you go, one per logical change, under the user's configured git identity. Run the tests before committing code changes, then push to `origin`.

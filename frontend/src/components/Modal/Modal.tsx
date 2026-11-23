@@ -94,7 +94,7 @@ export function Modal({ title, children, footer, onClose, size = "md" }: ModalPr
             {title}
           </h2>
           {onClose && (
-            <button type="button" className={styles.close} onClick={onClose} aria-label="Close">
+            <button type="button" className={styles.close} onClick={onClose} aria-label="Close dialog">
               <Icon name="close" />
             </button>
           )}

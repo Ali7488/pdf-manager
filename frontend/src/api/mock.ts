@@ -169,7 +169,7 @@ export function createMockApi(options: MockOptions = {}): MockApi {
   const jobs = new Map<string, MockJob>();
   let runningJob: MockJob | null = null;
   let jobCounter = 0;
-  let pickCounter = 0;
+  const pickCounts = { documents: 0, images: 0 };
 
   /** Short delay so calls feel like a real round trip. */
   const latency = () => wait(Math.max(1, Math.round(tickMs / 3)));
@@ -425,8 +425,8 @@ export function createMockApi(options: MockOptions = {}): MockApi {
 
     async pickFiles(kind: "documents" | "images") {
       await latency();
-      pickCounter += 1;
-      const extra = pickCounter > 1 ? pickCounter : null;
+      pickCounts[kind] += 1;
+      const extra = pickCounts[kind] > 1 ? pickCounts[kind] : null;
       const docs: InputFile[] = [
         { path: `${SAMPLE_FOLDER}\\Sample report.pdf`, name: "Sample report.pdf", kind: "pdf", sizeBytes: 1_240_000, pageCount: 12 },
         { path: `${SAMPLE_FOLDER}\\Slides overview.pptx`, name: "Slides overview.pptx", kind: "pptx", sizeBytes: 4_800_000, pageCount: null },

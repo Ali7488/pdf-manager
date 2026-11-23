@@ -132,8 +132,9 @@ def main(argv: list[str] | None = None) -> int:
     ]
     if args.platform == "windows":
         lines += [
-            "**Provenance note:** the pywin32 source archive is fetched from the "
-            "upstream GitHub release tag. The other listed Windows Python and runtime "
+            "**Provenance note:** pywin32 b312 is fetched by its pinned upstream "
+            "Git commit (2a277cb5552756c2b4d42b524dc36d25e0bb6354). "
+            "The other listed Windows Python and runtime "
             "source archives use their pinned SHA-256 digests; npm archives use the "
             "lockfile integrity values. The generated SHA256SUMS records every "
             "downloaded file, but does not independently authenticate an upstream "

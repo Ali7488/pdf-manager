@@ -3,6 +3,7 @@
     uv run scripts/check_licenses.py repo
     uv run scripts/check_licenses.py bundle "dist/PDF Manager"
     uv run scripts/check_licenses.py bundle "%LOCALAPPDATA%/Programs/PDF Manager" --installed
+    uv run scripts/check_licenses.py bundle "dist/PDF Manager (browser)" --installed --build browser
 
 ``repo`` (no network; run by the test suite in CI) compares ``licenses/manifest.json``
 with what the lockfiles say is bundled and with the build pins, and checks that every
@@ -15,7 +16,10 @@ built or installed Windows app: every native binary in it must belong to a compo
 the manifest; the WebView2 SDK files must be the exact files whose licence we ship;
 the bundled Python must be the version whose licence we ship; every bundled Python
 package must be in the manifest; and, with ``--installed``, the licence files next to the
-app must be byte-identical to the repository's.
+app must be byte-identical to the repository's. ``--build browser`` checks the
+browser-mode ZIP's folder: nothing of the desktop window's toolkit (pywebview,
+pythonnet, Qt, the WebView2 SDK) or the installer may be in it, and its licence
+files must be exactly those of the components it ships.
 
 ``bundle`` also keeps the Microsoft Visual C++ runtime out of the app (decision P32): no
 Visual C++ runtime DLL may be bundled anywhere in it. The app relies on the separately
@@ -51,6 +55,12 @@ TOP_LEVEL = {
     "LICENSING.md": "LICENSING.md",
     "THIRD_PARTY_NOTICES.md": "THIRD_PARTY_NOTICES.md",
 }
+# The same for the browser-mode ZIP, which has its own notices (scripts/stage_licenses.py).
+BROWSER_TOP_LEVEL = {**TOP_LEVEL, "THIRD_PARTY_NOTICES-browser.md": "THIRD_PARTY_NOTICES.md"}
+del BROWSER_TOP_LEVEL["THIRD_PARTY_NOTICES.md"]
+BUILDS = ("desktop", "browser")
+# Components that aren't Python packages and ship only in the desktop build.
+DESKTOP_ONLY = ("WEBVIEW2", "INNO SETUP")
 COPYLEFT_MARKERS = {
     "AGPL-3.0-only.txt": "GNU AFFERO GENERAL PUBLIC LICENSE",
     "GPL-3.0-only.txt": "GNU GENERAL PUBLIC LICENSE",
@@ -146,10 +156,14 @@ def _norm(name: str) -> str:
     return re.sub(r"[-_.]+", "-", name).lower()
 
 
-def locked_python_packages() -> dict[str, str]:
-    """Runtime packages bundled on Windows or Linux, from ``uv export`` of uv.lock."""
+def locked_python_packages(*extra: str) -> dict[str, str]:
+    """Runtime packages bundled on Windows or Linux, from ``uv export`` of uv.lock.
+
+    Args:
+        *extra: More ``uv export`` options (``"--no-group", "desktop"``: browser mode's).
+    """
     out = subprocess.run(
-        ["uv", "export", "--no-dev", "--frozen", "--no-hashes", "--no-emit-project"],
+        ["uv", "export", "--no-dev", "--frozen", "--no-hashes", "--no-emit-project", *extra],
         cwd=ROOT,
         capture_output=True,
         text=True,
@@ -166,6 +180,21 @@ def locked_python_packages() -> dict[str, str]:
         name, _, version = spec.strip().partition("==")
         packages[_norm(name)] = version
     return packages
+
+
+def browser_python_packages() -> dict[str, str]:
+    """The packages the browser-mode ZIP bundles: no desktop window toolkit."""
+    return locked_python_packages("--no-group", "desktop")
+
+
+def components_for(manifest: dict, build: str) -> list[dict]:
+    """The manifest's components that ``build`` ships."""
+    return [c for c in manifest["components"] if build in c.get("builds", BUILDS)]
+
+
+def licence_files(manifest: dict, build: str) -> list[str]:
+    """Paths under licenses/ of every licence text ``build`` must carry."""
+    return sorted({f for c in components_for(manifest, build) for f in c["files"]})
 
 
 def locked_frontend_packages() -> dict[str, str]:
@@ -207,6 +236,26 @@ def check_repo(report: Report) -> None:
             )
     for name in set(python) - set(locked_python_packages()):
         report.fail(f"Python package {name} is listed but no longer bundled")
+    # Which build ships what: the browser build is the lockfile without the desktop group.
+    browser = browser_python_packages()
+    for c in components:
+        builds = c.get("builds")
+        report.check(
+            bool(builds) and set(builds) <= set(BUILDS),
+            f"{c['name']}: builds must be some of {BUILDS}",
+        )
+        if c["group"] == "python" and builds:
+            expected = _norm(c["name"]) in browser
+            report.check(
+                ("browser" in builds) == expected,
+                f"{c['name']}: the lockfile's browser build "
+                f"{'includes' if expected else 'leaves it out'}, but the notices disagree",
+            )
+    for name in set(browser) - set(python):
+        report.fail(f"Python package {name} is in the browser build but not listed")
+    for c in components:
+        if any(words in c["name"] for words in ("WebView2", "Inno Setup")):
+            report.check(c.get("builds") == ["desktop"], f"{c['name']} must be desktop-only")
     frontend = by_group.get("frontend", {})
     for name, version in locked_frontend_packages().items():
         entry = frontend.get(name)
@@ -292,6 +341,14 @@ def check_repo(report: Report) -> None:
     notices = (ROOT / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8")
     for c in components:
         report.check(f"| {c['name']} |" in notices, f"THIRD_PARTY_NOTICES.md lacks {c['name']}")
+    browser_notices = (ROOT / "THIRD_PARTY_NOTICES-browser.md").read_text(encoding="utf-8")
+    for c in components:
+        listed = f"| {c['name']} |" in browser_notices
+        ships = "browser" in c.get("builds", BUILDS)
+        report.check(
+            listed == ships,
+            f"THIRD_PARTY_NOTICES-browser.md {'lacks' if ships else 'wrongly lists'} {c['name']}",
+        )
     iss = (ROOT / "packaging" / "installer.iss").read_text(encoding="utf-8")
     for source in TOP_LEVEL:
         report.check(f'{{#RepoRoot}}\\{source}"' in iss, f"installer.iss doesn't install {source}")
@@ -421,10 +478,22 @@ def classify(relative: str) -> str | None:
     return None
 
 
-def check_bundle(report: Report, app: Path, installed: bool) -> None:
-    """Check a built (``dist/PDF Manager``) or installed Windows app folder."""
+def check_bundle(report: Report, app: Path, installed: bool, build: str = "desktop") -> None:
+    """Check a built (``dist/PDF Manager``) or installed Windows app folder.
+
+    Args:
+        report: Collects the failures.
+        app: The app folder.
+        installed: Also compare the licence files next to the app with the repository's.
+        build: ``"desktop"`` (the installer's app) or ``"browser"`` (the browser-mode
+            ZIP, which must contain nothing of the desktop window's toolkit).
+    """
     manifest = load_manifest()
-    names = {_norm(c["name"]) for c in manifest["components"] if c["group"] == "python"}
+    shipped = components_for(manifest, build)
+    names = {_norm(c["name"]) for c in shipped if c["group"] == "python"}
+    desktop_only = {
+        _norm(c["name"]) for c in manifest["components"] if c.get("builds") == ["desktop"]
+    }
     report.check((app / "PDF Manager.exe").is_file(), f"No PDF Manager.exe in {app}")
     internal = app / "_internal"
 
@@ -451,13 +520,15 @@ def check_bundle(report: Report, app: Path, installed: bool) -> None:
             continue
         counts[component] = counts.get(component, 0) + 1
         print(f"  {relative}: {component}")
-        if component not in NON_PACKAGE:
+        if build == "browser" and (component in DESKTOP_ONLY or _norm(component) in desktop_only):
+            report.fail(f"{relative}: {component} belongs to the desktop build only")
+        elif component not in NON_PACKAGE:
             report.check(_norm(component) in names, f"{relative}: {component} isn't listed")
     for relative in unknown:
         report.fail(f"{relative} belongs to no listed component; add its notice")
     listed = " ".join(c["name"] for c in manifest["components"])
     for component, words in NON_PACKAGE.items():
-        if counts.get(component):
+        if counts.get(component) and not (build == "browser" and component in DESKTOP_ONLY):
             report.check(words in listed, f"The notices don't list the {component.lower()}")
     print("Native files by component:", json.dumps(counts, sort_keys=True))
 
@@ -507,7 +578,7 @@ def check_bundle(report: Report, app: Path, installed: bool) -> None:
     report.check(not qt, f"Qt/PySide6 files in the Windows app: {qt[:5]}")
 
     # The WebView2 SDK files are exactly the ones whose licence we ship.
-    for in_wheel, sha in manifest["webview2_sdk"]["sha256"].items():
+    for in_wheel, sha in (manifest["webview2_sdk"]["sha256"] if build == "desktop" else {}).items():
         path = internal / in_wheel
         report.check(path.is_file(), f"Missing {in_wheel}")
         if path.is_file():
@@ -542,22 +613,26 @@ def check_bundle(report: Report, app: Path, installed: bool) -> None:
 
     # The licence files next to the installed app are the repository's.
     if installed:
-        for source, name in TOP_LEVEL.items():
+        for source, name in (BROWSER_TOP_LEVEL if build == "browser" else TOP_LEVEL).items():
             target = app / name
             report.check(target.is_file(), f"Installed app lacks {name}")
             if target.is_file():
                 report.check(_sha256(target) == _sha256(ROOT / source), f"{name} differs")
-        for path in sorted(LICENSES.rglob("*")):
-            if path.is_file():
-                relative = path.relative_to(ROOT)
-                target = app / relative
-                report.check(target.is_file(), f"Installed app lacks {relative.as_posix()}")
-                if target.is_file():
-                    report.check(_sha256(target) == _sha256(path), f"{relative.as_posix()} differs")
+        # The installer copies the whole licenses/ folder; the browser ZIP exactly the
+        # licence texts of the components it ships (scripts/stage_licenses.py).
+        if build == "browser":
+            wanted = {f"licenses/{f}" for f in licence_files(manifest, build)}
+        else:
+            wanted = {p.relative_to(ROOT).as_posix() for p in LICENSES.rglob("*") if p.is_file()}
+        for relative in sorted(wanted):
+            target = app / relative
+            report.check(target.is_file(), f"Installed app lacks {relative}")
+            if target.is_file():
+                report.check(_sha256(target) == _sha256(ROOT / relative), f"{relative} differs")
         extra = [
             p.relative_to(app).as_posix()
             for p in (app / "licenses").rglob("*")
-            if p.is_file() and not (ROOT / p.relative_to(app)).is_file()
+            if p.is_file() and p.relative_to(app).as_posix() not in wanted
         ]
         report.check(not extra, f"Stale licence files in the installed app: {extra[:5]}")
 
@@ -569,12 +644,15 @@ def main(argv: list[str] | None = None) -> int:
     bundle = sub.add_parser("bundle", help="check a built or installed Windows app folder")
     bundle.add_argument("app", type=Path)
     bundle.add_argument("--installed", action="store_true", help="also compare licence files")
+    bundle.add_argument(
+        "--build", choices=BUILDS, default="desktop", help="which build the folder is"
+    )
     args = parser.parse_args(argv)
     report = Report()
     if args.mode == "repo":
         check_repo(report)
         return report.finish("repository")
-    check_bundle(report, args.app, args.installed)
+    check_bundle(report, args.app, args.installed, args.build)
     return report.finish(f"app at {args.app}")
 
 

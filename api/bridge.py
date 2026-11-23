@@ -351,16 +351,29 @@ class Api:
         return self._guard("get_settings", lambda issue: dict(DEFAULTS), self._settings.get)
 
     def save_settings(self, patch: dict) -> dict[str, Any]:
-        """Merge and persist a partial ``Settings``; return the full settings.
+        """Merge and persist a partial ``Settings`` (``SaveSettingsResult``).
 
         Invalid fields are ignored (and logged), so the returned settings show
-        what was actually kept.
+        what was actually kept. If the file can't be written, the settings
+        still apply until the app closes and ``issue`` is ``SETTINGS_SAVE_FAILED``.
+        pywebview runs each call on its own thread; the store applies them one
+        at a time, in the order they arrive.
 
         Args:
             patch: Partial ``Settings`` (camelCase).
+
+        Returns:
+            ``{ settings, issue }``; ``issue`` is ``None`` when saved.
         """
+
+        def body() -> dict[str, Any]:
+            update = self._settings.update(patch)
+            return dto.save_settings_json(update.settings, update.issue)
+
         return self._guard(
-            "save_settings", lambda issue: self._settings.get(), self._settings.update, patch
+            "save_settings",
+            lambda issue: dto.save_settings_json(self._settings.get(), issue),
+            body,
         )
 
     def pick_files(self, kind: str) -> list[dict[str, Any]]:
@@ -469,6 +482,8 @@ class Api:
                     )
                     return not_found(log_issue(issue))
                 found = chosen
+            # A failed save is already logged by the store; the path still applies
+            # for this session. OcrSearchResult has no slot for that warning.
             self._settings.update({"tesseractPath": str(found)})
             log.info("OCR found at %s", found)
             return {"found": True, "path": str(found), "issue": None}

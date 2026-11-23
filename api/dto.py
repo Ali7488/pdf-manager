@@ -362,3 +362,17 @@ def save_outcome_json(
         "folder": str(folder) if folder else None,
         "issue": issue_to_json(issue) if issue is not None else None,
     }
+
+
+def save_settings_json(settings: dict[str, Any], issue: Issue | None) -> dict[str, Any]:
+    """Build the contract's ``SaveSettingsResult``.
+
+    Args:
+        settings: The full settings now in effect (already camelCase).
+        issue: ``SETTINGS_SAVE_FAILED`` if they weren't written to disk, or why
+            the call failed (already logged); ``None`` when saved.
+
+    Returns:
+        The ``SaveSettingsResult`` object.
+    """
+    return {"settings": settings, "issue": issue_to_json(issue) if issue is not None else None}

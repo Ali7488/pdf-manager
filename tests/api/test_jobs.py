@@ -347,22 +347,23 @@ def test_failed_save_keeps_results(make_manager, recorder, tmp_path, monkeypatch
     out = tmp_path / "out"
     out.mkdir()
     manager, job_id = finished_job(make_manager, recorder, "a.pdf", "b.pdf")
-    real_copy = jobs.shutil.copyfileobj
+    real_copy = jobs._copy_stream
     calls = []
 
-    def flaky_copy(src, dst, length=0):
+    def flaky_copy(src, dst, abort):
         calls.append(1)
         if len(calls) == 2:
+            dst.write(b"%PDF-partial")  # Half a file, then the disk is full.
             raise OSError(28, "No space left on device")
-        real_copy(src, dst, length)
+        real_copy(src, dst, abort)
 
-    monkeypatch.setattr(jobs.shutil, "copyfileobj", flaky_copy)
+    monkeypatch.setattr(jobs, "_copy_stream", flaky_copy)
     with pytest.raises(ConversionError) as info:
         manager.save(job_id, out, as_zip=False)
     assert info.value.issue.code == IssueCode.SAVE_FAILED
     assert "No space left" in info.value.issue.details
     assert list(out.iterdir()) == []  # The first, completed copy was rolled back too.
-    monkeypatch.setattr(jobs.shutil, "copyfileobj", real_copy)
+    monkeypatch.setattr(jobs, "_copy_stream", real_copy)
     # Results were kept, so a retry works.
     assert [p.name for p in manager.save(job_id, out, as_zip=False)] == ["a.pdf", "b.pdf"]
 
@@ -450,3 +451,246 @@ def test_cancelled_raised_directly(make_manager, recorder):
     manager = make_manager(run)
     manager.start(Action.COMPRESS, ActionSettings(), DATA)
     assert recorder.finish()["status"] == "cancelled"
+
+
+# ----- Save, discard and shutdown at the same time (audit R4) -----
+#
+# Every test below is ordered with events, never sleeps: a patched copy writes
+# half of a file and then blocks, so a discard or shutdown arrives exactly
+# mid-copy.
+
+
+class BlockingCopy:
+    """Replaces ``jobs._copy_stream``: the ``block_on``-th copy stops halfway.
+
+    It writes the first half of the file, sets ``mid_copy`` and waits, either
+    for ``release`` or, with ``until_abort``, for the save to be aborted. Then
+    the real copy finishes the rest (and raises SaveAborted if aborted).
+    With ``fail``, it raises OSError instead of finishing.
+    """
+
+    def __init__(self, block_on=1, until_abort=False, fail=False):
+        self.real = jobs._copy_stream
+        self.block_on = block_on
+        self.until_abort = until_abort
+        self.fail = fail
+        self.calls = 0
+        self.mid_copy = threading.Event()
+        self.release = threading.Event()
+
+    def __call__(self, src, dst, abort):
+        self.calls += 1
+        if self.calls == self.block_on:
+            data = src.read()
+            dst.write(data[: len(data) // 2])
+            src.seek(len(data) // 2)
+            self.mid_copy.set()
+            assert (abort if self.until_abort else self.release).wait(5)
+            if self.fail:
+                raise OSError(28, "No space left on device")
+        self.real(src, dst, abort)
+
+
+class SaveThread(threading.Thread):
+    """Runs ``manager.save`` on its own thread (like a bridge call) and keeps the outcome."""
+
+    def __init__(self, manager, job_id, folder, as_zip=False):
+        super().__init__(daemon=True)
+        self.manager, self.job_id, self.folder, self.as_zip = manager, job_id, folder, as_zip
+        self.saved = None
+        self.error = None
+
+    def run(self):
+        try:
+            self.saved = self.manager.save(self.job_id, self.folder, as_zip=self.as_zip)
+        except ConversionError as exc:
+            self.error = exc
+
+    def outcome(self):
+        """Wait for the save to end and return (saved paths, ConversionError)."""
+        self.join(5)
+        assert not self.is_alive(), "save did not finish"
+        return self.saved, self.error
+
+
+def expected_contents(*names):
+    """The bytes make_outputs writes for each output name."""
+    return [b"%PDF-1.4 sample " + name.encode() for name in names]
+
+
+def assert_complete(saved, as_zip, names):
+    """The saved files (or zip entries) hold exactly the full outputs."""
+    if as_zip:
+        assert len(saved) == 1
+        with zipfile.ZipFile(saved[0]) as archive:
+            assert archive.testzip() is None
+            assert [archive.read(n) for n in archive.namelist()] == expected_contents(*names)
+    else:
+        assert [p.read_bytes() for p in saved] == expected_contents(*names)
+
+
+def scratch_folders(tmp_path):
+    """The job scratch folders that still exist."""
+    return list(tmp_path.glob("pdf-manager-*"))
+
+
+def wait_state(manager, predicate):
+    """Block until predicate() holds; the manager signals every state change."""
+    with manager._changed:
+        assert manager._changed.wait_for(predicate, 5)
+
+
+@pytest.mark.parametrize("as_zip", [False, True])
+def test_discard_during_save_is_applied_after_it(
+    make_manager, recorder, tmp_path, monkeypatch, as_zip
+):
+    """A discard (twice, even) mid-copy waits for the save; the saved files are complete."""
+    out = tmp_path / "out"
+    out.mkdir()
+    names = ("a.pdf", "b.pdf")
+    manager, job_id = finished_job(make_manager, recorder, *names, action=Action.SPLIT)
+    job = manager._jobs[job_id]
+    copy = BlockingCopy(block_on=2)
+    monkeypatch.setattr(jobs, "_copy_stream", copy)
+    save = SaveThread(manager, job_id, out, as_zip)
+    save.start()
+    assert copy.mid_copy.wait(5)
+    manager.discard(job_id)  # Returns at once: deferred until the save ends.
+    manager.discard(job_id)
+    assert job.drop_requested
+    assert all(output.path.is_file() for output in job.outputs)  # Nothing deleted mid-copy.
+    copy.release.set()
+    saved, error = save.outcome()
+    assert error is None
+    assert_complete(saved, as_zip, names)
+    assert not scratch_folders(tmp_path)
+    with pytest.raises(ConversionError) as info:
+        manager.save(job_id, out, as_zip=as_zip)
+    assert "No results found" in info.value.issue.details
+
+
+def test_discard_during_failed_save_leaves_nothing_behind(
+    make_manager, recorder, tmp_path, monkeypatch
+):
+    """If the save fails after a discard was requested, its files and the results are removed."""
+    out = tmp_path / "out"
+    out.mkdir()
+    manager, job_id = finished_job(make_manager, recorder, "a.pdf", "b.pdf")
+    copy = BlockingCopy(block_on=2, fail=True)
+    monkeypatch.setattr(jobs, "_copy_stream", copy)
+    save = SaveThread(manager, job_id, out)
+    save.start()
+    assert copy.mid_copy.wait(5)
+    manager.discard(job_id)
+    assert len(scratch_folders(tmp_path)) == 1
+    copy.release.set()
+    saved, error = save.outcome()
+    assert error.issue.code == IssueCode.SAVE_FAILED
+    assert list(out.iterdir()) == []  # Neither the complete first file nor the partial one.
+    assert not scratch_folders(tmp_path)  # The discard was applied after the save.
+
+
+def test_save_after_discard_reports_results_gone(make_manager, recorder, tmp_path):
+    """Saving discarded results is the usual SAVE_FAILED "no results" issue."""
+    out = tmp_path / "out"
+    out.mkdir()
+    manager, job_id = finished_job(make_manager, recorder, "a.pdf")
+    manager.discard(job_id)
+    with pytest.raises(ConversionError) as info:
+        manager.save(job_id, out, as_zip=False)
+    assert info.value.issue.code == IssueCode.SAVE_FAILED
+    assert info.value.issue.details == f"No results found for job {job_id}."
+    assert list(out.iterdir()) == []
+
+
+def test_concurrent_discards_delete_once(make_manager, recorder, tmp_path, monkeypatch):
+    """A second discard while the first is deleting is a no-op, not a second delete."""
+    manager, job_id = finished_job(make_manager, recorder, "a.pdf")
+    real_remove = jobs._remove_tree
+    removing = threading.Event()
+    release = threading.Event()
+    removed = []
+
+    def slow_remove(path):
+        removed.append(path)
+        removing.set()
+        assert release.wait(5)
+        real_remove(path)
+
+    monkeypatch.setattr(jobs, "_remove_tree", slow_remove)
+    first = threading.Thread(target=manager.discard, args=(job_id,), daemon=True)
+    first.start()
+    assert removing.wait(5)
+    manager.discard(job_id)  # Returns at once: the job is already gone.
+    assert len(removed) == 1
+    release.set()
+    first.join(5)
+    assert not first.is_alive()
+    assert len(removed) == 1
+    assert not scratch_folders(tmp_path)
+
+
+@pytest.mark.parametrize("as_zip", [False, True])
+def test_shutdown_during_save_waits_for_it(make_manager, recorder, tmp_path, monkeypatch, as_zip):
+    """Shutdown mid-copy lets the save finish, then deletes the scratch folder."""
+    out = tmp_path / "out"
+    out.mkdir()
+    names = ("a.pdf", "b.pdf")
+    manager, job_id = finished_job(make_manager, recorder, *names, action=Action.SPLIT)
+    job = manager._jobs[job_id]
+    copy = BlockingCopy(block_on=2)
+    monkeypatch.setattr(jobs, "_copy_stream", copy)
+    save = SaveThread(manager, job_id, out, as_zip)
+    save.start()
+    assert copy.mid_copy.wait(5)
+    shutdown = threading.Thread(target=manager.shutdown, kwargs={"timeout": 5}, daemon=True)
+    shutdown.start()
+    wait_state(manager, lambda: job.drop_requested)  # Shutdown has seen the save...
+    assert all(output.path.is_file() for output in job.outputs)  # ...and deleted nothing.
+    copy.release.set()
+    saved, error = save.outcome()
+    shutdown.join(5)
+    assert not shutdown.is_alive()
+    assert error is None
+    assert_complete(saved, as_zip, names)
+    assert not job.abort.is_set()  # It finished in time, so it wasn't aborted.
+    assert not scratch_folders(tmp_path)
+
+
+@pytest.mark.parametrize("as_zip", [False, True])
+def test_shutdown_aborts_a_slow_save_and_rolls_it_back(
+    make_manager, recorder, tmp_path, monkeypatch, as_zip
+):
+    """A save still copying when the shutdown timeout ends is aborted: no partial files remain."""
+    out = tmp_path / "out"
+    out.mkdir()
+    (out / "keep.txt").write_bytes(b"user file")
+    manager, job_id = finished_job(make_manager, recorder, "a.pdf", "b.pdf", action=Action.SPLIT)
+    job = manager._jobs[job_id]
+    copy = BlockingCopy(block_on=2, until_abort=True)  # Never finishes unless aborted.
+    monkeypatch.setattr(jobs, "_copy_stream", copy)
+    save = SaveThread(manager, job_id, out, as_zip)
+    save.start()
+    assert copy.mid_copy.wait(5)
+    manager.shutdown(timeout=0.01)  # The first wait runs out (the copy is blocked): abort.
+    saved, error = save.outcome()
+    assert job.abort.is_set()
+    assert saved is None
+    assert error.issue.code == IssueCode.SAVE_FAILED
+    assert "SaveAborted" in error.issue.details
+    assert [p.name for p in out.iterdir()] == ["keep.txt"]  # Partial and completed files gone.
+    assert (out / "keep.txt").read_bytes() == b"user file"
+    assert not scratch_folders(tmp_path)  # The save removed it once it had stopped.
+
+
+def test_save_after_shutdown_reports_results_gone(make_manager, recorder, tmp_path):
+    """After shutdown, saving is the usual "no results" issue and writes nothing."""
+    out = tmp_path / "out"
+    out.mkdir()
+    manager, job_id = finished_job(make_manager, recorder, "a.pdf")
+    manager.shutdown()
+    with pytest.raises(ConversionError) as info:
+        manager.save(job_id, out, as_zip=False)
+    assert "No results found" in info.value.issue.details
+    assert list(out.iterdir()) == []
+    assert not scratch_folders(tmp_path)

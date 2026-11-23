@@ -230,6 +230,10 @@ def check_repo(report: Report) -> None:
     # 3. Every listed licence file exists, and copyleft texts are complete.
     for c in components:
         report.check(bool(c["files"]), f"{c['name']} has no licence text")
+        report.check(
+            len(c["files"]) == len(set(c["files"])),
+            f"{c['name']}: duplicate licence paths in the manifest",
+        )
         for file in c["files"]:
             path = LICENSES / file
             if not path.is_file():
@@ -266,6 +270,10 @@ def check_repo(report: Report) -> None:
             )
     for key in ("mupdf", "pyinstaller", "python_runtime"):
         report.check(bool(sources.get(key, {}).get("url")), f"No source URL for {key}")
+        report.check(
+            bool(re.fullmatch(r"[0-9a-f]{64}", sources.get(key, {}).get("sha256", ""))),
+            f"No pinned SHA-256 for {key} source archive",
+        )
 
     # 5. The notices, installer and user-facing documents.
     notices = (ROOT / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8")

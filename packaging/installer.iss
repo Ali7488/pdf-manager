@@ -25,7 +25,7 @@
 #define AppName "PDF Manager"
 #define AppExeName "PDF Manager.exe"
 ; SourcePath is the folder holding this script (packaging\); its parent is the repo root.
-#define RepoRoot ExtractFileDir(RemoveBackslash(SourcePath))
+#define RepoRoot ExtractFileDir(RemoveBackslashUnlessRoot(SourcePath))
 #define BuildDir RepoRoot + "\dist\PDF Manager"
 
 #ifndef AppVersion
@@ -391,8 +391,10 @@ begin
   PowerPointFound := IsPowerPointInstalled;
   OcrAlreadyInstalled := IsTesseractInstalled;
   LibreOfficeAlreadyInstalled := IsLibreOfficeInstalled;
-  Log(Format('PowerPoint found: %d, Tesseract found: %d, LibreOffice found: %d',
-    [Ord(PowerPointFound), Ord(OcrAlreadyInstalled), Ord(LibreOfficeAlreadyInstalled)]));
+  { Keep the argument list on the same line: in [Code], a line starting with "["
+    is read by Inno Setup as a new section tag. }
+  Log(Format('PowerPoint found: %d, Tesseract found: %d, LibreOffice found: %d', [
+    Ord(PowerPointFound), Ord(OcrAlreadyInstalled), Ord(LibreOfficeAlreadyInstalled)]));
   CreateComponentsPage;
 end;
 

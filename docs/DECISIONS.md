@@ -73,6 +73,7 @@ Decisions made by the project owner, in their own direction (summarized, not quo
 | F31 | 2026-11-22 | The **install wizard offers both** optional components: Tesseract OCR (unchecked) and LibreOffice (checked only if PowerPoint isn't found). |
 | F32 | 2026-11-22 | Once a default folder is set, each mode page's **"Save to default folder" starts ticked**. |
 | F33 | 2026-11-22 | **No separate first-time OCR check**; the Convert modal's check is enough. |
+| F34 | 2026-11-22 | **Function-based API:** every conversion action (Flatten, Merge, Split and so on) goes through **one function** that takes an **action enum**, a **settings object** and the **data** (the files): `startJob(action, settings, data)` in the UI, `run_action(action, settings, data)` in Python. |
 
 ## Open questions
 

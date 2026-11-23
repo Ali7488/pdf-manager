@@ -49,4 +49,8 @@ A short, summarized record of each request made to the coding agent, and what ca
     - [x] Record the decision (F34).
     - [ ] Pass the change to the frontend agent.
     - [ ] Python side: `converter.run_action(action, settings, data)` with an `Action` enum.
+17. **Layers and more parallel agents.** Push small commits as you go, use as many subagents as needed, and separate the frontend, API and service layers. Checklist:
+    - [x] Record decisions P13 and F35.
+    - [ ] Define the service-layer interface (`run_action`, types, issues, cancellation).
+    - [ ] Hand the API layer, the new actions and packaging to parallel agents; merge their branches.
 

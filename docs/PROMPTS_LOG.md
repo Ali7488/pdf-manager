@@ -113,4 +113,5 @@ A short, summarized record of each request made to the coding agent, and what ca
 31. **UI refinements.** Soft rounded buttons, thicker borders, and at most three high-contrast, complementary tones per scheme (dark: black and gold; burgundy: burgundy and pink with white text). → Decision F43; screenshots checked for light and dark.
 32. **Less contrast, more muted.** Background, foreground, text and at most one accent per scheme; neighbouring colours easy to tell apart. → Decision F44; light and dark screenshots checked.
 33. **Drop the eyebrow texts.** Quick, easy instructions instead of subtitles everywhere. → Decision F45; action explanations moved into (?) tooltips; unused summaries and hint styles removed.
+34. **Too empty: add explanation, not eyebrows.** → Each action page opens with a plain sentence on what it does; every option has a short explanation beside it (F45 updated).
 

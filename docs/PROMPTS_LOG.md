@@ -17,18 +17,18 @@ A short, summarized record of each request made to the coding agent, and what ca
 11. **Add docstrings and comments** so the intended behaviour can be read from the code. → Every function documented; known issues flagged inline.
 12. **Converter fixes and project docs** (this batch). Restate the plan and log it before starting, then discuss frontend v1, which will be built by a parallel agent while the converter work continues. Checklist:
     - [x] Add `AGENTS.md`, `CLAUDE.md` and this prompts log.
-    - [ ] **PowerPoint quitting:** only close PowerPoint if the converter started it, so the user's open PowerPoint and presentations are never closed.
-    - [ ] **PowerPoint errors:** keep the real PowerPoint error. If conversion fails completely, show it in a popup; if LibreOffice rescued it, return it as a structured warning instead.
-    - [ ] **Error logs:** write errors and warnings to a logs folder next to the installed app, and add a button that opens that folder in File Explorer.
-    - [ ] **Cancel:** a manual Cancel button that stops a running job, including killing Tesseract or LibreOffice mid-run.
-    - [ ] **Automatic timeouts:** give up on a page that takes too long to OCR (default to be chosen, likely about 2 minutes, configurable), and on a PowerPoint export that hangs.
-    - [ ] **Keep bookmarks** when merging (and when flattening), with one top-level bookmark per input file.
-    - [ ] **Contents page (can be turned off; default to be confirmed):** for merged output, add an index page at the start listing every input file with its page range and clickable links.
-    - [ ] **Page numbering** for merged output, using viewer page labels.
-    - [ ] **Stricter flatten check:** every page must be image-backed and the page count must match the input.
-    - [ ] **Registry path fix:** handle unquoted `tesseract.exe,0` values in `find_tesseract`.
-    - [ ] **Installer:** detect Microsoft PowerPoint first; offer LibreOffice as an optional backup instead of always installing it.
-    - [ ] **Investigate PowerPoint falling back to LibreOffice too often:** check whether the success check is too strict, and look at the documented "Waiting for printer connection" popup during PowerPoint's PDF export.
+    - [x] *(service done; not yet run on Windows)* **PowerPoint quitting:** only close PowerPoint if the converter started it, so the user's open PowerPoint and presentations are never closed.
+    - [x] *(service done: warning or error issue with the real PowerPoint error; the popup is the frontend's job)* **PowerPoint errors:** keep the real PowerPoint error. If conversion fails completely, show it in a popup; if LibreOffice rescued it, return it as a structured warning instead.
+    - [ ] *(API layer, in progress)* **Error logs:** write errors and warnings to a logs folder next to the installed app, and add a button that opens that folder in File Explorer.
+    - [x] *(service done: cancel stops between pages and kills Tesseract/LibreOffice/PowerPoint we started; the button is the frontend's job)* **Cancel:** a manual Cancel button that stops a running job, including killing Tesseract or LibreOffice mid-run.
+    - [x] *(done: 2 minutes per OCR page by default, 5 minutes per PowerPoint/LibreOffice export)* **Automatic timeouts:** give up on a page that takes too long to OCR (default to be chosen, likely about 2 minutes, configurable), and on a PowerPoint export that hangs.
+    - [x] **Keep bookmarks** when merging (and when flattening), with one top-level bookmark per input file.
+    - [x] **Contents page (can be turned off; default to be confirmed):** for merged output, add an index page at the start listing every input file with its page range and clickable links.
+    - [x] **Page numbering** for merged output, using viewer page labels.
+    - [x] **Stricter flatten check:** every page must be image-backed and the page count must match the input.
+    - [x] **Registry path fix:** handle unquoted `tesseract.exe,0` values in `find_tesseract`.
+    - [x] *(new install wizard in `packaging/`; never compiled or run on Windows yet)* **Installer:** detect Microsoft PowerPoint first; offer LibreOffice as an optional backup instead of always installing it.
+    - [x] *(two likely causes addressed, neither confirmed on Windows: the Mark-of-the-Web / Protected View problem, fixed by rendering a plain copy; and the printer dialog, now timed out with troubleshooting text)* **Investigate PowerPoint falling back to LibreOffice too often:** check whether the success check is too strict, and look at the documented "Waiting for printer connection" popup during PowerPoint's PDF export.
 13. **Answers and frontend v1 direction.** Logs go next to the installed app; page numbering uses viewer labels; the fallback issue is about LibreOffice. Defined the frontend: a desktop window app for Windows 11, Vite + React + TypeScript + npm, CSS Modules in feature folders, themes, IBM Plex Sans, drag-and-drop files, new Split mode (and possibly format conversion), a "Use OCR" checkbox, troubleshooting popups, a tool-check modal on Convert, and sidebar navigation. Asked for a running decisions log, a role statement in `AGENTS.md`, and a full plan plus clarifications before any work starts. Checklist:
     - [x] Create `docs/DECISIONS.md` with every owner decision so far.
     - [x] Add the senior full-stack engineer role statement to `AGENTS.md`.
@@ -40,22 +40,22 @@ A short, summarized record of each request made to the coding agent, and what ca
 15. **Start as planned.** Write the API contract first, then build the frontend with a parallel agent in its own worktree while the converter work continues. Checklist:
     - [x] API contract (`docs/API.md` and `frontend/src/api/types.ts`).
     - [x] Launch the frontend agent.
-    - [ ] Converter fixes and new modes (checklist in item 12 plus Split, Images to PDF and Compress).
+    - [x] Converter fixes and new modes (checklist in item 12 plus Split, Images to PDF and Compress).
     - [ ] pywebview shell connecting the UI to the converter.
-    - [ ] Packaging: PyInstaller and the Inno Setup install wizard.
+    - [x] *(written; untested on Windows)* Packaging: PyInstaller and the Inno Setup install wizard.
     - [ ] Delete the Tkinter app once the new app works.
 16. **Function-based API.** Conversion actions share one function that takes an action enum, a settings object and the data, instead of a single bundled request object. Checklist:
     - [x] Update `frontend/src/api/types.ts` and `docs/API.md` (`startJob(action, settings, data)`, `Action` enum, `ActionSettings`, `ActionData`).
     - [x] Record the decision (F34).
-    - [ ] Pass the change to the frontend agent.
-    - [ ] Python side: `converter.run_action(action, settings, data)` with an `Action` enum.
+    - [x] Pass the change to the frontend agent.
+    - [x] Python side: `converter.run_action(action, settings, data)` with an `Action` enum.
 17. **Layers and more parallel agents.** Push small commits as you go, use as many subagents as needed, and separate the frontend, API and service layers. Checklist:
     - [x] Record decisions P13 and F35.
-    - [ ] Define the service-layer interface (`run_action`, types, issues, cancellation).
+    - [x] Define the service-layer interface (`run_action`, types, issues, cancellation).
     - [ ] Hand the API layer, the new actions and packaging to parallel agents; merge their branches.
 18. **Verbose logging in development.** Error logging should be verbose in development mode; production can be more concise but still keep some verbose logs. Checklist:
     - [x] Record decision C13.
-    - [ ] Service layer logs verbosely at DEBUG level (commands, timings, tool output, tracebacks).
+    - [x] Service layer logs verbosely at DEBUG level (commands, timings, tool output, tracebacks).
     - [ ] API layer: DEBUG level in development mode, INFO in production, with errors always logged in full.
 19. **Roadmap.** Windows first, then an Ubuntu `.deb` and an Arch `PKGBUILD`, then Qt, then GNOME. Checklist:
     - [x] Record decision P14 and open questions O9 (meaning of "Qt then GNOME") and O10 (Linux log location).
@@ -63,7 +63,7 @@ A short, summarized record of each request made to the coding agent, and what ca
 20. **Cross-platform architecture.** Support Windows, Ubuntu/Debian and Arch from one frontend and one Python engine; isolate platform-specific code behind minimal interfaces; keep PowerPoint COM optional with LibreOffice as the cross-platform renderer; no Linux packaging yet; no Windows-only assumptions in shared logic; document portability constraints and future Linux release requirements without interrupting the running subagents. Checklist:
     - [x] Record decision P15.
     - [x] Write `docs/PORTABILITY.md`.
-    - [ ] Service layer: move platform-specific code into `converter/platforms/` (Windows and POSIX modules behind one small interface).
+    - [x] Service layer: move platform-specific code into `converter/platforms/` (Windows and POSIX modules behind one small interface), enforced by `tests/test_portability.py`.
     - [ ] API layer: after merging its branch, move Windows-specific parts (opening folders, OCR install, settings paths) behind the same kind of interface.
 21. **Documentation for a post-build review.** Keep accurate, proportional documentation of architecture decisions, dependencies, execution flows, non-obvious choices, significant bugs, tests and CI, so the owner can understand, debug, modify and defend the app; never claim unreviewed code was reviewed. Checklist:
     - [x] Record decision P16 and add the rule to `AGENTS.md`.
@@ -71,5 +71,5 @@ A short, summarized record of each request made to the coding agent, and what ca
     - [ ] Update `docs/ENGINEERING_REVIEW.md` with the bugs found and their status, plus a review-status section.
 22. **Split the converter into folders by responsibility.** Checklist:
     - [x] Record decision F36.
-    - [ ] Restructure `converter/` into subpackages once `run_action` lands (and update imports in merged agent branches).
+    - [x] Restructure `converter/` into subpackages (the API-layer branch's imports still need updating when it's merged).
 

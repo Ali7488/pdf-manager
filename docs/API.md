@@ -4,7 +4,14 @@ How the React frontend and the Python backend talk to each other inside the desk
 
 ## Transport
 
-The app is a **pywebview** window (Edge WebView2 on Windows 11) showing the built React app. There is **no local web server**.
+The desktop app is a **pywebview** window (Edge WebView2 on Windows 11) showing the built React app; it has no local web server. **Browser mode** (decision P33) shows the same app in the user's own browser, through a loopback-only HTTP API instead. It has the same methods and JSON shapes, with these differences:
+
+- the routes are listed in `api/web/server.py` (`ROUTES`);
+- files, picked folders and downloads are opaque IDs; `InputFile.path` is an ID there;
+- the page polls job and OCR-install status instead of receiving events, and dispatches the same events itself;
+- dropped files are uploaded.
+
+See [BROWSER_MODE.md](BROWSER_MODE.md). The rest of this page describes the desktop transport; the calls, models and rules apply to both.
 
 - **UI → Python (calls):** pywebview exposes a Python object as `window.pywebview.api`. Each method returns a `Promise`. Python method names are `snake_case`; the frontend wraps them in a typed `camelCase` client (`src/api/client.ts`).
 - **Python → UI (events):** Python dispatches DOM events on `window`, named `pdfmanager:<eventName>`, with the payload in `event.detail`.

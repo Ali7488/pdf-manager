@@ -45,6 +45,15 @@ The workflow runs only when started by hand (the repository is public, so standa
 
 The run also checks licensing. `scripts/check_licenses.py` fails the build if any file in the bundle or in the installed app belongs to no component listed in `THIRD_PARTY_NOTICES.md`, or if the installed licence files differ from the repository's. A second job uploads **PDF-Manager-third-party-sources**, the third-party source code to attach to the release (see `LICENSING.md`). Nothing is published.
 
+## The browser-mode ZIP
+
+`packaging/build-browser.ps1` builds the portable browser-mode app (docs/BROWSER_MODE.md) as `dist\PDF-Manager-<version>-browser-windows-x64.zip`: the folder `PDF Manager (browser)` with `PDF Manager.exe`, its licences and `READ ME FIRST.txt`. It needs uv and Node.js; Inno Setup isn't needed.
+
+- **Bundling:** `pdf-manager.spec` with `PDF_MANAGER_BUILD=browser`, from its own environment (`build\venv-browser`, `--no-group desktop`). Your `.venv` is left alone, and pywebview, pythonnet and the WebView2 SDK can't get in.
+- **Checks:** `check_licenses.py bundle --build browser` checks the bundle. `stage_licenses.py --build browser` then adds exactly its licence texts, which `--installed --build browser` checks byte for byte.
+- **No installer:** nothing checks for the Microsoft Visual C++ Redistributable, so `READ ME FIRST.txt` and the README say to install it first.
+- **On GitHub:** the `browser-zip` job of `build-windows.yml` builds it, unzips it, checks the unzipped folder, and runs `tests/e2e` against the packaged exe with the runner's Edge. It uploads **PDF-Manager-browser-ZIP**, and the sources job uploads **PDF-Manager-browser-third-party-sources**.
+
 ## Releasing (only with the owner's approval)
 
 1. Bump the version in `pyproject.toml`; regenerate the notices if dependencies changed (`uv run --with pip python scripts/collect_licenses.py`) and commit.

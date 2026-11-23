@@ -13,7 +13,7 @@ import { NumberSetting } from "./NumberSetting";
 import { OcrSection } from "./OcrSection";
 import styles from "./SettingsPage.module.css";
 import { ThemePicker } from "./ThemePicker";
-import { APP_LICENSE, COPYRIGHT, SOURCE_URL } from "../../lib/about";
+import { APP_LICENSE, COPYRIGHT, SOURCE_URL, sourceUrlFor } from "../../lib/about";
 
 /** The Settings page. */
 export function SettingsPage() {
@@ -142,7 +142,9 @@ export function SettingsPage() {
           source code is also available under the MIT License. The full licence texts, the third-party notices
           and the build instructions come with the app; the third-party source code is attached to each release.
         </p>
-        <p>Complete source code: {SOURCE_URL}</p>
+        <p>
+          Complete source code: {appInfo ? `${sourceUrlFor(appInfo.version)} (this version)` : SOURCE_URL}
+        </p>
         <div>
           <Button
             icon="folder"

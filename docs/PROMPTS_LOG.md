@@ -156,9 +156,10 @@ A short, summarized record of each request made to the coding agent, and what ca
 
     Checklist:
     - [x] Merge PR #1 (`9f58e64`).
-    - [ ] Shared workflow extracted from the desktop bridge; browser-mode server, session, operations and launcher; native dialogs; `main.py --browser` / `--no-browser`.
-    - [ ] Frontend HTTP adapter (server bootstrap, polling, uploads, download fallback, connection errors).
-    - [ ] Browser-only dependency set; portable ZIP build; artifact licence checks.
-    - [ ] Tests: unit, security, real browser integration; CI and Windows build.
-    - [ ] Docs and decisions; draft pull request for review.
+    - [x] Shared workflow extracted from the desktop bridge; browser-mode server, session, operations and launcher; native dialogs; `main.py --browser` / `--no-browser`.
+    - [x] Frontend HTTP adapter (server bootstrap, polling, uploads, download fallback, connection errors).
+    - [x] Browser-only dependency set; portable ZIP build; artifact licence checks. The owner added: include every licence as dependencies are added. Every new dependency's licence was checked; the browser build's licences are generated and checked.
+    - [x] Tests: unit, security, real browser integration (local, with the frozen Linux build too).
+    - [ ] CI and Windows build results; draft pull request for review.
+    - [x] Docs and decisions (P33, docs/BROWSER_MODE.md).
 

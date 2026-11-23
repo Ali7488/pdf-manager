@@ -43,6 +43,17 @@ See [`packaging/README.md`](packaging/README.md). In short, on Windows with uv, 
 
 This builds the interface, installs the locked Python dependencies, bundles the app with PyInstaller and compiles the installer.
 
+## The browser-mode ZIP
+
+The browser-mode ZIP ([docs/BROWSER_MODE.md](docs/BROWSER_MODE.md)) is the same app without the desktop window's toolkit (pywebview, pythonnet, Qt, the WebView2 SDK) and without the installer. It is also distributed under the AGPL-3.0.
+
+- **Notices:** [`THIRD_PARTY_NOTICES-browser.md`](THIRD_PARTY_NOTICES-browser.md), shipped as `THIRD_PARTY_NOTICES.md`, with exactly the licence texts of what the ZIP contains. Its build fails if a desktop-only file is bundled, or a licence text is missing or extra.
+- **Sources:** its third-party sources are gathered with `scripts/collect_sources.py --platform windows --build browser`.
+- **The browser:** it runs in the user's own browser, which is never shipped.
+- **AGPL-3.0 section 13:** the server listens on 127.0.0.1 only, so the only user is the person running the app, who already has the source. Settings → About also links to the source of exactly the running version. A version modified to serve other people over a network (for example a future Docker image) must offer those users its own corresponding source.
+
+**Development and test tools aren't distributed:** pytest, python-pptx, Playwright and the browser it drives, PyInstaller's build-time packages, and the frontend's build tools. Playwright (Apache-2.0) and its greenlet dependency (MIT AND Python-2.0) are in the separate `e2e` group, so they never enter a build. The PyInstaller bootloader that *is* bundled is listed in the notices.
+
 ## Notices shipped with the app
 
 The installer puts these next to the app: `LICENSE.txt` (MIT, the original code), `LICENSE-AGPL-3.0.txt`, this file, `THIRD_PARTY_NOTICES.md` and the `licenses/` folder. In the app, **Settings → About** shows the copyright, the licence, the no-warranty notice and where to get the source, and **Open licences folder** opens these files.

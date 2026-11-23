@@ -37,6 +37,18 @@ If PDF Manager shows **"Failed to load Python DLL"** when it starts, the Microso
 
 You can install OCR later from the app's **Settings**. Logs are written to a `logs` folder next to the installed app (open it from Settings); settings are in `%LOCALAPPDATA%\PDFManager`.
 
+### Windows 11: in your web browser (portable ZIP, being tested)
+
+The same app, without the installer or the desktop window: it opens in your own web browser ([details](docs/BROWSER_MODE.md)).
+
+1. Install the **Microsoft Visual C++ Redistributable (x64)**, version 14.44 or newer, if you don't have it (`https://aka.ms/vc14/vc_redist.x64.exe`; it needs administrator permission).
+2. Unzip **`PDF-Manager-<version>-browser-windows-x64.zip`** and double-click **`PDF Manager.exe`** in the folder.
+3. **Browser expectation:**
+   - If your **default browser is Microsoft Edge or a Chromium-based browser** (Google Chrome, Brave, Chromium), PDF Manager opens in **its own window, with no tabs or address bar** (app mode).
+   - **With any other default browser (for example Firefox), it opens as a normal tab** in that browser, at a local address (`http://127.0.0.1:...`).
+   - Either way it works offline, and your files never leave your computer.
+4. Closing the window leaves PDF Manager running, so it reopens quickly. Quit it from **Settings → Quit PDF Manager**; it also quits by itself after an hour without use.
+
 ### Linux (Ubuntu/Debian, Arch)
 
 Linux packages are planned for **v0.75**. Until then, run it from source (see *Development* below).
@@ -119,6 +131,7 @@ main.py                Desktop application entry point
 
 - [Architecture](docs/ARCHITECTURE.md): layers, execution flows, non-obvious choices, tests and CI.
 - [UI ↔ Python API](docs/API.md): bridge methods, JSON models and events.
+- [Browser mode](docs/BROWSER_MODE.md): the app in your own browser. It opens in app mode with Edge or a Chromium-based browser, otherwise as a localhost tab. Also covers security and the portable ZIP.
 - [Decisions](docs/DECISIONS.md): the owner's decisions.
 - [Engineering review](docs/ENGINEERING_REVIEW.md): known issues, test evidence and verification gaps.
 - [Portability](docs/PORTABILITY.md): Windows and Linux considerations.

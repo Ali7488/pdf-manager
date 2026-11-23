@@ -108,6 +108,17 @@ Vite + React + TypeScript, CSS Modules, feature folders (`pages/`, `components/`
 | `actions/compress.py` | Balanced: images above 200 DPI → 150 DPI, JPEG q75. Strong: above 120 → 96 DPI, q50. Light: lossless clean-up only. Never returns a bigger file. Uses PyMuPDF's low-level `mupdf.PdfImageRewriterOptions`. | Exact target resolutions need bicubic subsampling options the simple `rewrite_images` arguments don't offer. The low-level API is more likely to change between PyMuPDF versions (tests would catch it). |
 | `actions/split.py` | Ranges accept spaces and en/em dashes; overlapping ranges allowed; each part keeps in-range bookmarks with shifted pages and drops links to pages outside it. | Friendly input; valid output files. |
 
+### Browser mode (`api/web/`)
+
+`main.py --browser` serves the same interface from `127.0.0.1` (decision P33; [BROWSER_MODE.md](BROWSER_MODE.md)). `api/workflow.py` holds what both front doors share: settings, tool checks, OCR, jobs and saving. `api/bridge.py` adds only the pywebview window's dialogs, drops and DOM events. The browser-mode modules:
+
+- `web/session.py`: the per-launch opaque IDs, staged uploads and polled status;
+- `web/operations.py`: the explicit operations and their input checks;
+- `web/server.py`: the loopback HTTP server (session cookie, Host/Origin checks, limits);
+- `web/launch.py`: start, reuse, opening the default browser in app mode or a tab, and shutdown.
+
+The frontend picks `api/http.ts` when the server's bootstrap tag is present.
+
 ## Dependencies
 
 Runtime: **PyMuPDF** (all PDF work), **pywin32** (Windows only, optional PowerPoint). External programs: **Tesseract** (OCR, optional), **LibreOffice** (slides; required on Linux, backup on Windows), **Microsoft PowerPoint** (optional, Windows). The API layer uses **pywebview** (the window and the JS bridge; Edge WebView2 on Windows). The frontend's runtime dependencies are React and dnd-kit; the font is bundled. Details and per-platform package names: [`../README.md`](../README.md), [`PORTABILITY.md`](PORTABILITY.md). Python ≥ 3.11 (uses `StrEnum`); pinned to 3.13.

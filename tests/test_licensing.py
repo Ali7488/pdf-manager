@@ -122,6 +122,30 @@ def _fake_app(tmp_path: Path) -> Path:
     return app
 
 
+def test_complete_fake_app_passes_the_bundle_check(tmp_path):
+    """Every component type in one app folder: nothing may be reported for them."""
+    app = _fake_app(tmp_path)
+    internal = app / "_internal"
+    for relative in [
+        "unins000.exe",
+        "_internal/vcruntime140.dll",
+        "_internal/MSVCP140.dll",
+        "_internal/mupdfcpp64.dll",
+        "_internal/libcrypto-3.dll",
+        "_internal/pythonnet/runtime/Python.Runtime.dll",
+        "_internal/clr_loader/ffi/dlls/amd64/ClrLoader.dll",
+        "_internal/pywin32_system32/pythoncom313.dll",
+        "_internal/_cffi_backend.cp313-win_amd64.pyd",
+    ]:
+        (app / relative).parent.mkdir(parents=True, exist_ok=True)
+        (app / relative).write_bytes(b"MZ")
+    del internal
+    failures = _failures(lambda r: check.check_bundle(r, app, installed=False))
+    # Only the WebView2 files can differ here (the fake app has placeholders when the
+    # pywebview wheel isn't cached) and the Python version (this isn't a Windows build).
+    assert [f for f in failures if "WebView2" not in f and "Python" not in f] == []
+
+
 def test_unknown_native_file_in_bundle_fails(tmp_path):
     app = _fake_app(tmp_path)
     (app / "_internal" / "mystery.dll").write_bytes(b"MZ")

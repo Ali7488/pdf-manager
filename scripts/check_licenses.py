@@ -89,6 +89,14 @@ RUNTIME_FILES = [
     "winsound.pyd",
 ]
 NATIVE = {".dll", ".pyd", ".exe", ".so"}
+# Components that aren't Python packages, and words their manifest entry's name contains.
+NON_PACKAGE = {
+    "WEBVIEW2": "WebView2",
+    "PYTHON RUNTIME": "python.org Windows",
+    "MSVC RUNTIME": "Visual C++ runtime",
+    "PyInstaller bootloader": "PyInstaller bootloader",
+    "INNO SETUP": "Inno Setup",
+}
 
 
 class Report:
@@ -316,23 +324,12 @@ def check_bundle(report: Report, app: Path, installed: bool) -> None:
             continue
         counts[component] = counts.get(component, 0) + 1
         print(f"  {relative}: {component}")
-        if component not in (
-            "WEBVIEW2",
-            "PYTHON RUNTIME",
-            "MSVC RUNTIME",
-            "PyInstaller bootloader",
-        ):
+        if component not in NON_PACKAGE:
             report.check(_norm(component) in names, f"{relative}: {component} isn't listed")
     for relative in unknown:
         report.fail(f"{relative} belongs to no listed component; add its notice")
     listed = " ".join(c["name"] for c in manifest["components"])
-    for component, words in (
-        ("WEBVIEW2", "WebView2"),
-        ("PYTHON RUNTIME", "python.org Windows"),
-        ("MSVC RUNTIME", "Visual C++ runtime"),
-        ("PyInstaller bootloader", "PyInstaller bootloader"),
-        ("INNO SETUP", "Inno Setup"),
-    ):
+    for component, words in NON_PACKAGE.items():
         if counts.get(component):
             report.check(words in listed, f"The notices don't list the {component.lower()}")
     print("Native files by component:", json.dumps(counts, sort_keys=True))

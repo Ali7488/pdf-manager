@@ -22,4 +22,4 @@ Modules:
 # Shown in Settings ("About") and written to the log on start. Keep in sync with
 # ``version`` in pyproject.toml (a test checks this). A constant, rather than
 # reading pyproject.toml, so it also works in the packaged executable.
-__version__ = "1.1.1"
+__version__ = "0.5.0"

@@ -281,12 +281,13 @@ class Api:
     # ----- Contract methods (public: exposed to JavaScript) -----
 
     def get_app_info(self) -> dict[str, Any]:
-        """Return the app version, logs folder and platform (``AppInfo``)."""
+        """Return the app version, logs and licences folders, and platform (``AppInfo``)."""
 
         def body() -> dict[str, Any]:
             return {
                 "version": __version__,
                 "logsDir": str(self._logs_folder()),
+                "licensesDir": str(paths.licenses_dir()),
                 "platform": platforms.platform_name(),
             }
 
@@ -295,6 +296,7 @@ class Api:
             lambda issue: {
                 "version": __version__,
                 "logsDir": "",
+                "licensesDir": "",
                 "platform": platforms.platform_name(),
             },
             body,

@@ -464,7 +464,8 @@ export function createMockApi(options: MockOptions = {}): MockApi {
     async getAppInfo(): Promise<AppInfo> {
       await latency();
       const logsDir = platform === "windows" ? "C:\\Users\\Public\\PDF Manager\\logs" : "/home/user/.local/state/pdf-manager/logs";
-      return { version: "1.0.0 (preview)", logsDir, platform };
+      const licensesDir = platform === "windows" ? "C:\\Users\\Public\\PDF Manager" : "/opt/pdf-manager";
+      return { version: "1.0.0 (preview)", logsDir, licensesDir, platform };
     },
 
     async getSettings() {

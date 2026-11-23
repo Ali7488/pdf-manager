@@ -223,9 +223,13 @@ def test_emit_failure_is_swallowed(api_obj, window):
 
 
 def test_get_app_info(api_obj, logs):
-    """AppInfo has version, logs folder and platform."""
+    """AppInfo has version, logs and licences folders, and platform."""
     info = api_obj.get_app_info()
-    assert set(info) == {"version", "logsDir", "platform"}
+    assert set(info) == {"version", "logsDir", "licensesDir", "platform"}
+    # From source the licence texts are at the repository root.
+    licenses_dir = Path(info["licensesDir"])
+    assert (licenses_dir / "LICENSE").is_file()
+    assert (licenses_dir / "THIRD_PARTY_NOTICES.md").is_file()
     assert info["logsDir"] == str(logs.parent)
     assert info["platform"] in {"windows", "linux", "mac"}
     assert info["platform"] == platforms.platform_name()

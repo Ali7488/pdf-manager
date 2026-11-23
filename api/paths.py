@@ -75,6 +75,19 @@ def ui_index() -> Path:
     return resource_dir() / "frontend" / "dist" / "index.html"
 
 
+def licenses_dir() -> Path:
+    """Folder holding the licence texts shown from Settings > About.
+
+    Installed, the installer puts ``LICENSING.md``, ``THIRD_PARTY_NOTICES.md``,
+    the licence files and the ``licenses/`` folder next to the app, so this is
+    the app folder. From source, it's the repository root (same files).
+
+    Returns:
+        The app folder (installed) or the repository root (source).
+    """
+    return app_dir()
+
+
 def logs_dir() -> Path:
     """The logs folder.
 

@@ -1,0 +1,3 @@
+-r requirements.txt
+# Test-only: builds a sample PPTX fixture.
+python-pptx>=1.0,<2

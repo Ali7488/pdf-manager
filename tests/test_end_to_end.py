@@ -19,8 +19,10 @@ from converter import (
     ActionSettings,
     Cancelled,
     CancelToken,
+    CompressLevel,
     ConversionError,
     IssueCode,
+    SplitMethod,
     run_action,
     safe_destination,
 )
@@ -164,3 +166,81 @@ def test_safe_destination_never_overwrites(tmp_path):
     taken: set[str] = set()
     assert safe_destination(tmp_path, "Sample.pdf", taken).name == "Sample (2).pdf"
     assert safe_destination(tmp_path, "Sample.pdf", taken).name == "Sample (3).pdf"
+
+
+def test_split_ranges_through_run_action(tmp_path):
+    src = text_pdf(tmp_path / "Report.pdf", [f"Page {i}" for i in range(1, 7)])
+    settings = ActionSettings()
+    settings.split.ranges = "1-2, 5"
+    result = run_action(Action.SPLIT, settings, ActionData([src]), scratch=tmp_path / "w")
+    assert [(o.name, o.page_count) for o in result.outputs] == [
+        ("Report - pages 1-2.pdf", 2),
+        ("Report - page 5.pdf", 1),
+    ]
+
+
+def test_split_bad_ranges_is_a_clear_issue(tmp_path):
+    src = text_pdf(tmp_path / "Report.pdf", ["one", "two"])
+    settings = ActionSettings()
+    settings.split.ranges = "1-9"
+    with pytest.raises(ConversionError) as err:
+        run_action(Action.SPLIT, settings, ActionData([src]), scratch=tmp_path / "w")
+    assert err.value.issue.code is IssueCode.INVALID_PAGE_RANGES
+
+
+@needs_lo
+def test_split_accepts_powerpoint(tmp_path, inputs):
+    _, pptx = inputs
+    settings = ActionSettings()
+    settings.split.method = SplitMethod.PER_PAGE
+    result = run_action(Action.SPLIT, settings, ActionData([pptx]), scratch=tmp_path / "w")
+    assert [o.name for o in result.outputs] == ["Document B - page 1.pdf"]
+
+
+def png(path, text):
+    with fitz.open() as doc:
+        page = doc.new_page(width=600, height=300)
+        page.insert_text((40, 120), text, fontsize=30)
+        page.get_pixmap(dpi=150).save(str(path))
+    return path
+
+
+@needs_ocr
+def test_images_combined_with_ocr(tmp_path):
+    images = [png(tmp_path / "First.png", "Image one text"), png(tmp_path / "b.png", "Second")]
+    result = run_action(
+        Action.IMAGES_TO_PDF,
+        ActionSettings(use_ocr=True, combine_images=True),
+        ActionData(images),
+        scratch=tmp_path / "w",
+    )
+    [output] = result.outputs
+    assert output.name == "First + 1 more - Images.pdf" and output.page_count == 2
+    assert "Image one" in page_texts(output.path)[0]
+
+
+def test_images_one_pdf_each(tmp_path):
+    images = [png(tmp_path / "a.png", "A"), png(tmp_path / "b.png", "B")]
+    result = run_action(
+        Action.IMAGES_TO_PDF,
+        ActionSettings(combine_images=False),
+        ActionData(images),
+        scratch=tmp_path / "w",
+    )
+    assert [o.name for o in result.outputs] == ["a.pdf", "b.pdf"]
+
+
+def test_compress_through_run_action(tmp_path):
+    src = text_pdf(tmp_path / "Report.pdf", ["Keep this text"])
+    before = sha(src)
+    result = run_action(
+        Action.COMPRESS,
+        ActionSettings(compress_level=CompressLevel.STRONG),
+        ActionData([src]),
+        scratch=tmp_path / "w",
+    )
+    [output] = result.outputs
+    assert output.name == "Report - Compressed.pdf"
+    assert output.size_bytes <= src.stat().st_size
+    assert "Keep this text" in page_texts(output.path)[0]
+    assert sha(src) == before

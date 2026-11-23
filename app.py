@@ -251,9 +251,7 @@ class Dashboard:
 
         heading = tk.Frame(wrapper, bg=BG)
         heading.pack(fill="x")
-        tk.Label(heading, text=APP_NAME, bg=BG, fg=TEXT, font=(FONT, 21, "bold")).pack(
-            anchor="w"
-        )
+        tk.Label(heading, text=APP_NAME, bg=BG, fg=TEXT, font=(FONT, 21, "bold")).pack(anchor="w")
         tk.Label(
             heading,
             text="Flatten, OCR and merge PDFs and PowerPoints",
@@ -571,9 +569,7 @@ class Dashboard:
         # Antivirus/PDF renderer locks can linger briefly on Windows.
         # Cleanup is best effort: never turn a successful conversion into a
         # failure just because one scratch file is temporarily locked.
-        self.temp = tempfile.TemporaryDirectory(
-            prefix="slidestitch-", ignore_cleanup_errors=True
-        )
+        self.temp = tempfile.TemporaryDirectory(prefix="slidestitch-", ignore_cleanup_errors=True)
         self.set_busy(True)
         self.status.set("Converting files. Keep this window open...")
         threading.Thread(

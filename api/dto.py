@@ -214,7 +214,11 @@ def parse_save_options(value: Any) -> tuple[Path | None, bool]:
 
 
 def issue_to_json(issue: Issue) -> dict[str, Any]:
-    """Convert an :class:`Issue` to the contract's ``Issue`` object."""
+    """Convert an :class:`Issue` to the contract's ``Issue`` object.
+
+    ``command`` (a command the user can copy and run themselves, decision
+    C16) is always present: ``None`` (JSON ``null``) when the issue has none.
+    """
     return {
         "code": str(issue.code),
         "severity": str(issue.severity),
@@ -223,6 +227,7 @@ def issue_to_json(issue: Issue) -> dict[str, Any]:
         "troubleshooting": list(issue.troubleshooting),
         "details": issue.details,
         "logFile": issue.log_file,
+        "command": issue.command,
         "file": issue.file,
     }
 

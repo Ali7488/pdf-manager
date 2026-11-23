@@ -2,37 +2,31 @@
 
 Two run modes are supported:
 
-* **Source** (development): ``uv run main.py`` from the repository. Every
-  folder is relative to the repository root.
+* **Source** (development): ``uv run main.py`` from the repository. The app
+  and resource folders are the repository root, and logs go to its ``logs/``
+  folder on every platform.
 * **Frozen** (the installed app): a PyInstaller executable. Bundled files
-  (the built UI) are unpacked to ``sys._MEIPASS``; the logs folder sits next
-  to the executable (decision C4). The app installs per user (decision F17),
-  so that folder is writable.
+  (the built UI) are unpacked to ``sys._MEIPASS``. The logs folder is chosen
+  by the platform module: next to the executable on Windows (decision C4;
+  the app installs per user, decision F17, so that folder is writable), and
+  the XDG state folder on Linux (decision C15).
+
+Settings live in the platform's per-user settings folder in both modes.
 """
 
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
+
+from . import platforms
 
 # Repository root: this file is <root>/api/paths.py.
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 
 # Folder and file names, in one place.
-APP_FOLDER_WINDOWS = "PDFManager"  # Under %LOCALAPPDATA%.
-APP_FOLDER_OTHER = "pdf-manager"  # Under $XDG_CONFIG_HOME.
 SETTINGS_FILE = "settings.json"
 LOGS_FOLDER = "logs"
-
-
-def on_windows() -> bool:
-    """Whether the app runs on Windows (a function so tests can switch it).
-
-    Returns:
-        True on Windows.
-    """
-    return os.name == "nt"
 
 
 def is_frozen() -> bool:
@@ -82,30 +76,29 @@ def ui_index() -> Path:
 
 
 def logs_dir() -> Path:
-    """The logs folder, next to the installed app (decision C4).
+    """The logs folder.
 
     Returns:
-        ``<app_dir>/logs``. Not created here.
+        From source, the repository's ``logs/`` folder. Installed, the
+        platform's choice (:func:`api.platforms.installed_logs_dir`): next to
+        the app on Windows (decision C4), ``$XDG_STATE_HOME/pdf-manager/logs``
+        on Linux (decision C15). Not created here.
     """
-    return app_dir() / LOGS_FOLDER
+    if not is_frozen():
+        return _REPO_ROOT / LOGS_FOLDER
+    return platforms.installed_logs_dir(app_dir())
 
 
 def settings_path() -> Path:
     """Where the user's settings are saved.
 
-    On Windows this is per user, under ``%LOCALAPPDATA%\\PDFManager``, so it
-    survives reinstalls and needs no admin rights. Elsewhere it follows the
-    XDG convention (``$XDG_CONFIG_HOME``, default ``~/.config``).
+    The folder is per user and comes from the platform module:
+    ``%LOCALAPPDATA%\\PDFManager`` on Windows (it survives reinstalls and
+    needs no admin rights), ``$XDG_CONFIG_HOME/pdf-manager`` (default
+    ``~/.config/pdf-manager``) on Linux.
 
     Returns:
         Full path of ``settings.json``. Neither the file nor its folder is
         created here.
     """
-    if on_windows():
-        base = os.environ.get("LOCALAPPDATA")
-        # LOCALAPPDATA is always set on a normal Windows session; this is a fallback.
-        root = Path(base) if base else Path.home() / "AppData" / "Local"
-        return root / APP_FOLDER_WINDOWS / SETTINGS_FILE
-    base = os.environ.get("XDG_CONFIG_HOME")
-    root = Path(base) if base else Path.home() / ".config"
-    return root / APP_FOLDER_OTHER / SETTINGS_FILE
+    return platforms.settings_dir() / SETTINGS_FILE

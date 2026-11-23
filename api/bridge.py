@@ -23,9 +23,7 @@ import json
 import logging
 import os
 import re
-import shutil
 import subprocess
-import sys
 import threading
 import time
 import traceback
@@ -36,7 +34,7 @@ from typing import Any
 import webview
 from webview.dom import DOMEventHandler
 
-from . import __version__, dto, logging_setup, paths, service
+from . import __version__, dto, logging_setup, paths, platforms, service
 from .jobs import JobManager
 from .logging_setup import log_issue
 from .service import ConversionError, Issue, ocr_install_failed, ocr_missing, unexpected_error
@@ -47,25 +45,6 @@ log = logging.getLogger(__name__)
 EVENT_PREFIX = "pdfmanager:"
 _EVENT_NAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9]*$")
 
-# Native picker filters, in pywebview's "Description (*.ext;*.ext)" format.
-FILE_FILTERS = {
-    "all": ("Supported files (*.pdf;*.pptx;*.ppt;*.png;*.jpg;*.jpeg)",),
-    "documents": ("PDF and PowerPoint files (*.pdf;*.pptx;*.ppt)",),
-    "images": ("Images (*.png;*.jpg;*.jpeg)",),
-}
-
-# Tesseract from the UB Mannheim build, the usual Windows distribution.
-WINGET_INSTALL = (
-    "winget",
-    "install",
-    "--id",
-    "UB-Mannheim.TesseractOCR",
-    "-e",
-    "--silent",
-    "--accept-source-agreements",
-    "--accept-package-agreements",
-)
-WINGET_TIMEOUT_SEC = 20 * 60
 TESSERACT_VERSION_TIMEOUT_SEC = 15
 DRAGOVER_DEBOUNCE_MS = 500  # Only preventDefault matters for dragover; Python ignores it.
 
@@ -97,13 +76,6 @@ def event_script(name: str, payload: Any) -> str:
     literal = json.dumps(payload, ensure_ascii=True, allow_nan=False, separators=(",", ":"))
     literal = literal.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
     return f'window.dispatchEvent(new CustomEvent("{EVENT_PREFIX}{name}", {{detail: {literal}}}));'
-
-
-def _platform_name() -> str:
-    """The contract's ``AppInfo.platform``: ``"windows"``, ``"mac"`` or ``"linux"``."""
-    if paths.on_windows():
-        return "windows"
-    return "mac" if sys.platform == "darwin" else "linux"
 
 
 def _ignore_event(_event: Any) -> None:
@@ -138,28 +110,6 @@ def _describe_files(candidates: Iterable[str | Path]) -> list[dict[str, Any]]:
     return files
 
 
-def _open_in_file_manager(folder: Path) -> None:
-    """Open a folder in File Explorer (or the desktop's file manager elsewhere).
-
-    Args:
-        folder: An existing folder. The caller checks it is a folder, so this
-            can never be used to launch a program.
-
-    Raises:
-        OSError: The file manager couldn't be started.
-    """
-    if paths.on_windows():
-        os.startfile(str(folder))  # Opens Explorer; the caller checked it's a folder.
-        return
-    opener = "open" if sys.platform == "darwin" else "xdg-open"
-    subprocess.Popen(
-        [opener, str(folder)],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        start_new_session=True,  # Don't tie the file manager to this app's lifetime.
-    )
-
-
 def _check_tesseract(path: Path) -> str | None:
     """Check that a user-picked file really is Tesseract.
 
@@ -173,7 +123,7 @@ def _check_tesseract(path: Path) -> str | None:
     if not path.is_file():
         return f"Not a file: {path}"
     if path.stem.casefold() != "tesseract":
-        return f"Expected a file named tesseract{'.exe' if paths.on_windows() else ''}: {path}"
+        return f"Expected a file named {platforms.tesseract_file_name()}: {path}"
     try:
         proc = service.run_command([path, "--version"], timeout=TESSERACT_VERSION_TIMEOUT_SEC)
     except (OSError, subprocess.SubprocessError) as exc:
@@ -337,12 +287,16 @@ class Api:
             return {
                 "version": __version__,
                 "logsDir": str(self._logs_folder()),
-                "platform": _platform_name(),
+                "platform": platforms.platform_name(),
             }
 
         return self._guard(
             "get_app_info",
-            lambda issue: {"version": __version__, "logsDir": "", "platform": _platform_name()},
+            lambda issue: {
+                "version": __version__,
+                "logsDir": "",
+                "platform": platforms.platform_name(),
+            },
             body,
         )
 
@@ -388,10 +342,11 @@ class Api:
         """
 
         def body() -> list[dict[str, Any]]:
-            if kind not in FILE_FILTERS:
+            filters = platforms.file_filters()
+            if kind not in filters:
                 raise dto.invalid_request(f"kind must be all, documents or images; got {kind!r}")
             picked = self._window.create_file_dialog(
-                webview.FileDialog.OPEN, allow_multiple=True, file_types=FILE_FILTERS[kind]
+                webview.FileDialog.OPEN, allow_multiple=True, file_types=filters[kind]
             )
             return _describe_files(picked or [])
 
@@ -449,11 +404,12 @@ class Api:
         return self._guard("get_ocr_languages", lambda issue: [], body)
 
     def search_ocr(self) -> dict[str, Any]:
-        """Find Tesseract, asking the user to pick ``tesseract.exe`` if needed.
+        """Find Tesseract, asking the user to pick the program if needed.
 
         The usual places are searched first. If nothing is found, a file
-        picker opens; the chosen file must be named ``tesseract(.exe)`` and
-        answer ``--version``. A found path is saved as ``tesseractPath``.
+        picker opens; the chosen file must be named like the platform's
+        Tesseract program (``tesseract.exe`` on Windows, ``tesseract`` on
+        Linux) and answer ``--version``. A found path is saved as ``tesseractPath``.
 
         Returns:
             ``OcrSearchResult``.
@@ -465,9 +421,10 @@ class Api:
         def body() -> dict[str, Any]:
             found = service.find_tesseract(self._settings.get().get("tesseractPath"))
             if found is None:
-                filters = ("Programs (*.exe)",) if paths.on_windows() else ()
                 picked = self._window.create_file_dialog(
-                    webview.FileDialog.OPEN, allow_multiple=False, file_types=filters
+                    webview.FileDialog.OPEN,
+                    allow_multiple=False,
+                    file_types=platforms.program_filters(),
                 )
                 if not picked:
                     return not_found(log_issue(ocr_missing()))
@@ -491,26 +448,24 @@ class Api:
         return self._guard("search_ocr", not_found, body)
 
     def install_ocr(self) -> None:
-        """Start installing Tesseract with winget. Returns at once.
+        """Start installing Tesseract with the platform's installer. Returns at once.
 
         Progress arrives as ``ocrInstallProgress`` and the end as
-        ``ocrInstallFinished``. Without Windows and winget, the install ends
-        straight away with an ``OCR_INSTALL_FAILED`` issue that explains how
-        to install Tesseract manually. A second call while an install runs is
-        ignored.
+        ``ocrInstallFinished``. Where the app can't or mustn't install it
+        itself (always on Linux, decision C16; on Windows without App
+        Installer), the install ends straight away with an
+        ``OCR_INSTALL_FAILED`` issue explaining what to do; on Linux its
+        ``command`` holds the exact install command to copy. A second call
+        while an install runs is ignored.
         """
 
         def finish_failed(issue: Issue) -> None:
             self._emit("ocrInstallFinished", {"ok": False, "issue": dto.issue_to_json(issue)})
 
         def body() -> None:
-            if not paths.on_windows() or shutil.which("winget") is None:
-                raise ConversionError(
-                    ocr_install_failed(
-                        "Automatic install needs Windows with winget (App Installer). "
-                        "Install Tesseract OCR yourself, then click Search for OCR in Settings."
-                    )
-                )
+            unavailable = platforms.ocr_install_unavailable()
+            if unavailable is not None:
+                raise ConversionError(unavailable)
             with self._install_lock:
                 if self._installing:
                     log.info("OCR install already running; ignoring the request")
@@ -522,27 +477,16 @@ class Api:
         return None
 
     def _install_worker(self) -> None:
-        """Background thread: run winget, then check Tesseract is really there. Never raises."""
+        """Background thread: run the install, then check Tesseract is there. Never raises."""
         try:
             self._emit(
                 "ocrInstallProgress",
                 {"message": "Downloading and installing OCR. This can take a few minutes."},
             )
-            log.info("Installing OCR: %s", " ".join(WINGET_INSTALL))
-            details = None
-            try:
-                proc = service.run_command(WINGET_INSTALL, timeout=WINGET_TIMEOUT_SEC)
-                details = (
-                    f"winget exit code {proc.returncode}\n"
-                    f"{(proc.stdout or '').strip()}\n{(proc.stderr or '').strip()}"
-                ).strip()
-            except subprocess.TimeoutExpired:
-                details = f"winget didn't finish within {WINGET_TIMEOUT_SEC // 60} minutes."
-            except OSError as exc:
-                details = f"Couldn't run winget: {exc}"
+            details = platforms.run_ocr_install()
             self._emit("ocrInstallProgress", {"message": "Checking the installation."})
-            # Judge by the result, not the exit code: winget also exits non-zero
-            # when Tesseract is already installed.
+            # Judge by the result, not the exit code: an installer may also exit
+            # non-zero when Tesseract is already installed.
             found = service.find_tesseract(self._settings.get().get("tesseractPath"))
             if found is not None:
                 self._settings.update({"tesseractPath": str(found)})
@@ -622,7 +566,7 @@ class Api:
         return None
 
     def open_folder(self, path: str) -> None:
-        """Open a folder in File Explorer. Anything but an existing folder is ignored.
+        """Open a folder in the file manager. Anything but an existing folder is ignored.
 
         Args:
             path: Folder to open.
@@ -632,22 +576,22 @@ class Api:
             if not isinstance(path, str) or not path:
                 raise dto.invalid_request(f"path must be a folder path; got {path!r}")
             folder = Path(path)
-            # Only folders: os.startfile on a file would open (or run) it.
+            # Only folders: opening a file would open (or run) it.
             if not folder.is_dir():
                 log.warning("Not opening %s: not an existing folder", folder)
                 return
-            _open_in_file_manager(folder)
+            platforms.open_folder(folder)
 
         self._guard("open_folder", lambda issue: None, body)
         return None
 
     def open_logs_folder(self) -> None:
-        """Open the logs folder in File Explorer, creating it if needed."""
+        """Open the logs folder in the file manager, creating it if needed."""
 
         def body() -> None:
             folder = self._logs_folder()
             folder.mkdir(parents=True, exist_ok=True)
-            _open_in_file_manager(folder)
+            platforms.open_folder(folder)
 
         self._guard("open_logs_folder", lambda issue: None, body)
         return None

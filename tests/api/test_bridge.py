@@ -12,9 +12,10 @@ from pathlib import Path
 import fitz
 import pytest
 
-from api import bridge, paths, service
+from api import bridge, platforms, service
 from api.bridge import Api, event_script
 from api.jobs import JobManager
+from api.platforms import linux, windows
 from api.service import JobResult, OutputFile, ToolCheck, ToolStatus, ocr_missing
 from api.settings_store import SettingsStore
 
@@ -46,6 +47,7 @@ ISSUE_KEYS = {
     "troubleshooting",
     "details",
     "logFile",
+    "command",
     "file",
 }
 SETTINGS = {
@@ -226,6 +228,38 @@ def test_get_app_info(api_obj, logs):
     assert set(info) == {"version", "logsDir", "platform"}
     assert info["logsDir"] == str(logs.parent)
     assert info["platform"] in {"windows", "linux", "mac"}
+    assert info["platform"] == platforms.platform_name()
+
+
+def test_get_app_info_platform_comes_from_platform_module(api_obj, monkeypatch, logs):
+    """The platform name is whatever the platform module reports."""
+    monkeypatch.setattr(platforms, "platform_name", linux.platform_name)
+    assert api_obj.get_app_info()["platform"] == "linux"
+    monkeypatch.setattr(platforms, "platform_name", windows.platform_name)
+    assert api_obj.get_app_info()["platform"] == "windows"
+
+
+def test_search_ocr_picker_uses_platform_filters(api_obj, monkeypatch, window):
+    """The Tesseract picker's filter comes from the platform module."""
+    monkeypatch.setattr(service, "find_tesseract", lambda configured=None: None)
+    monkeypatch.setattr(platforms, "program_filters", windows.program_filters)
+    window.dialog_results = [None, None]
+    api_obj.search_ocr()
+    monkeypatch.setattr(platforms, "program_filters", linux.program_filters)
+    api_obj.search_ocr()
+    filters = [call["file_types"] for call in window.dialog_calls]
+    assert filters == [("Programs (*.exe)",), ()]
+
+
+def test_search_ocr_names_the_platform_program(api_obj, monkeypatch, window, tmp_path):
+    """A wrongly named pick is explained with the platform's Tesseract file name."""
+    monkeypatch.setattr(service, "find_tesseract", lambda configured=None: None)
+    monkeypatch.setattr(platforms, "tesseract_file_name", linux.tesseract_file_name)
+    wrong = tmp_path / "gimp"
+    wrong.write_bytes(b"sample")
+    window.dialog_results = [(str(wrong),)]
+    details = api_obj.search_ocr()["issue"]["details"]
+    assert "Expected a file named tesseract:" in details
 
 
 def test_settings_round_trip(api_obj, store):
@@ -443,20 +477,53 @@ def test_search_ocr_validates_with_version(api_obj, monkeypatch, window, tmp_pat
     assert store.get()["tesseractPath"] == str(exe)
 
 
-def test_install_ocr_off_windows_fails_with_guidance(api_obj, monkeypatch, window):
-    """Without Windows/winget the install ends at once with OCR_INSTALL_FAILED."""
-    monkeypatch.setattr(paths, "on_windows", lambda: False)
+def use_windows_install(monkeypatch):
+    """Route install_ocr through the Windows platform module, with winget present."""
+    monkeypatch.setattr(platforms, "ocr_install_unavailable", windows.ocr_install_unavailable)
+    monkeypatch.setattr(platforms, "run_ocr_install", windows.run_ocr_install)
+    monkeypatch.setattr(windows.shutil, "which", lambda name: "C:\\winget.exe")
+
+
+def test_install_ocr_unavailable_fails_at_once(api_obj, monkeypatch, window):
+    """Where the app can't install OCR, the install ends at once with that issue."""
+    monkeypatch.setattr(platforms, "ocr_install_unavailable", windows.ocr_install_unavailable)
+    monkeypatch.setattr(windows.shutil, "which", lambda name: None)
+    ran = []
+    monkeypatch.setattr(platforms, "run_ocr_install", lambda: ran.append(True))
     assert api_obj.install_ocr() is None
     finished = window.events_named("ocrInstallFinished")
     assert len(finished) == 1 and finished[0]["ok"] is False
     assert_issue(finished[0]["issue"], "OCR_INSTALL_FAILED")
     assert "Search for OCR" in finished[0]["issue"]["details"]
+    assert finished[0]["issue"]["command"] is None
+    assert ran == [] and window.events_named("ocrInstallProgress") == []
+
+
+def test_install_ocr_on_linux_sends_the_command_and_runs_nothing(api_obj, monkeypatch, window):
+    """On Linux nothing is run (no sudo, decision C16); the issue carries the command."""
+    monkeypatch.setattr(platforms, "ocr_install_unavailable", linux.ocr_install_unavailable)
+    monkeypatch.setattr(platforms, "run_ocr_install", linux.run_ocr_install)
+    monkeypatch.setattr(linux, "read_os_release", lambda: {"ID": "ubuntu", "ID_LIKE": "debian"})
+
+    def no_commands(*args, **kwargs):
+        raise AssertionError("install_ocr must not run anything on Linux")
+
+    monkeypatch.setattr(service, "run_command", no_commands)
+    monkeypatch.setattr(subprocess, "Popen", no_commands)
+    api_obj.install_ocr()
+    finished = window.events_named("ocrInstallFinished")
+    assert len(finished) == 1 and finished[0]["ok"] is False
+    issue = finished[0]["issue"]
+    assert_issue(issue, "OCR_INSTALL_FAILED")
+    assert issue["command"] == "sudo apt install tesseract-ocr tesseract-ocr-eng"
+    assert any("Search for OCR" in step for step in issue["troubleshooting"])
+    assert issue["logFile"]  # Logged like every other issue.
+    assert window.events_named("ocrInstallProgress") == []
 
 
 def test_install_ocr_with_winget(api_obj, monkeypatch, window, store):
     """On Windows, winget runs in the background and the found path is saved."""
-    monkeypatch.setattr(paths, "on_windows", lambda: True)
-    monkeypatch.setattr(bridge.shutil, "which", lambda name: "C:\\winget.exe")
+    use_windows_install(monkeypatch)
     commands = []
 
     def fake_run(cmd, timeout=0, cancel=None):
@@ -477,8 +544,7 @@ def test_install_ocr_with_winget(api_obj, monkeypatch, window, store):
 
 def test_install_ocr_failure_reports_winget_output(api_obj, monkeypatch, window):
     """If Tesseract still isn't found afterwards, the issue carries winget's output."""
-    monkeypatch.setattr(paths, "on_windows", lambda: True)
-    monkeypatch.setattr(bridge.shutil, "which", lambda name: "C:\\winget.exe")
+    use_windows_install(monkeypatch)
     monkeypatch.setattr(
         service,
         "run_command",
@@ -589,7 +655,7 @@ def test_discard_results_repeated_and_after_save(api_obj, window, tmp_path):
 def test_open_folder_only_opens_folders(api_obj, monkeypatch, tmp_path):
     """open_folder opens existing folders and refuses files (which would launch them)."""
     opened = []
-    monkeypatch.setattr(bridge, "_open_in_file_manager", opened.append)
+    monkeypatch.setattr(platforms, "open_folder", opened.append)
     program = tmp_path / "setup.exe"
     program.write_bytes(b"sample")
     api_obj.open_folder(str(program))
@@ -601,7 +667,7 @@ def test_open_folder_only_opens_folders(api_obj, monkeypatch, tmp_path):
 def test_open_logs_folder_creates_it(api_obj, monkeypatch, logs):
     """open_logs_folder creates the logs folder if needed, then opens it."""
     opened = []
-    monkeypatch.setattr(bridge, "_open_in_file_manager", opened.append)
+    monkeypatch.setattr(platforms, "open_folder", opened.append)
     for handler in list(bridge.logging_setup._handlers):
         handler.close()
     logs.unlink()

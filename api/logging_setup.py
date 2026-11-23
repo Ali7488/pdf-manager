@@ -6,8 +6,10 @@ timings, tool output and tracebacks, and also prints to the console.
 **Production** (the installed app) logs at INFO level, but errors are always
 written in full, with details and tracebacks.
 
-Decision C4: the log files live in the logs folder next to the installed app
-(:func:`api.paths.logs_dir`), which Settings can open in File Explorer.
+Where the log files live (:func:`api.paths.logs_dir`), which Settings can
+open in the file manager: the repository's ``logs/`` folder from source; for
+the installed app, next to it on Windows (decision C4) and
+``$XDG_STATE_HOME/pdf-manager/logs`` on Linux (decision C15).
 """
 
 from __future__ import annotations

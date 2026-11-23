@@ -10,6 +10,9 @@ This package is the middle of the three layers (decision F35):
 * ``converter/``: pure conversion logic with no UI or bridge code.
 
 Modules:
+    platforms       The only platform-specific code (Windows, Linux, a macOS
+                    fallback): opening folders, OCR install, picker filters,
+                    settings/log folders and the window's GUI backend.
     paths           Where the app, its bundled files, logs and settings live.
     logging_setup   Log files, log levels (dev vs production) and issue logging.
     settings_store  Loading, validating and atomically saving user settings.
@@ -17,6 +20,7 @@ Modules:
     jobs            The job manager: worker thread, progress, cancel, save, discard.
     bridge          The ``Api`` class exposed to JavaScript, events and drag and drop.
     app             Window creation and the ``main()`` entry point.
+    smoke           The start-up smoke test (``PDF_MANAGER_SMOKE_TEST=1``, CI).
 """
 
 # Shown in Settings ("About") and written to the log on start. Keep in sync with

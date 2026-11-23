@@ -6,7 +6,7 @@ import sys
 
 import pytest
 
-from api import app, logging_setup, paths
+from api import app, logging_setup, paths, platforms, smoke
 from api.bridge import Api
 
 
@@ -80,16 +80,24 @@ class FakeWebview:
         self.created = {"title": title, **kwargs}
         return self.window
 
-    def start(self, **kwargs):
+    def start(self, func=None, **kwargs):
         self.started = kwargs
         if self.fail:
             raise RuntimeError("no GUI backend")
+        if func is not None:
+            self.started["func"] = func
+            func()
 
 
-def run_main(monkeypatch, tmp_path, window, fail=False):
+def run_main(monkeypatch, tmp_path, window, fail=False, smoke_test=False):
     """Run app.main() with a fake webview module and temporary folders."""
     fake = FakeWebview(window, fail)
     monkeypatch.setattr(app, "webview", fake)
+    monkeypatch.setattr(platforms, "prepare_gui", lambda: "fake-gui")
+    if smoke_test:
+        monkeypatch.setenv(smoke.SMOKE_ENV, "1")
+    else:
+        monkeypatch.delenv(smoke.SMOKE_ENV, raising=False)
     monkeypatch.setattr(paths, "logs_dir", lambda: tmp_path / "logs")
     monkeypatch.setattr(paths, "settings_path", lambda: tmp_path / "settings.json")
     monkeypatch.setattr(paths, "ui_index", lambda: tmp_path / "missing" / "index.html")
@@ -110,7 +118,8 @@ def test_main_creates_window_and_shuts_down(monkeypatch, tmp_path, window, logs)
     assert created["min_size"] == (960, 640)
     assert isinstance(created["js_api"], Api)
     assert created["url"] is None and "missing" in created["html"]
-    assert fake.started == {"debug": True}
+    # The GUI comes from the platform module (Qt with PySide6 on Linux, P18/P19).
+    assert fake.started == {"debug": True, "gui": "fake-gui"}
     # The Api is bound to the window and listens for page loads (drag and drop).
     assert window.events.loaded.handlers == [created["js_api"]._on_loaded]
     assert shutdowns == [created["js_api"]]
@@ -123,3 +132,66 @@ def test_main_reports_startup_failure(monkeypatch, tmp_path, window, logs):
     assert len(shutdowns) == 1
     log_text = (tmp_path / "logs" / "pdf-manager.log").read_text(encoding="utf-8")
     assert "no GUI backend" in log_text
+
+
+def test_windows_start_is_unchanged(monkeypatch, tmp_path, window, logs):
+    """On Windows no GUI is forced, so pywebview keeps using Edge WebView2."""
+    from api.platforms import windows
+
+    monkeypatch.delattr(sys, "frozen", raising=False)
+    fake = FakeWebview(window)
+    monkeypatch.setattr(app, "webview", fake)
+    monkeypatch.setattr(platforms, "prepare_gui", windows.prepare_gui)
+    monkeypatch.delenv(smoke.SMOKE_ENV, raising=False)
+    monkeypatch.setattr(paths, "settings_path", lambda: tmp_path / "settings.json")
+    monkeypatch.setattr(Api, "_shutdown", lambda self: None)
+    assert app.main() == 0
+    assert fake.started == {"debug": True, "gui": None}
+
+
+class FakeSmokeCheck:
+    """Stands in for smoke.SmokeCheck: records how main() drives it."""
+
+    instances: list = []
+    next_exit_code = 0
+
+    def __init__(self, window):
+        self.window = window
+        self.calls = []
+        self.exit_code = FakeSmokeCheck.next_exit_code
+        FakeSmokeCheck.instances.append(self)
+
+    def arm(self):
+        self.calls.append("arm")
+
+    def run(self):
+        self.calls.append("run")
+
+    def disarm(self):
+        self.calls.append("disarm")
+
+
+@pytest.mark.parametrize("exit_code", [0, 1])
+def test_smoke_test_mode(monkeypatch, tmp_path, window, logs, exit_code):
+    """With PDF_MANAGER_SMOKE_TEST=1 the check runs in pywebview's thread and sets the exit code."""
+    FakeSmokeCheck.instances = []
+    FakeSmokeCheck.next_exit_code = exit_code
+    monkeypatch.setattr(smoke, "SmokeCheck", FakeSmokeCheck)
+    code, fake, shutdowns = run_main(monkeypatch, tmp_path, window, smoke_test=True)
+    assert code == exit_code
+    check = FakeSmokeCheck.instances[0]
+    assert check.window is window
+    assert check.calls == ["arm", "run", "disarm"]
+    # No devtools window in smoke mode; same GUI as a normal start.
+    assert fake.started == {"debug": False, "gui": "fake-gui", "func": check.run}
+    assert len(shutdowns) == 1
+
+
+def test_smoke_test_mode_gui_failure(monkeypatch, tmp_path, window, logs):
+    """If the GUI can't start in smoke mode, main() fails with 1 and disarms the watchdog."""
+    FakeSmokeCheck.instances = []
+    FakeSmokeCheck.next_exit_code = 0
+    monkeypatch.setattr(smoke, "SmokeCheck", FakeSmokeCheck)
+    code, fake, shutdowns = run_main(monkeypatch, tmp_path, window, fail=True, smoke_test=True)
+    assert code == 1
+    assert FakeSmokeCheck.instances[0].calls == ["arm", "disarm"]

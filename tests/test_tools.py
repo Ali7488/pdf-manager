@@ -11,7 +11,8 @@ import pytest
 
 from converter.context import CancelToken
 from converter.issues import Cancelled
-from converter.tools import exe_from_registry_value, run_command
+from converter.platforms.windows import exe_from_registry_value
+from converter.tools import run_command
 
 
 @pytest.mark.parametrize(

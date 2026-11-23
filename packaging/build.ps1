@@ -25,7 +25,8 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 # PyInstaller is a build-only tool, so it isn't in pyproject.toml; uv adds it on the fly.
-$PyInstallerSpec = 'pyinstaller>=6.10,<7'
+# Pinned exactly so a release can be rebuilt from its tagged source (AGPL corresponding source).
+$PyInstallerSpec = 'pyinstaller==6.22.3'
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 
 function Write-Step {

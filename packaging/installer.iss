@@ -115,10 +115,13 @@ Type: filesandordirs; Name: "{app}\_internal"
 
 [Files]
 Source: "{#BuildDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-; Licences next to the app: PDF Manager's MIT licence, the third-party notices and every
-; bundled component's licence text (PyMuPDF is AGPL-3.0, so these must ship with the app).
+; Licences next to the app (see LICENSING.md): the original code's MIT licence, the AGPL-3.0
+; that the distributed app is under (it includes PyMuPDF), the licensing summary, the
+; third-party notices and every bundled component's licence text.
 Source: "{#RepoRoot}\LICENSE"; DestDir: "{app}"; DestName: "LICENSE.txt"; Flags: ignoreversion
 Source: "{#RepoRoot}\THIRD_PARTY_NOTICES.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#RepoRoot}\LICENSE-AGPL-3.0.txt"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#RepoRoot}\LICENSING.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#RepoRoot}\licenses\*"; DestDir: "{app}\licenses"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]

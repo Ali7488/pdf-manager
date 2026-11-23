@@ -53,9 +53,12 @@ jobs:
           $appDir = Join-Path $env:LOCALAPPDATA 'Programs\PDF Manager'
           $app = Join-Path $appDir 'PDF Manager.exe'
           if (-not (Test-Path $app)) { throw "The app wasn't installed at $app" }
-          foreach ($name in 'LICENSE.txt', 'THIRD_PARTY_NOTICES.md', 'licenses\python') {
+          foreach ($name in 'LICENSE.txt', 'LICENSE-AGPL-3.0.txt', 'LICENSING.md', 'THIRD_PARTY_NOTICES.md', 'licenses\python', 'licenses\other') {
             if (-not (Test-Path (Join-Path $appDir $name))) { throw "Missing licence file: $name" }
           }
+          # Qt (PySide6) is Linux-only (decision P19); it must not be in the Windows app.
+          $qt = Get-ChildItem -Path $appDir -Recurse -Include 'Qt6*.dll', 'PySide6', 'shiboken6' -ErrorAction SilentlyContinue
+          if ($qt) { $qt | Select-Object -First 5 FullName; throw 'Qt/PySide6 files found in the Windows app' }
           $env:PDF_MANAGER_SMOKE_TEST = '1'
           $run = Start-Process $app -Wait -PassThru
           $log = Join-Path $appDir 'logs\pdf-manager.log'

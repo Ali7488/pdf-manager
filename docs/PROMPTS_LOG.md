@@ -160,6 +160,6 @@ A short, summarized record of each request made to the coding agent, and what ca
     - [x] Frontend HTTP adapter (server bootstrap, polling, uploads, download fallback, connection errors).
     - [x] Browser-only dependency set; portable ZIP build; artifact licence checks. The owner added: include every licence as dependencies are added. Every new dependency's licence was checked; the browser build's licences are generated and checked.
     - [x] Tests: unit, security, real browser integration (local, with the frozen Linux build too).
-    - [ ] CI and Windows build results; draft pull request for review.
+    - [x] CI 45243745067 and Windows build 45243767264 green; draft pull request #2 for the owner's review (real Windows 11 testing still open).
     - [x] Docs and decisions (P33, docs/BROWSER_MODE.md).
 

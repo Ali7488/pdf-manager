@@ -87,4 +87,9 @@ A short, summarized record of each request made to the coding agent, and what ca
     - [x] R8: remove the transitional import fallback in `api/service.py`.
     - [x] R9: update `ARCHITECTURE.md`, `SOURCE_INVENTORY.md` and `PORTABILITY.md` against the merged code, with real test counts.
     - [ ] R10: needs a real Windows 11 machine; can't be closed from Linux.
+25. **Linux bridge: why or why not, then the pending decisions.** Explained that Linux is feasible (shared converter and UI, pywebview GTK/Qt backends, mostly Linux-aware API layer) and what's missing (a window backend, an API platform module, Linux log and OCR-install behaviour, unverified drag and drop and dialogs). Owner answered: "Qt then GNOME" means window backends, Qt first (P18); Linux logs in `~/.local/state` (C15); no contents/numbering in Settings (F38); one OCR language (F39); Linux "Install OCR" shows the command with a Copy button (C16); refactor and Linux run-from-source now (P17). Checklist:
+    - [x] Record the decisions; no open questions remain.
+    - [ ] Move the API layer's platform-specific code into `api/platforms/` (Windows, Linux).
+    - [ ] Run from source on Linux with the Qt backend (optional dependency, logs, OCR-install command popup).
+    - [ ] CI job that starts the app on Linux in a virtual display.
 

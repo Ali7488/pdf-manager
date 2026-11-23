@@ -15,6 +15,9 @@
 ;     app files: Tesseract OCR (unchecked) and LibreOffice (checked only when
 ;     Microsoft PowerPoint isn't found). A failure never fails the setup.
 ;   * Checks for the Microsoft Edge WebView2 Runtime and offers the download.
+;   * Checks for the Microsoft Visual C++ Redistributable (x64), which the app needs and
+;     doesn't bundle (decision P32), and offers Microsoft's download. Installing it
+;     needs administrator permission; PDF Manager itself still doesn't.
 ;
 ; Keep this file ASCII-only: Inno Setup reads BOM-less files as ANSI.
 
@@ -101,6 +104,12 @@ WebView2Missing=PDF Manager needs the Microsoft Edge WebView2 Runtime, a free Wi
 WebView2Continue=Setup will continue either way. Do you want to download it now? Run the downloaded file to install it.
 WebView2StillMissing=The Microsoft Edge WebView2 Runtime still isn't installed, so PDF Manager won't open yet.
 WebView2DownloadNow=Do you want to download it now? Run the downloaded file to install it, then open PDF Manager from the Start menu.
+VCRuntimeMissing=PDF Manager needs the Microsoft Visual C++ Redistributable (x64), version %1 or newer. It is a free Windows component from Microsoft that many programs use, but an up-to-date copy wasn't found on this computer.
+VCRuntimeAdmin=Installing it needs administrator permission: Windows will ask, and on a work or school computer an administrator may need to approve it.
+VCRuntimeContinue=Setup will continue either way. Do you want to download it from Microsoft now? Run the downloaded file (vc_redist.x64.exe) to install it.
+VCRuntimeStillMissing=The Microsoft Visual C++ Redistributable (x64) still isn't installed, so PDF Manager won't open yet.
+VCRuntimeDownloadNow=Do you want to download it from Microsoft now? Run the downloaded file (vc_redist.x64.exe) to install it, then open PDF Manager from the Start menu.
+WelcomeVCRuntimeNote=Before PDF Manager can open, the free Microsoft Visual C++ Redistributable needs to be installed too. Setup will offer the download; installing it needs administrator permission.
 RemoveSettings=Do you also want to remove your PDF Manager settings?
 RemoveSettingsHint=Choose No to keep them for the next time you install PDF Manager.
 
@@ -132,8 +141,8 @@ Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExeName}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
 
 [Run]
-; Hidden while WebView2 is missing: the app can't open without it.
-Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent; Check: IsWebView2Installed
+; Hidden while WebView2 or the Visual C++ runtime is missing: the app can't open without them.
+Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent; Check: CanStartApp
 
 [UninstallDelete]
 ; The logs folder is created by the app, so the uninstaller doesn't know about it.
@@ -153,6 +162,23 @@ const
     0x8A15002B: no newer version available. 0x8A150061: package already installed. }
   WingetNoApplicableUpdate = -1978335189;
   WingetPackageAlreadyInstalled = -1978335135;
+  { The Microsoft Visual C++ Redistributable (x64) the app needs (decision P32). The
+    bundled Python runtime, PyMuPDF, pywin32 and cffi import these DLLs; MFC
+    (mfc140u.dll) only from pywin32's unused win32ui. scripts/check_licenses.py reads
+    these three constants and fails the build if a bundled binary imports a runtime DLL
+    not listed here, or was linked by a newer MSVC toolset than the minimum version:
+    Microsoft requires the installed redistributable to be at least as new as the
+    toolset that built the app. }
+  VCRuntimeFiles = 'vcruntime140.dll,vcruntime140_1.dll,msvcp140.dll,mfc140u.dll';
+  VCRuntimeMinMajor = 14;
+  VCRuntimeMinMinor = 44;
+  { Microsoft's permalink to the latest supported v14 redistributable, from
+    https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist }
+  VCRuntimeDownloadUrl = 'https://aka.ms/vc14/vc_redist.x64.exe';
+  { The redistributable records its version here, in the 32-bit registry view
+    (https://learn.microsoft.com/cpp/windows/redistributing-visual-cpp-files). Logged
+    only: the DLL check below is what decides. }
+  VCRuntimeKey = 'SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64';
 
 var
   ComponentsPage: TWizardPage;
@@ -214,6 +240,97 @@ begin
             FileExists(ExpandConstant('{localappdata}\Programs\LibreOffice\program\soffice.exe'));
   if not Result and IsWin64 then
     Result := FileExists(ExpandConstant('{commonpf64}\LibreOffice\program\soffice.exe'));
+end;
+
+{ The folder to look for the Visual C++ runtime in: the 64-bit System32, where the
+  redistributable installs it (setup runs in 64-bit mode, so {sys} is that folder).
+  /VCRUNTIMEDIR=<folder> on the command line replaces it, so automated tests can
+  simulate a computer without the runtime; it has no other use. }
+function VCRuntimeDir: String;
+begin
+  Result := ExpandConstant('{param:VCRUNTIMEDIR|}');
+  if Result = '' then
+    Result := ExpandConstant('{sys}');
+end;
+
+{ The minimum version as text, for messages and the log. }
+function VCRuntimeMinVersion: String;
+begin
+  Result := Format('%d.%d', [VCRuntimeMinMajor, VCRuntimeMinMinor]);
+end;
+
+{ Whether the Microsoft Visual C++ Redistributable (x64) is installed and new enough:
+  every DLL in VCRuntimeFiles must be in System32 with a file version of at least
+  VCRuntimeMinMajor.VCRuntimeMinMinor. This is what Windows itself needs when it
+  loads the app, so it is checked instead of trusting the registry alone. Also used as
+  part of the Check for the "Launch PDF Manager" box. }
+function IsVCRuntimeInstalled: Boolean;
+var
+  Files: TStringList;
+  I: Integer;
+  Path, Version: String;
+  VersionMS, VersionLS: Cardinal;
+begin
+  Result := True;
+  Files := TStringList.Create;
+  try
+    Files.CommaText := VCRuntimeFiles;
+    for I := 0 to Files.Count - 1 do
+    begin
+      Path := AddBackslash(VCRuntimeDir) + Files[I];
+      if not FileExists(Path) then
+      begin
+        Log('Visual C++ runtime: ' + Path + ' not found.');
+        Result := False;
+      end
+      else if not GetVersionNumbers(Path, VersionMS, VersionLS) then
+      begin
+        Log('Visual C++ runtime: ' + Path + ' has no version information.');
+        Result := False;
+      end
+      else
+      begin
+        GetVersionNumbersString(Path, Version);
+        Log('Visual C++ runtime: ' + Path + ' version ' + Version + '.');
+        if (VersionMS shr 16 < VCRuntimeMinMajor) or
+           ((VersionMS shr 16 = VCRuntimeMinMajor) and ((VersionMS and $FFFF) < VCRuntimeMinMinor)) then
+          Result := False;
+      end;
+    end;
+  finally
+    Files.Free;
+  end;
+  if RegQueryStringValue(HKLM32, VCRuntimeKey, 'Version', Version) then
+    Log('Visual C++ Redistributable registry version: ' + Version + '.')
+  else
+    Log('Visual C++ Redistributable registry version: not recorded.');
+  if Result then
+    Log('Visual C++ runtime found (' + VCRuntimeMinVersion + ' or newer needed).')
+  else
+    Log('Visual C++ runtime not found or older than ' + VCRuntimeMinVersion + '.');
+end;
+
+{ The Check for the "Launch PDF Manager" box: the app opens only with both. }
+function CanStartApp: Boolean;
+begin
+  Result := IsWebView2Installed and IsVCRuntimeInstalled;
+end;
+
+procedure OpenVCRuntimeDownload;
+var
+  ErrorCode: Integer;
+begin
+  ShellExec('open', VCRuntimeDownloadUrl, '', '', SW_SHOWNORMAL, ewNoWait, ErrorCode);
+end;
+
+{ Tells the user the Visual C++ Redistributable is missing and offers Microsoft's
+  download. Message is VCRuntimeContinue before installing, VCRuntimeDownloadNow after. }
+procedure OfferVCRuntimeDownload(const Intro, Question: String; const Icon: TMsgBoxType);
+begin
+  if SuppressibleMsgBox(FmtMessage(CustomMessage(Intro), [VCRuntimeMinVersion]) + #13#10#13#10 +
+                        CustomMessage('VCRuntimeAdmin') + #13#10#13#10 +
+                        CustomMessage(Question), Icon, MB_YESNO, IDNO) = IDYES then
+    OpenVCRuntimeDownload;
 end;
 
 procedure OpenWebView2Download;
@@ -395,6 +512,8 @@ end;
 function InitializeSetup: Boolean;
 begin
   Result := True;
+  if not IsVCRuntimeInstalled then
+    OfferVCRuntimeDownload('VCRuntimeMissing', 'VCRuntimeContinue', mbConfirmation);
   if not IsWebView2Installed then
   begin
     Log('WebView2 Runtime not found.');
@@ -414,6 +533,11 @@ begin
   Log(Format('PowerPoint found: %d, Tesseract found: %d, LibreOffice found: %d', [
     Ord(PowerPointFound), Ord(OcrAlreadyInstalled), Ord(LibreOfficeAlreadyInstalled)]));
   CreateComponentsPage;
+  { The welcome page says no administrator rights are needed, which is true of PDF
+    Manager itself; say so when the Microsoft prerequisite will need them. }
+  if not IsVCRuntimeInstalled then
+    WizardForm.WelcomeLabel2.Caption := WizardForm.WelcomeLabel2.Caption + #13#10#13#10 +
+      CustomMessage('WelcomeVCRuntimeNote');
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
@@ -422,6 +546,8 @@ begin
   begin
     { The app files are in place; now the optional programs. }
     InstallOptionalComponents;
+    if not IsVCRuntimeInstalled then
+      OfferVCRuntimeDownload('VCRuntimeStillMissing', 'VCRuntimeDownloadNow', mbError);
     if not IsWebView2Installed then
       if SuppressibleMsgBox(CustomMessage('WebView2StillMissing') + #13#10#13#10 +
                             CustomMessage('WebView2DownloadNow'), mbError, MB_YESNO, IDNO) = IDYES then

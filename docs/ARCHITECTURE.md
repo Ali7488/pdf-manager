@@ -2,7 +2,7 @@
 
 How PDF Manager is put together, how a conversion runs, and the implementation choices that aren't obvious from reading one file. Owner decisions are referenced by their IDs in [`DECISIONS.md`](DECISIONS.md); known bugs and what has or hasn't been verified are in [`ENGINEERING_REVIEW.md`](ENGINEERING_REVIEW.md).
 
-> **Status:** the service layer (`converter/`) and the Windows packaging scripts are merged. The API layer (`api/`) and the React frontend (`frontend/`) are still being built; their sections below will be filled in when they are merged.
+> **Status (2026-11-23):** all layers are merged on `main`: React frontend (`frontend/`), Python API layer (`api/`), service layer (`converter/`) and Windows packaging (`packaging/`). The desktop entry point is `main.py`; the old Tkinter app was removed. Nothing has run on a real Windows 11 machine yet except the automated Windows CI tests (see `ENGINEERING_REVIEW.md`).
 
 ## Layers (F35)
 
@@ -59,12 +59,43 @@ Errors: fatal problems raise `ConversionError(issue)`; a user cancel raises `Can
 - **Logging (C13).** Modules log with `logging.getLogger(__name__)`; `run_command` logs every command, its duration, exit code and output at DEBUG. The API layer chooses the level (DEBUG in development, INFO in production; errors always in full).
 - **Originals are never modified.** Inputs are opened read-only; PowerPoint files are rendered from a scratch copy; tests compare input hashes before and after.
 
+## API layer (`api/`)
+
+Started by `main.py` → `api.app.main()`, which configures logging, creates the pywebview window and exposes `api.bridge.Api` to the page as `window.pywebview.api`.
+
+| Module | Responsibility |
+| --- | --- |
+| `app.py` | Window creation (1200×800, min 960×640), choosing what to load (the built `frontend/dist/index.html` as a `file://` URL; in dev mode an `http(s)` URL from `PDF_MANAGER_UI_URL`), a fallback page if the UI is missing, clean shutdown. |
+| `bridge.py` | `Api`: exactly the contract's methods (`docs/API.md`). Every public method catches errors and returns contract-shaped results with an `Issue`, so nothing raises into JavaScript. Events go to the page by dispatching `pdfmanager:<name>` DOM events. Also native pickers, OCR search/install (winget), opening folders, and drag-and-drop paths. |
+| `jobs.py` | `JobManager`: one job at a time on a worker thread calling `converter.run_action`; throttled progress (≤ 1 event / 100 ms, final event always delivered); one state per job (running → ready → saving → gone) so save, discard and shutdown never race (audit R4); saving copies in chunks with exclusive-create (never overwrites), optional zip. |
+| `settings_store.py` | Persisted settings (`%LOCALAPPDATA%\PDFManager\settings.json` on Windows, XDG elsewhere): validated fields, atomic writes, updates applied first-come-first-served; a failed write returns the in-memory settings plus a `SETTINGS_SAVE_FAILED` issue (audit R6). |
+| `dto.py` | camelCase JSON ↔ service dataclasses; invalid UI input becomes an `UNEXPECTED_ERROR` issue. |
+| `logging_setup.py` | Rotating log files (2 MB × 5) next to the installed app (C4), DEBUG in dev mode and INFO in production (C13); `log_issue` records every issue shown to the user. |
+| `paths.py` | App, bundled-resource, logs and settings locations in source vs frozen (PyInstaller) mode. |
+| `service.py` | The single import seam from the API layer into `converter/`. |
+
+**Drag and drop:** a web page can't see real file paths, so Python subscribes to the document's `drop` event (pywebview `DOMEventHandler`), reads `pywebviewFullPath` for each file, describes it with `converter.inspect_file` and sends a `filesAdded` event.
+
+**Platform note:** the API layer's Windows-specific behaviour (winget, `os.startfile`, picker filters) is currently gated by `paths.on_windows()` checks inside `bridge.py`, not isolated in one platform module as P15 asks. Tracked in `ENGINEERING_REVIEW.md`.
+
+## Frontend (`frontend/`)
+
+Vite + React + TypeScript, CSS Modules, feature folders (`pages/`, `components/`, `styles/`), Vitest + React Testing Library tests next to the code. No router or state library: the sidebar tab is app state.
+
+- `src/api/`: `types.ts` (the contract), `bridge.ts` (pywebview calls and `pdfmanager:*` events), `mock.ts` (an in-memory backend for `npm run dev` and tests; excluded from production builds), `client.ts` (picks one).
+- `src/state/`: app state (reducer + context). Settings changes apply on screen immediately; saves are queued one at a time, with pending changes merged, so a late reply can never undo a newer choice (audit R5). A failed save shows a "Not saved" warning in Settings (R6).
+- `src/pages/`: Home (drop zone, shared file list, action buttons), one `ActionPage` per action, Settings.
+- `src/components/`: shared pieces (file list with dnd-kit reordering, `InfoTip` (?) tooltips, the Convert modal's issue view, buttons, modal, progress).
+- **Build:** `npm run build` produces **one self-contained `dist/index.html`** (JS, CSS and IBM Plex fonts inlined, via `vite-plugin-singlefile`). WebView2 blocks module scripts and fonts loaded over `file://`, and the app has no local server (F18), so nothing may be fetched at runtime.
+- **Themes:** CSS custom properties per theme (`data-theme` on `<html>`): system (follows Windows), light, dark, burgundy, green. A tiny inline script picks light/dark before first paint.
+
 ## Non-obvious implementation choices
 
 | Where | Choice | Why |
 | --- | --- | --- |
-| `slides/render.py` | Render PowerPoint files from a plain byte copy in scratch. | Downloaded files carry the Windows Mark-of-the-Web; PowerPoint opens them in Protected View, which hidden automation can't use. A likely cause of the reported "falls back to LibreOffice too often" (unconfirmed on Windows). |
-| `platforms/windows_powerpoint.py` | Export on a helper thread; quit or kill PowerPoint **only if the converter started it** (C2). | PowerPoint is single-instance, so the converter may attach to the user's open PowerPoint. The thread allows a timeout when PowerPoint hangs (e.g. "Waiting for printer connection"). |
+| `slides/render.py`, `platforms/` | The scratch copy **keeps** the Windows Mark-of-the-Web. Downloaded presentations are rendered by LibreOffice, never automated with PowerPoint, with an `UNTRUSTED_PRESENTATION` warning (C14, audit R1). | Stripping the marker (an earlier version did) bypasses Office's Protected View trust signal. Files from the internet open in Protected View, which hidden automation can't use anyway. |
+| `slides/render.py` | PowerPoint and LibreOffice write into separate, freshly emptied folders (audit R3). | A partial file from a failed PowerPoint export must never be accepted as LibreOffice's result. LibreOffice can exit 0 without writing anything. |
+| `platforms/windows_powerpoint.py` | Export on a helper thread; quit or kill PowerPoint **only if the converter can prove it started that process**: PowerPoint wasn't running, exactly one new `POWERPNT.EXE` appeared, and it is the automation window's process (`owned_pid`, audit R2). Any doubt: never kill or quit. | PowerPoint is single-instance, so the converter may attach to the user's open PowerPoint. The thread allows a timeout when PowerPoint hangs (e.g. "Waiting for printer connection"). |
 | `slides/render.py` | LibreOffice runs with a throwaway profile; success also requires a non-empty output file. | With the user's LibreOffice open, the command would otherwise hand off and do nothing; LibreOffice often exits 0 on failure. |
 | `tools/process.py`, `platforms/` | Kill the whole process tree (`taskkill /T`, or a process group on Linux). | `soffice` starts `soffice.bin`; killing only the parent leaves the real worker running. |
 | `actions/flatten.py` | Page images and OCR files stay in scratch until the job ends. | Deleting them immediately caused WinError 32 on Windows (file still held by a renderer or virus scanner). Regression test: `tests/test_temp_lock.py`. |
@@ -79,26 +110,25 @@ Errors: fatal problems raise `ConversionError(issue)`; a user cancel raises `Can
 
 ## Dependencies
 
-Runtime: **PyMuPDF** (all PDF work), **pywin32** (Windows only, optional PowerPoint). External programs: **Tesseract** (OCR, optional), **LibreOffice** (slides; required on Linux, backup on Windows), **Microsoft PowerPoint** (optional, Windows). The API layer will add **pywebview**. Details and per-platform package names: [`../README.md`](../README.md), [`PORTABILITY.md`](PORTABILITY.md). Python ≥ 3.11 (uses `StrEnum`); pinned to 3.13.
+Runtime: **PyMuPDF** (all PDF work), **pywin32** (Windows only, optional PowerPoint). External programs: **Tesseract** (OCR, optional), **LibreOffice** (slides; required on Linux, backup on Windows), **Microsoft PowerPoint** (optional, Windows). The API layer uses **pywebview** (the window and the JS bridge; Edge WebView2 on Windows). The frontend's runtime dependencies are React and dnd-kit; the font is bundled. Details and per-platform package names: [`../README.md`](../README.md), [`PORTABILITY.md`](PORTABILITY.md). Python ≥ 3.11 (uses `StrEnum`); pinned to 3.13.
 
 Known dependency notes: the code imports `pymupdf` (the old `fitz` name is deprecated in 1.28); `pymupdf.image_profile` raises a `TypeError` in the installed 1.28.2, so it isn't used.
 
 ## Tests
 
-`uv run pytest` runs everything in `tests/`. Tests needing Tesseract or LibreOffice are skipped when those aren't installed.
+Python: `uv run pytest` (on 2026-11-23, Linux: **355 passed, 5 skipped**; the skipped ones are Windows-only NTFS tests). Tests needing Tesseract or LibreOffice skip when those aren't installed. Frontend: `npm test` in `frontend/` (**83 passed**).
 
-| File | Covers |
+| Where | Covers |
 | --- | --- |
-| `test_end_to_end.py` | Every action through `run_action`: naming, page counts, OCR on/off, contents page, order, monotonic progress, cancel, missing OCR, wrong file types, inputs unchanged. |
-| `test_flatten.py`, `test_merge.py`, `test_split.py`, `test_images.py`, `test_compress.py`, `test_ocr.py` | Each action and the OCR text layer in detail (bookmarks, labels, links, EXIF, levels, rotated pages, password-protected files). |
-| `test_powerpoint.py` | Renderer order and fallback warnings with a **fake** PowerPoint; the COM helper thread's timeout/cancel/kill rules with a fake export. Real PowerPoint is never exercised. |
-| `test_tools.py` | Registry path parsing, `run_command` output, timeout, cancel and child-process killing. |
-| `test_portability.py` | Fails if shared service code contains OS checks or Windows-only APIs outside `converter/platforms/`. |
-| `test_temp_lock.py` | WinError 32 regression (simulated). |
-
-All tests run on Linux only so far.
+| `tests/test_end_to_end.py` | Every action through `run_action`: naming, page counts, OCR on/off, contents page, order, monotonic progress, cancel, missing OCR, wrong file types, inputs unchanged. |
+| `tests/test_flatten.py`, `test_merge.py`, `test_split.py`, `test_images.py`, `test_compress.py`, `test_ocr.py` | Each action and the OCR text layer in detail. |
+| `tests/test_powerpoint.py` | Renderer order and fallback with a **fake** PowerPoint; untrusted-file routing (R1); the partial-output scenario (R3, fails on the old code); proven process ownership (R2); the COM helper thread's timeout/cancel rules. Real PowerPoint is never exercised. |
+| `tests/test_provenance.py` | Mark-of-the-Web parsing; on Windows (CI), real NTFS zone streams and that copies keep them. |
+| `tests/test_tools.py`, `test_portability.py`, `test_temp_lock.py` | Running/killing external programs; no OS checks in shared service code; the WinError 32 regression. |
+| `tests/api/` | Paths, logging, settings store (including failed writes, R6), DTOs, job manager (including deterministic save/discard/shutdown races, R4), bridge contract (method names and argument lists), app entry, the import seam (R8). No real window is opened. |
+| `frontend/src/**/*.test.ts(x)` | Bridge mapping, mock, file list, action options and defaults, Split validation, Convert modal flow, settings save ordering (R5) and failure display (R6), tooltips. |
 
 ## CI
 
-- `.github/workflows/build-windows.yml`: builds the Windows installer on `windows-latest`. **Manual trigger only** (`workflow_dispatch`) to avoid spending Actions minutes on a private repo. Not run yet; it can't succeed until `api/`, `main.py` and the frontend are merged.
-- There is **no automated test run in CI** yet; tests are run locally.
+- **`.github/workflows/ci.yml`** (every push and pull request, decision F37): Python lint, format check and tests on **Linux** (with Tesseract and LibreOffice installed) and on **Windows** (without them, so OCR/slide tests skip there); frontend typecheck, lint, tests and the single-file build check. A newer push cancels an older run on the same branch.
+- **`.github/workflows/build-windows.yml`**: builds the Windows installer (PyInstaller + Inno Setup). **Manual trigger only.** Not run yet.

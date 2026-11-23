@@ -73,6 +73,10 @@ class JobContext:
         warnings: Non-fatal issues collected during the job.
         file_index: 1-based index of the input file being processed.
         file_count: Number of input files in the job.
+        phase_start: Where the current phase starts on the overall 0..1 bar.
+        phase_span: How much of the bar the current phase covers. A job with
+            several phases (e.g. flatten every file, then merge) sets these so
+            the progress bar never jumps backwards.
     """
 
     settings: ActionSettings = field(default_factory=ActionSettings)
@@ -81,6 +85,8 @@ class JobContext:
     warnings: list[Issue] = field(default_factory=list)
     file_index: int = 1
     file_count: int = 1
+    phase_start: float = 0.0
+    phase_span: float = 1.0
 
     def check_cancel(self) -> None:
         """Stop the job here if the user pressed Cancel."""
@@ -100,8 +106,9 @@ class JobContext:
     ) -> None:
         """Send a progress update.
 
-        Overall progress gives each input file an equal share. Within a file,
-        ``within_file`` (0 to 1) is used if given, otherwise page / page_count.
+        Within the current phase, each input file gets an equal share. Within
+        a file, ``within_file`` (0 to 1) is used if given, otherwise
+        page / page_count. The phase is then mapped onto the overall bar.
 
         Args:
             stage: Current phase.
@@ -113,9 +120,15 @@ class JobContext:
         if within_file is None:
             within_file = (page - 1) / page_count if page and page_count else 0.0
         count = max(self.file_count, 1)
-        fraction = ((self.file_index - 1) + min(max(within_file, 0.0), 1.0)) / count
+        local = ((self.file_index - 1) + min(max(within_file, 0.0), 1.0)) / count
+        fraction = self.phase_start + self.phase_span * min(local, 1.0)
         self.progress(
             ProgressEvent(
                 stage, self.file_index, self.file_count, page, page_count, fraction, message
             )
         )
+
+    def begin_phase(self, start: float, span: float, file_count: int) -> None:
+        """Start a new phase covering ``[start, start + span]`` of the progress bar."""
+        self.phase_start, self.phase_span = start, span
+        self.file_index, self.file_count = 1, max(file_count, 1)

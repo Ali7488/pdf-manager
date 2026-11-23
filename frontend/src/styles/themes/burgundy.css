@@ -1,14 +1,11 @@
-/* Burgundy theme: burgundy and pink. Base colours only. */
+/*
+ * Burgundy: burgundy and bright pink, white text.
+ * Exactly three tones: base (background), text, accent. Everything else in
+ * ../palette.css is derived from these three.
+ */
 [data-theme="burgundy"] {
   color-scheme: dark;
-  --band: #6b2742;
-  --on-band: #fff7fa;
-  --accent: #df789b;
-  --on-accent: #1b141b;
-  --paper: #2b1e29;
-  --canvas: #1b141b;
-  --ink: #fff7fa;
-  --line: #694557;
-  --alert: #ff8f95;
-  --shadow-lg: 0 2px 12px rgb(0 0 0 / 0.5);
+  --base: #4a0f26;
+  --text: #ffffff;
+  --accent: #ff8fbd;
 }

@@ -15,7 +15,9 @@
   --space-12: 3rem;
 
   /* Corner radius */
-  /* Office-2016-style: crisp, almost square corners. */
+  /* Crisp, almost square corners; buttons get their own soft radius. */
+  --radius-button: 6px;
+  --border-width: 2px;
   --radius-sm: 2px;
   --radius-md: 2px;
   --radius-lg: 3px;

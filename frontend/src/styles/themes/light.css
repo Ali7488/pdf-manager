@@ -1,14 +1,11 @@
-/* Light theme: gold on white (the owner's template colours). Base colours only. */
+/*
+ * Light: white and gold, near-black text.
+ * Exactly three tones: base (background), text, accent. Everything else in
+ * ../palette.css is derived from these three.
+ */
 [data-theme="light"] {
   color-scheme: light;
-  --band: #7a5410;
-  --on-band: #ffffff;
-  --accent: #8c600c;
-  --on-accent: #ffffff;
-  --paper: #ffffff;
-  --canvas: #f3f2ee;
-  --ink: #1b1a16;
-  --line: #d9d3c4;
-  --alert: #b42e36;
-  --shadow-lg: 0 2px 10px rgb(27 26 22 / 0.18);
+  --base: #ffffff;
+  --text: #141414;
+  --accent: #8a6100;
 }

@@ -119,9 +119,10 @@ export function SettingsPage() {
           {APP_LICENSE} (GNU Affero General Public License, version 3). It comes with ABSOLUTELY NO WARRANTY.
         </p>
         <p>
-          It includes open-source components, including PyMuPDF ({APP_LICENSE}), each under its own licence. The
-          author's own source code is also available under the MIT License. The full licence texts, the
-          third-party notices and the build instructions come with the app and are in the repository.
+          It includes third-party components, each under its own licence: among them PyMuPDF and MuPDF
+          ({APP_LICENSE}) and, on Windows, Microsoft's WebView2 and Visual C++ runtime files. The author's own
+          source code is also available under the MIT License. The full licence texts, the third-party notices
+          and the build instructions come with the app; the third-party source code is attached to each release.
         </p>
         <p>Complete source code: {SOURCE_URL}</p>
         <div>

@@ -29,3 +29,7 @@ A short, summarized record of each request made to the coding agent, and what ca
     - [ ] **Registry path fix:** handle unquoted `tesseract.exe,0` values in `find_tesseract`.
     - [ ] **Installer:** detect Microsoft PowerPoint first; offer LibreOffice as an optional backup instead of always installing it.
     - [ ] **Investigate PowerPoint falling back to LibreOffice too often:** check whether the success check is too strict, and look at the documented "Waiting for printer connection" popup during PowerPoint's PDF export.
+13. **Answers and frontend v1 direction.** Logs go next to the installed app; page numbering uses viewer labels; the fallback issue is about LibreOffice. Defined the frontend: a desktop window app for Windows 11, Vite + React + TypeScript + npm, CSS Modules in feature folders, themes, IBM Plex Sans, drag-and-drop files, new Split mode (and possibly format conversion), a "Use OCR" checkbox, troubleshooting popups, a tool-check modal on Convert, and sidebar navigation. Asked for a running decisions log, a role statement in `AGENTS.md`, and a full plan plus clarifications before any work starts. Checklist:
+    - [x] Create `docs/DECISIONS.md` with every owner decision so far.
+    - [x] Add the senior full-stack engineer role statement to `AGENTS.md`.
+    - [ ] Present the full plan and open questions; wait for confirmation before starting.

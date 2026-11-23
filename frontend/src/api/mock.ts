@@ -99,14 +99,14 @@ const DEFAULT_SETTINGS: Settings = {
   tesseractPath: null,
 };
 
-/** Builds an Issue with the contract's shape. */
+/** Builds an Issue with the contract's shape. `details`, `file` and `command` default to null. */
 function makeIssue(
   code: IssueCode,
   severity: Issue["severity"],
   title: string,
   message: string,
   troubleshooting: string[],
-  extra: Partial<Pick<Issue, "details" | "file">> = {},
+  extra: Partial<Pick<Issue, "details" | "file" | "command">> = {},
 ): Issue {
   return {
     code,
@@ -116,6 +116,7 @@ function makeIssue(
     troubleshooting,
     details: extra.details ?? null,
     logFile: "C:\\Users\\Public\\PDF Manager\\logs\\pdf-manager.log",
+    command: extra.command ?? null,
     file: extra.file ?? null,
   };
 }

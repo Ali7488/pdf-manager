@@ -56,6 +56,7 @@ export function settingsCallFailedIssue(error: unknown): Issue {
     ],
     details: error instanceof Error ? error.message : String(error),
     logFile: null,
+    command: null,
     file: null,
   };
 }

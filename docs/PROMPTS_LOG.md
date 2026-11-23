@@ -44,4 +44,9 @@ A short, summarized record of each request made to the coding agent, and what ca
     - [ ] pywebview shell connecting the UI to the converter.
     - [ ] Packaging: PyInstaller and the Inno Setup install wizard.
     - [ ] Delete the Tkinter app once the new app works.
+16. **Function-based API.** Conversion actions share one function that takes an action enum, a settings object and the data, instead of a single bundled request object. Checklist:
+    - [x] Update `frontend/src/api/types.ts` and `docs/API.md` (`startJob(action, settings, data)`, `Action` enum, `ActionSettings`, `ActionData`).
+    - [x] Record the decision (F34).
+    - [ ] Pass the change to the frontend agent.
+    - [ ] Python side: `converter.run_action(action, settings, data)` with an `Action` enum.
 

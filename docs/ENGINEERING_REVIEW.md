@@ -75,7 +75,7 @@ Implementation of the fixes above, by AI agents (not a human review). Evidence:
 2. Fix concurrency/persistence issues **R4–R6** and add regression tests.
 3. Implement automated Python/frontend pull-request CI **R7** and record actual run results, not just agent-reported test counts.
 4. Remove transitional import fallback **R8** and update `docs/ARCHITECTURE.md`, `docs/SOURCE_INVENTORY.md` and any obsolete references in `docs/PORTABILITY.md` (**R9**).
-5. Make Windows-specific troubleshooting text platform-aware before Linux packages (see `PORTABILITY.md`).
+5. ~~Make Windows-specific troubleshooting text platform-aware.~~ Done 2026-11-23 for the service layer's messages (`os_family()`, tested); the API layer's Linux OCR-install message is being added with the Linux work.
 6. Public release requirements: choose a license and versioning policy, validate third-party licenses, and decide whether/when to sign the installer (unsigned accepted for initial private testing, F17).
 7. Complete a line-by-line human code ownership review and actual-user acceptance before resume/release claims.
 

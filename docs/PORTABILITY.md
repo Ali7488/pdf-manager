@@ -18,7 +18,7 @@ PDF Manager ships first on **Windows 11** (v1). The same code base must later su
 2. **Optional, never required, Windows features.** Microsoft PowerPoint (COM) is an optional, higher-fidelity slide renderer on Windows. **LibreOffice is the cross-platform renderer** and must always work as the fallback. No feature may depend on PowerPoint.
 3. **Paths:** use `pathlib`; never hard-code drive letters, `\` separators, `Program Files` or `%LOCALAPPDATA%` outside platform modules. Remember Linux file names are case-sensitive.
 4. **External tools are found, not assumed:** Tesseract and LibreOffice are located through the platform interface (PATH first, then platform-specific places).
-5. **User-facing text:** wording that names a platform-specific fix (for example "Microsoft Print to PDF" or a Windows download page) must become platform-aware before a Linux release (see "Known Windows-specific spots").
+5. **User-facing text:** wording that names a platform-specific fix (for example "Microsoft Print to PDF" or a Windows download page) must be platform-aware. `converter/core/issues.py` chooses wording with `platforms.os_family()`; `tests/test_issue_wording.py` checks Linux messages contain no Windows-only steps.
 6. **Tests:** platform-independent tests run on Linux in development. Windows-only behaviour is isolated so it can be faked in tests and verified on a real Windows 11 machine.
 
 ## Platform interface (service layer)
@@ -32,6 +32,7 @@ PDF Manager ships first on **Windows 11** (v1). The same code base must later su
 | `tesseract_candidates()` | Program Files / LocalAppData folders and installer registry entries. | None beyond `PATH` (packages install to `/usr/bin`). |
 | `libreoffice_candidates()` | Program Files / LocalAppData folders. | None beyond `PATH` (`soffice`, `libreoffice`). |
 | `powerpoint_installed()` / `powerpoint_path()` | Registry checks for PowerPoint's automation class and executable. | Always `False` / `None`. |
+| `os_family()` | `"windows"` | `"linux"` (or `"mac"`) |
 | `is_untrusted(path)` / `copy_with_provenance(src, dst)` | Read the Mark-of-the-Web zone; copy a file with its `Zone.Identifier` stream (never strip it, audit R1). | Always `False`; plain copy. |
 | `export_slides_with_powerpoint` | The optional COM-based renderer (`windows_powerpoint.py`). | `None`: LibreOffice renders slides. |
 
@@ -64,6 +65,5 @@ To be done in a later release; not implemented now.
 
 | Where | What | Plan |
 | --- | --- | --- |
-| `converter/core/issues.py` | Troubleshooting text mentions Windows-only fixes (default printer, Windows download page) | Make platform-aware before the Linux release. |
 | `api/bridge.py`, `api/paths.py` | Opening folders (`os.startfile` / `xdg-open`), OCR install via winget, picker filters and the settings path are gated by `paths.on_windows()` checks inside these modules | Move behind one API-layer platform module (P15); tracked in `ENGINEERING_REVIEW.md`. |
 | `packaging/` | Windows installer (PyInstaller + Inno Setup) | Windows only by design; Linux packaging is separate future work. |

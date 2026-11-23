@@ -1,16 +1,75 @@
-"""Rendering PowerPoint files (PPT/PPTX) to PDF via Microsoft PowerPoint or LibreOffice."""
+"""Rendering PowerPoint files (PPT/PPTX) to PDF.
+
+Two renderers, tried in this order:
+
+1. **Microsoft PowerPoint** (optional, Windows only, via
+   ``platforms.export_slides_with_powerpoint``): the most faithful rendering.
+2. **LibreOffice** (cross-platform): always the fallback, and the only
+   renderer on Linux.
+
+If PowerPoint fails and LibreOffice succeeds, the job continues with a
+``POWERPOINT_FALLBACK`` warning that carries PowerPoint's real error. If both
+fail, the job stops with ``POWERPOINT_CONVERSION_FAILED`` and both errors.
+
+Why the input is copied first: files downloaded from the internet or email
+carry a Windows "Mark of the Web" tag (a hidden ``Zone.Identifier`` stream).
+PowerPoint opens such files in Protected View, which hidden automation can't
+use, so the export fails and every such file fell back to LibreOffice. A plain
+byte-for-byte copy into the scratch folder doesn't carry the tag. The copy also
+guarantees the original is never touched by either renderer.
+"""
 
 from __future__ import annotations
 
-import os
+import logging
+import shutil
+import subprocess
 import tempfile
 from pathlib import Path
 
-from .common import Progress
+from . import platforms
+from .common import Stage
+from .context import JobContext
+from .issues import (
+    ConversionError,
+    powerpoint_failed,
+    powerpoint_fallback,
+    slide_renderer_missing,
+)
 from .tools import find_libreoffice, run_command
 
+log = logging.getLogger(__name__)
 
-def libreoffice_convert(source: Path, dest_dir: Path, filter_spec: str, extension: str) -> Path:
+# Seconds a renderer may take for one presentation before it is stopped.
+POWERPOINT_TIMEOUT_SEC = 300
+LIBREOFFICE_TIMEOUT_SEC = 300
+
+
+class LibreOfficeError(RuntimeError):
+    """LibreOffice failed; the message holds its output."""
+
+
+def copy_for_rendering(source: Path, folder: Path) -> Path:
+    """Copy ``source`` into ``folder`` as plain bytes, keeping its file name.
+
+    ``shutil.copyfileobj`` copies only the file's contents, never Windows
+    alternate data streams such as the Mark-of-the-Web ``Zone.Identifier``.
+    """
+    folder.mkdir(parents=True, exist_ok=True)
+    target = folder / source.name
+    with open(source, "rb") as src, open(target, "wb") as dst:
+        shutil.copyfileobj(src, dst, length=1024 * 1024)
+    return target
+
+
+def libreoffice_convert(
+    source: Path,
+    dest_dir: Path,
+    filter_spec: str,
+    extension: str,
+    ctx: JobContext | None = None,
+    timeout: float = LIBREOFFICE_TIMEOUT_SEC,
+) -> Path:
     """Convert a document with LibreOffice running headless (no window).
 
     Args:
@@ -18,109 +77,112 @@ def libreoffice_convert(source: Path, dest_dir: Path, filter_spec: str, extensio
         dest_dir: Folder where LibreOffice writes the result.
         filter_spec: LibreOffice's ``--convert-to`` value, e.g.
             ``"pdf:impress_pdf_Export"`` for slides to PDF.
-        extension: Extension of the expected output, e.g. ``".pdf"``. Used to
-            find the file LibreOffice wrote (it is named after the source).
+        extension: Extension of the expected output, e.g. ``".pdf"``. LibreOffice
+            names the output after the source, so this locates it.
+        ctx: Job context, so Cancel can stop LibreOffice.
+        timeout: Seconds before LibreOffice is stopped.
 
     Returns:
         Path to the converted file, ``dest_dir / (source stem + extension)``.
 
     Raises:
-        RuntimeError: LibreOffice isn't installed, or the conversion failed or
-            produced an empty file. The message includes LibreOffice's output.
+        ConversionError: LibreOffice isn't installed (``SLIDE_RENDERER_MISSING``).
+        LibreOfficeError: The conversion failed, timed out or wrote nothing.
+        Cancelled: The user cancelled.
     """
     office = find_libreoffice()
     if office is None:
-        raise RuntimeError("PowerPoint conversion requires Microsoft PowerPoint or LibreOffice.")
+        raise ConversionError(slide_renderer_missing())
+    cancel = ctx.cancel if ctx else None
     # A throwaway LibreOffice profile for this one run. Without it, if the user
     # already has LibreOffice open, the command hands the job to that running
     # instance and exits without converting anything.
     with tempfile.TemporaryDirectory(prefix="pdf-manager-lo-") as profile:
-        proc = run_command(
-            [
-                str(office),
-                f"-env:UserInstallation={Path(profile).as_uri()}",
-                "--headless",
-                "--convert-to",
-                filter_spec,
-                "--outdir",
-                str(dest_dir),
-                str(source),
-            ],
-            timeout=300,
-        )
+        try:
+            proc = run_command(
+                [
+                    office,
+                    f"-env:UserInstallation={Path(profile).as_uri()}",
+                    "--headless",
+                    "--convert-to",
+                    filter_spec,
+                    "--outdir",
+                    dest_dir,
+                    source,
+                ],
+                timeout=timeout,
+                cancel=cancel,
+            )
+        except subprocess.TimeoutExpired:
+            raise LibreOfficeError(f"LibreOffice didn't finish within {int(timeout)} seconds.")
     # LibreOffice often exits with code 0 even when it failed, so also check
     # that the output file exists and isn't empty.
     target = dest_dir / f"{source.stem}{extension}"
     if proc.returncode != 0 or not target.is_file() or target.stat().st_size == 0:
-        raise RuntimeError(
-            f"LibreOffice conversion failed: {(proc.stderr or proc.stdout).strip()[:350]}"
+        output = (proc.stderr or proc.stdout or "").strip()
+        raise LibreOfficeError(
+            f"LibreOffice exit code {proc.returncode}; output: {output or '(none)'}"
         )
     return target
 
 
-def powerpoint_to_pdf(source: Path, dest_dir: Path, report: Progress) -> Path:
+def render_slides(source: Path, dest_dir: Path, ctx: JobContext, file_label: str) -> Path:
     """Render a PowerPoint file to PDF, one page per slide.
-
-    On Windows, Microsoft PowerPoint is tried first because it renders slides
-    most faithfully. It is driven through COM automation (pywin32): the file is
-    opened read-only in a hidden window and exported with "Save As PDF". If
-    PowerPoint is missing or anything fails, LibreOffice is used instead. On
-    other systems only LibreOffice is used.
 
     Args:
         source: The ``.ppt`` or ``.pptx`` file. It is never modified.
-        dest_dir: Folder to write ``<source stem>.pdf`` into.
-        report: Progress callback for status messages.
+        dest_dir: This file's scratch folder; ``<stem>.pdf`` is written here.
+        ctx: Job context (progress, cancel, warnings).
+        file_label: Input file name, for messages.
 
     Returns:
         Path to the rendered PDF.
 
     Raises:
-        RuntimeError: Both PowerPoint and LibreOffice failed (or are missing).
-
-    Known issues:
-        * PowerPoint runs as a single instance, so ``DispatchEx`` may attach to
-          a PowerPoint the user already has open, and ``app.Quit()`` below can
-          then close it.
-        * The PowerPoint error is discarded; only the LibreOffice error is
-          reported if the fallback also fails.
+        ConversionError: Both renderers failed (``POWERPOINT_CONVERSION_FAILED``)
+            or neither is installed (``SLIDE_RENDERER_MISSING``).
+        Cancelled: The user cancelled.
     """
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    local = copy_for_rendering(source, dest_dir / "input")
     output = dest_dir / f"{source.stem}.pdf"
-    if os.name == "nt":
-        try:
-            import pythoncom
-            import win32com.client
+    powerpoint_error: str | None = None
 
-            # COM must be initialised on each thread that uses it; conversions
-            # run on a background worker thread.
-            pythoncom.CoInitialize()
-            app = None
-            pres = None
-            try:
-                report("Rendering PowerPoint slides...")
-                app = win32com.client.DispatchEx("PowerPoint.Application")
-                # Open(FileName, ReadOnly=True, Untitled=False, WithWindow=False)
-                pres = app.Presentations.Open(str(source.resolve()), True, False, False)
-                pres.SaveAs(str(output.resolve()), 32)  # 32 = ppSaveAsPDF
-                if output.is_file() and output.stat().st_size:
-                    return output
-                # An empty or missing PDF falls through to LibreOffice below.
-            finally:
-                # Always close the file and PowerPoint, even after an error,
-                # so no hidden PowerPoint process is left running.
-                if pres is not None:
-                    try:
-                        pres.Close()
-                    except Exception:
-                        pass
-                if app is not None:
-                    try:
-                        app.Quit()
-                    except Exception:
-                        pass
-                pythoncom.CoUninitialize()
-        except Exception:
-            # Covers pywin32 not installed, PowerPoint not installed, and any
-            # error while opening or exporting.
-            report("Using LibreOffice to render the slides...")
-    return libreoffice_convert(source, dest_dir, "pdf:impress_pdf_Export", ".pdf")
+    exporter = platforms.export_slides_with_powerpoint
+    if exporter is not None and platforms.powerpoint_installed():
+        ctx.report(Stage.RENDERING_SLIDES, f"Converting slides with PowerPoint: {file_label}")
+        try:
+            exporter(local, output, POWERPOINT_TIMEOUT_SEC, ctx.cancel)
+            return output
+        except Exception as exc:
+            # Cancelled is an Exception too: a user cancel must stop the job,
+            # not fall back to LibreOffice.
+            if ctx.cancel.cancelled:
+                raise
+            powerpoint_error = str(exc)
+            log.warning("PowerPoint couldn't convert %s; trying LibreOffice.", file_label)
+            log.debug("PowerPoint error for %s:\n%s", file_label, powerpoint_error)
+
+    ctx.check_cancel()
+    ctx.report(Stage.RENDERING_SLIDES, f"Converting slides with LibreOffice: {file_label}")
+    try:
+        result = libreoffice_convert(local, dest_dir, "pdf:impress_pdf_Export", ".pdf", ctx)
+    except ConversionError as exc:
+        if powerpoint_error is None:
+            raise  # LibreOffice missing and PowerPoint not available: renderer missing.
+        details = f"PowerPoint: {powerpoint_error}\n\nLibreOffice: not installed."
+        raise ConversionError(powerpoint_failed(file_label, details)) from exc
+    except LibreOfficeError as exc:
+        details = f"LibreOffice: {exc}"
+        if powerpoint_error is not None:
+            details = f"PowerPoint: {powerpoint_error}\n\n{details}"
+        raise ConversionError(powerpoint_failed(file_label, details)) from exc
+
+    if powerpoint_error is not None:
+        ctx.warn(powerpoint_fallback(file_label, powerpoint_error))
+    return result
+
+
+def powerpoint_to_pdf(source: Path, dest_dir: Path, report) -> Path:
+    """Legacy wrapper for the old pipeline and Tkinter app; removed once they're migrated."""
+    return render_slides(source, dest_dir, JobContext(), source.name)

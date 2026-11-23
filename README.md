@@ -1,138 +1,132 @@
 # PDF Manager
 
-A lightweight, offline desktop application for converting, preparing, and organizing PDF and PowerPoint documents. Built with **React + TypeScript** for the interface, a **Python** document-processing engine, and **pywebview** for a native desktop window.
+A lightweight, offline desktop application for converting, preparing and organizing PDF and PowerPoint documents. The interface is **React + TypeScript**, the document engine is **Python**, and **pywebview** gives it a native desktop window.
 
-> **Project status:** Active development. The React frontend, Python bridge, conversion engine, and Windows packaging source are merged. Automated tests have been reported passing by the development agents, but the packaged application, installer, and Microsoft PowerPoint integration **have not yet been verified on a real Windows 11 system**. This is **not a supported public release**.
+> **⚠️ Pre-release for testing (v0.5).** This version is for testing only. The installer is **unsigned** and has **not yet been verified on a real Windows 11 PC**. Don't use it as your only copy of important documents. The full v1.0 release will follow after manual verification of the functions, code and features.
 
-## Features
+## What it does
 
 | Tool | What it does | Inputs |
 | --- | --- | --- |
-| **Flatten** | Turns each page into a fixed image-backed PDF; optionally adds searchable OCR text. | PDF, PPT, PPTX |
-| **Flatten + Merge** | Flattens several documents and combines them in the selected order. | PDF, PPT, PPTX |
-| **Merge** | Combines documents while retaining existing PDF text where possible. | PDF, PPT, PPTX |
-| **Split** | Extracts specified page ranges, every N pages, or individual pages. | PDF, PPT, PPTX |
-| **Images to PDF** | Converts JPEG/PNG images into one combined PDF or separate PDFs. | JPG, JPEG, PNG |
-| **Compress PDF** | Offers light, balanced, and strong compression. | PDF |
+| **Flatten** | Turns every page into a single image, so PDFs open reliably in apps that struggle with complex PDFs (for example tablet note-taking apps). Optional OCR makes the pages searchable again. | PDF, PPT, PPTX |
+| **Flatten + Merge** | Flattens several documents and combines them in the order you choose. | PDF, PPT, PPTX |
+| **Merge** | Combines documents, keeping their text, links and bookmarks. Optional clickable contents page. | PDF, PPT, PPTX |
+| **Split** | Splits by page ranges (e.g. `1-3, 5, 8-10`), every N pages, or one file per page. Save as files or one zip. | PDF, PPT, PPTX |
+| **Images to PDF** | Turns photos and images into one combined PDF or one PDF per image (photos stay upright). | JPG, PNG |
+| **Compress** | Makes PDFs smaller: Light, Balanced or Strong. | PDF |
 
-Additional capabilities include optional Tesseract OCR, drag-and-drop file selection and reordering, PDF bookmarks and optional contents pages, cancellation, progress updates, collision-safe output names, and clear errors with troubleshooting guidance.
+Also: drag and drop, drag to reorder, optional **OCR** (Tesseract) on every tool except Compress, progress and Cancel, an optional default save folder, four colour themes, and plain-language error messages with troubleshooting steps.
 
-**Document safety:** The application is designed to leave source documents unchanged. Conversion takes place in temporary storage, and completed results are saved as new files. This behavior has automated test coverage, but the final packaged Windows application still needs acceptance testing. Speaker-note export is intentionally **not** included.
+**Your files are safe:** originals are only read, never changed. Work happens in a temporary folder and results are saved as new files; existing files are never overwritten. Everything runs on your computer: no account, no cloud.
+
+## Install
+
+### Windows 11
+
+1. Open the [Releases page](https://github.com/Ali7488/pdf-manager/releases) and download **`PDF-Manager-Setup-<version>.exe`** from the latest pre-release.
+2. **Double-click it.** Because the installer isn't signed yet, Windows SmartScreen may say "Windows protected your PC": click **More info → Run anyway**.
+3. Follow the short wizard. It installs for your user only (no administrator rights needed) and can optionally install:
+   - **Tesseract OCR**, to make pages searchable (Windows may ask for permission);
+   - **LibreOffice**, only needed if Microsoft PowerPoint isn't installed.
+4. Start **PDF Manager** from the Start menu or the desktop icon.
+
+You can install OCR later from the app's **Settings**. Logs are written to a `logs` folder next to the installed app (open it from Settings); settings are in `%LOCALAPPDATA%\PDFManager`.
+
+### Linux (Ubuntu/Debian, Arch)
+
+Linux packages are planned for **v0.75**. Until then, run it from source (see *Development* below).
+
+## Testing without the window (CLI)
+
+A command-line tool runs every function through the same engine as the app, on Windows and Linux. With the source checked out and [uv](https://docs.astral.sh/uv/) installed:
+
+```bash
+uv sync
+uv run scripts/make_samples.py          # creates test documents for every function in ./samples
+uv run cli.py tools flatten samples/05-slides.pptx --ocr   # which helper programs a job needs
+uv run cli.py flatten samples/01-text-report.pdf --ocr --out out
+uv run cli.py merge samples/01-text-report.pdf samples/05-slides.pptx --contents --out out
+uv run cli.py split samples/13-long-document.pdf --ranges "1-3, 5" --zip --out out
+uv run cli.py images samples/07-photo-portrait.jpg samples/08-diagram.png --separate --out out
+uv run cli.py compress samples/09-image-heavy.pdf --level strong --out out
+uv run cli.py --help
+```
+
+`samples/README.txt` explains what each test document is for, including the expected error cases (a password-protected and a damaged PDF).
 
 ## How it works
 
 ```text
 React + TypeScript (frontend/)
          |
-         | pywebview JavaScript ↔ Python API
+         | pywebview JavaScript ↔ Python calls and events (docs/API.md)
          v
-Python desktop bridge (api/)
+Python desktop bridge (api/)       jobs, settings, progress, file dialogs, saving, logs
          |
-         | jobs, settings, progress, file dialogs, saving
          v
-Document conversion engine (converter/)
-         |
-         +-- PyMuPDF       PDF processing, image rendering, merging
-         +-- Tesseract     Optional offline OCR
-         +-- PowerPoint    Optional Windows slide renderer (COM)
-         +-- LibreOffice   Cross-platform slide renderer / fallback
+Document engine (converter/)       one entry point: run_action(action, settings, data)
+         +-- PyMuPDF       PDF processing, rendering, merging, splitting, compressing
+         +-- Tesseract     optional offline OCR
+         +-- PowerPoint    optional Windows slide renderer (COM)
+         +-- LibreOffice   cross-platform slide renderer and fallback
 ```
 
-The production frontend is bundled as a self-contained HTML asset and loaded in a desktop window. **No local web server, user account, or cloud document processing is required.** Document processing and installation of optional helpers occur locally.
+The interface is one self-contained HTML file loaded in the window: **no local web server**. Presentations downloaded from the internet or email are converted with LibreOffice rather than opened by PowerPoint automation, to keep your computer safe.
 
-## Windows installation
+## Development
 
-The intended distribution is a Windows 11 installer (Inno Setup + PyInstaller), using a normal Start-menu shortcut and an optional Desktop shortcut. It installs per user without requiring administrator access for the application itself.
-
-**There is no verified release installer yet.** Once the first Windows CI build succeeds, test its installer artifact on a Windows 11 machine before using it with important documents.
-
-Optional helpers:
-
-- **Tesseract OCR** for searchable text. The app can perform non-OCR operations without it.
-- **Microsoft PowerPoint or LibreOffice** for converting PPT/PPTX presentations. PowerPoint is Windows-only; LibreOffice is the fallback.
-- **Microsoft Edge WebView2 Runtime** to display the Windows desktop interface. This is normally available on Windows 11.
-
-See [Windows packaging](packaging/README.md) for build prerequisites, installer behavior, optional dependency installation, uninstall behavior, and the acceptance checklist.
-
-## Development setup
-
-Prerequisites: [uv](https://docs.astral.sh/uv/) for Python dependencies, Node.js and npm for the frontend, and the platform's required pywebview runtime. The repository contains `uv.lock` and `frontend/package-lock.json` for repeatable dependency resolution.
-
-**Build the interface and launch the desktop application:**
+Prerequisites: [uv](https://docs.astral.sh/uv/), Node.js 24 and npm. On Linux, pywebview uses Qt (PySide6).
 
 ```bash
 uv sync --frozen
-cd frontend
-npm ci
-npm run build
-cd ..
+cd frontend && npm ci && npm run build && cd ..
 uv run main.py
 ```
 
-The application entry point is **`main.py`**. The earlier Tkinter frontend and its batch/PowerShell launchers have been retired from this repository.
-
-**Run checks:**
+Checks (the same ones CI runs):
 
 ```bash
 uv run pytest
-uvx ruff check --line-length 100 .
-uvx ruff format --check --line-length 100 .
-cd frontend
-npm run lint
-npm run typecheck
-npm test
-npm run build
+uvx ruff check --select F,E9,I,E501 --line-length 100 api converter tests main.py cli.py scripts
+uvx ruff format --check --line-length 100 api converter tests main.py cli.py scripts
+cd frontend && npm run typecheck && npm run lint && npm test && npm run build
 ```
 
-Some Python integration tests need local Tesseract or LibreOffice and may skip when those tools are absent. Linux development is possible, but Linux desktop runtime dependencies and distribution packages are not yet a supported release target.
+Tests that need Tesseract or LibreOffice skip when those aren't installed.
 
-## Building a Windows installer
-
-On a Windows build machine with uv, Node.js/npm, and Inno Setup 6 installed:
-
-```powershell
-./packaging/build.ps1
-```
-
-The build script creates the React bundle, synchronizes locked Python dependencies, packages the desktop app with PyInstaller, and compiles an Inno Setup installer under `dist/installer/`.
-
-A [manual GitHub Actions workflow](.github/workflows/build-windows.yml) can also build and upload a Windows installer artifact. **That workflow is not a substitute for automated PR testing or real-machine verification, and its successful execution has not yet been confirmed.**
+**CI:** every push runs Python tests on Linux (with Tesseract and LibreOffice) and Windows, plus the frontend checks ([`ci.yml`](.github/workflows/ci.yml)). The Windows installer is built by [`build-windows.yml`](.github/workflows/build-windows.yml); see the [packaging guide](packaging/README.md).
 
 ## Repository layout
 
 ```text
-api/                   Python bridge: settings, file dialogs, jobs, events, saving
-converter/             UI-independent document-processing services
-frontend/              React, TypeScript, Vite, CSS Modules, and frontend tests
+api/                   Python bridge: settings, file dialogs, jobs, events, saving, logs
+converter/             UI-independent document engine (folders by responsibility)
+frontend/              React, TypeScript, Vite, CSS Modules and frontend tests
 packaging/             PyInstaller spec, PowerShell build script, Inno Setup wizard
-tests/                 Python tests, including integration and regression coverage
+scripts/               Test-document generator
+tests/                 Python tests (unit, end-to-end, regression)
 docs/                  Architecture, API contract, decisions, engineering review
-.github/workflows/     Manual Windows installer build
+cli.py                 Command-line front end for testing
 main.py                Desktop application entry point
-PDF Manager.ico        Windows application icon
-pyproject.toml         Python project/dependency metadata
-uv.lock                Python dependency lockfile
 ```
 
 ## Documentation
 
-- [Architecture](docs/ARCHITECTURE.md): service, API, and UI boundaries.
-- [UI ↔ Python API](docs/API.md): bridge methods, JSON models, and events.
-- [Decisions](docs/DECISIONS.md): owner-approved requirements and unresolved questions.
-- [Engineering review](docs/ENGINEERING_REVIEW.md): known issues, test evidence, and verification gaps.
-- [Portability](docs/PORTABILITY.md): Linux compatibility considerations.
-- [Packaging guide](packaging/README.md): Windows build and installation details.
+- [Architecture](docs/ARCHITECTURE.md): layers, execution flows, non-obvious choices, tests and CI.
+- [UI ↔ Python API](docs/API.md): bridge methods, JSON models and events.
+- [Decisions](docs/DECISIONS.md): the owner's decisions.
+- [Engineering review](docs/ENGINEERING_REVIEW.md): known issues, test evidence and verification gaps.
+- [Portability](docs/PORTABILITY.md): Windows and Linux considerations.
+- [Packaging guide](packaging/README.md): Windows build and installer details.
 
-## Current verification limits
+## Verification status
 
-The development agents reported **317 passing Python tests** and passing frontend checks after merging their work. These results have **not been independently rerun for this README update**. In particular, Windows PowerPoint COM behavior, WebView2 startup, the installer, updates/uninstalls, optional helper installation, and real-user workflows still require Windows testing.
-
-Do not treat a successful frontend build or simulated Windows test as proof of a working packaged Windows application.
+The Python suite (360 tests on Linux; on Windows CI, tests needing OCR or LibreOffice skip) and the frontend suite (92 tests) pass in CI. The packaged app, the installer, Microsoft PowerPoint automation and real-user workflows **still need testing on a real Windows 11 PC**; that's what this pre-release is for. Report problems via [Issues](https://github.com/Ali7488/pdf-manager/issues).
 
 ## Privacy and contributions
 
-All document processing is designed to run locally. Never commit real user documents, copyrighted lecture slides used as fixtures, credentials, or personally identifying file paths.
+All document processing runs locally. Never commit real user documents, copyrighted material, credentials or personal file paths.
 
-This project is being developed using Claude Code and AI subagents under human-directed product requirements and architectural decisions. Generated changes require human code review and runtime validation before release. Contributions and engineering outcomes should be represented accurately.
+This project is developed with Claude Code and AI subagents under human-directed requirements and architectural decisions. Generated changes require human code review and runtime validation before the v1.0 release.
 
-**License:** Not yet selected; the repository remains private. Do not assume permission to redistribute code or binaries until licensing is finalized.
+**License:** [MIT](LICENSE).

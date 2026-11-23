@@ -1,168 +1,264 @@
-"""Orchestration: prepare each input as a PDF, validate it, then flatten and/or merge."""
+"""The single entry point for every conversion: ``run_action(action, settings, data)``.
+
+Execution flow for one job (decision F34):
+
+1. **Validate**: every input exists and is accepted by the action; if "Use
+   OCR" is on, Tesseract must be installed (checked before any slow work).
+2. **Prepare** each input as a PDF: PDFs are used as they are (only read);
+   PowerPoint files are rendered (``powerpoint.render_slides``). Each input
+   gets its own scratch sub-folder ``item_NNN``.
+3. **Act**: flatten, merge, split, convert images or compress.
+4. **Return** the outputs (still in scratch) and any warnings. The API layer
+   copies outputs to the user's folder when they choose to save.
+
+Nothing here touches the user's original files or output folder.
+"""
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+import logging
 from pathlib import Path
 
 import fitz
 
-from .common import ALLOWED, FLATTEN, FLATTEN_MERGE, MERGE, MODES, Progress
-from .flatten import flatten_searchable
-from .merge import merge_pdfs
-from .powerpoint import powerpoint_to_pdf
-from .tools import require_tesseract
+from .common import (
+    ACCEPTS,
+    POWERPOINT_EXTENSIONS,
+    Action,
+    ActionData,
+    ActionSettings,
+    JobResult,
+    OutputFile,
+    Progress,
+    Stage,
+)
+from .compress import compress_pdf
+from .context import CancelToken, JobContext
+from .flatten import flatten_pdf
+from .images import images_to_pdf
+from .issues import (
+    ConversionError,
+    empty_pdf,
+    password_protected,
+    unreadable_file,
+    unsupported_file,
+)
+from .merge import Part, merge_documents
+from .ocr import add_text_layer, require_ocr
+from .powerpoint import render_slides
+from .split import split_pdf
 
-
-def prepare_pdf(source: Path, work: Path, report: Progress) -> Path:
-    """Get a PDF version of one input file.
-
-    PDFs are used directly (the original file is only ever read). PowerPoint
-    files are rendered to PDF inside ``work``.
-
-    Args:
-        source: Input file: ``.pdf``, ``.pptx`` or ``.ppt``.
-        work: This file's scratch folder; created if needed.
-        report: Progress callback.
-
-    Returns:
-        Path to a PDF: ``source`` itself for PDFs, otherwise the rendered file.
-
-    Raises:
-        ValueError: The file doesn't exist or has an unsupported extension.
-        RuntimeError: PowerPoint rendering failed.
-    """
-    source = source.expanduser().resolve()
-    if not source.is_file() or source.suffix.lower() not in ALLOWED:
-        raise ValueError(f"Unsupported input: {source.name}. Choose PDF, PPTX or PPT.")
-    work.mkdir(parents=True, exist_ok=True)
-    if source.suffix.lower() == ".pdf":
-        return source
-    return powerpoint_to_pdf(source, work, report)
-
-
-def check_pdf(source: Path) -> None:
-    """Reject PDFs the converter can't process.
-
-    Args:
-        source: PDF to check.
-
-    Raises:
-        ValueError: The PDF needs a password to open, or has no pages.
-        fitz.FileDataError: The file is not a valid PDF.
-    """
-    with fitz.open(str(source)) as doc:
-        if doc.needs_pass:
-            raise ValueError(f"Password-protected PDF not supported: {source.name}")
-        if len(doc) < 1:
-            raise ValueError(f"PDF is empty: {source.name}")
-
-
-def process_files(
-    files: Sequence[Path],
-    mode: str,
-    scratch: Path,
-    report: Progress,
-    engine: str | Path | None = None,
-) -> list[tuple[str, Path]]:
-    """Run a whole conversion job and return the results, still in the scratch folder.
-
-    This is the converter's main entry point. Nothing is written to the user's
-    output folder here: results stay in ``scratch`` so the caller can let the
-    user choose where to save them (see :func:`converter.output.safe_destination`).
-
-    Each input is processed in order, in its own ``scratch/item_NNN`` folder:
-    converted to PDF if needed (:func:`prepare_pdf`), validated
-    (:func:`check_pdf`), and, unless the mode is Merge, flattened with OCR.
-
-    Modes:
-        * ``FLATTEN``: one image-only + OCR PDF per input, named
-          ``"<input name> - Flattened Searchable.pdf"``.
-        * ``FLATTEN_MERGE``: all inputs flattened, then merged into one PDF in
-          list order, named ``"<first name> + N more - Flattened Searchable Merged.pdf"``.
-        * ``MERGE``: inputs merged as they are, keeping their original text and
-          annotations, named ``"<first name> + N more - Merged.pdf"``.
-
-    Args:
-        files: Input files, in the order they should appear when merged.
-        mode: One of :data:`FLATTEN`, :data:`FLATTEN_MERGE` or :data:`MERGE`.
-        scratch: Empty working folder for all intermediate and final files.
-        report: Progress callback for status messages.
-        engine: Optional user-chosen path to ``tesseract.exe``.
-
-    Returns:
-        ``(suggested file name, path in scratch)`` for each output file.
-
-    Raises:
-        ValueError: Unknown mode, no files, or an unusable input file.
-        RuntimeError: OCR is missing (in a flatten mode) or a conversion step
-            failed.
-    """
-    if mode not in MODES:
-        raise ValueError(f"Unknown conversion mode: {mode}")
-    if not files:
-        raise ValueError("Choose at least one file.")
-    scratch.mkdir(parents=True, exist_ok=True)
-    # Fail fast, before any slow PowerPoint rendering, if OCR will be needed
-    # but isn't installed.
-    if mode != MERGE:
-        require_tesseract(engine)
-    prepped: list[Path] = []  # Each input as a PDF (used by Merge).
-    flattened: list[Path] = []  # Each input flattened (used by both flatten modes).
-    for idx, item in enumerate(files, 1):
-        source = Path(item)
-        report(f"Preparing {idx} / {len(files)}: {source.name}")
-        work = scratch / f"item_{idx:03d}"
-        pdf = prepare_pdf(source, work, report)
-        check_pdf(pdf)
-        prepped.append(pdf)
-        if mode != MERGE:
-            rendered = work / "flattened_searchable.pdf"
-            flatten_searchable(pdf, rendered, work / "ocr_work", report, engine=engine)
-            flattened.append(rendered)
-
-    if mode == FLATTEN:
-        return [
-            (f"{Path(original).stem} - Flattened Searchable.pdf", result)
-            for original, result in zip(files, flattened)
-        ]
-
-    # Both merge modes produce a single file named after the first input.
-    final = scratch / "combined.pdf"
-    merge_pdfs(flattened if mode == FLATTEN_MERGE else prepped, final, report)
-    stem = Path(files[0]).stem
-    prefix = f"{stem} + {len(files) - 1} more" if len(files) > 1 else stem
-    suffix = "Flattened Searchable Merged.pdf" if mode == FLATTEN_MERGE else "Merged.pdf"
-    return [(f"{prefix} - {suffix}", final)]
+log = logging.getLogger(__name__)
 
 
 def run_action(
-    action,
-    settings,
-    data,
+    action: Action,
+    settings: ActionSettings,
+    data: ActionData,
     *,
     scratch: Path,
-    progress=None,
-    cancel=None,
-):
-    """Run one conversion job: the single entry point for every action.
-
-    Interface stub, replaced by the full implementation. Contract:
+    progress: Progress | None = None,
+    cancel: CancelToken | None = None,
+) -> JobResult:
+    """Run one conversion job.
 
     Args:
-        action (Action): What to do.
-        settings (ActionSettings): How to do it; each action reads only its fields.
-        data (ActionData): The input files, in the user's order.
-        scratch (Path): Empty working folder; outputs are left here.
-        progress (Progress | None): Receives ProgressEvent updates.
-        cancel (CancelToken | None): Lets the caller stop the job.
+        action: What to do.
+        settings: How to do it; each action reads only the fields it needs.
+        data: The input files, in the user's order.
+        scratch: Empty working folder; outputs are left in it.
+        progress: Receives :class:`~converter.common.ProgressEvent` updates.
+        cancel: Lets the caller stop the job.
 
     Returns:
-        JobResult: Output files (in scratch) and non-fatal warnings.
+        The outputs (in ``scratch``) and any non-fatal warnings.
 
     Raises:
         ConversionError: A fatal, user-explainable problem (``.issue``).
         Cancelled: The job was cancelled.
         Exception: Anything else is a bug; the caller reports it as unexpected.
     """
-    raise NotImplementedError
+    action = Action(action)
+    ctx = JobContext(settings=settings, cancel=cancel or CancelToken())
+    if progress is not None:
+        ctx.progress = progress
+    files = [Path(f) for f in data.files]
+    log.info("Starting %s on %d file(s)", action.value, len(files))
+    log.debug("Settings: %s", settings)
+
+    _validate_inputs(action, files)
+    scratch.mkdir(parents=True, exist_ok=True)
+    if settings.use_ocr and action is not Action.COMPRESS:
+        require_ocr(ctx)  # Fail fast, before any slow rendering.
+
+    handler = {
+        Action.FLATTEN: _flatten,
+        Action.FLATTEN_MERGE: _flatten_merge,
+        Action.MERGE: _merge,
+        Action.SPLIT: _split,
+        Action.IMAGES_TO_PDF: _images,
+        Action.COMPRESS: _compress,
+    }[action]
+    outputs = handler(files, scratch, ctx)
+    ctx.report(Stage.FINISHING, "Done", within_file=1.0)
+    log.info(
+        "Finished %s: %d output(s), %d warning(s)", action.value, len(outputs), len(ctx.warnings)
+    )
+    return JobResult(outputs, list(ctx.warnings))
+
+
+# --- Steps shared by several actions ---------------------------------------------------
+
+
+def _validate_inputs(action: Action, files: list[Path]) -> None:
+    """Every input must exist and be a type this action accepts."""
+    if not files:
+        raise ConversionError(unsupported_file("(no files)"))
+    for path in files:
+        if path.suffix.lower() not in ACCEPTS[action]:
+            raise ConversionError(unsupported_file(path.name))
+        if not path.is_file():
+            raise ConversionError(unreadable_file(path.name, f"File not found: {path}"))
+
+
+def check_pdf(path: Path, label: str) -> int:
+    """Reject PDFs that can't be processed; return the page count.
+
+    Raises:
+        ConversionError: Unreadable, password-protected or empty.
+    """
+    try:
+        doc = fitz.open(str(path))
+    except Exception as exc:
+        raise ConversionError(unreadable_file(label, str(exc))) from exc
+    with doc:
+        if doc.needs_pass:
+            raise ConversionError(password_protected(label))
+        if len(doc) == 0:
+            raise ConversionError(empty_pdf(label))
+        return len(doc)
+
+
+def prepare_pdf(source: Path, work: Path, ctx: JobContext) -> Path:
+    """Get a PDF version of one input: PDFs as they are, PowerPoints rendered into ``work``."""
+    ctx.report(Stage.PREPARING, f"Opening {source.name}")
+    pdf = source
+    if source.suffix.lower() in POWERPOINT_EXTENSIONS:
+        pdf = render_slides(source, work, ctx, source.name)
+    check_pdf(pdf, source.name)
+    return pdf
+
+
+def _with_ocr(pdf: Path, work: Path, ctx: JobContext, label: str) -> Path:
+    """If "Use OCR" is on, return a copy with a searchable text layer; else ``pdf``."""
+    if not ctx.settings.use_ocr:
+        return pdf
+    searchable = work / "searchable.pdf"
+    add_text_layer(pdf, searchable, work / "ocr", ctx, label)
+    return searchable
+
+
+def _output(name: str, path: Path) -> OutputFile:
+    """Describe a finished output file."""
+    with fitz.open(str(path)) as doc:
+        pages = len(doc)
+    return OutputFile(name, path, pages, path.stat().st_size)
+
+
+def _merged_name(files: list[Path], suffix: str) -> str:
+    """'<first> - <suffix>.pdf' or '<first> + N more - <suffix>.pdf'."""
+    first = files[0].stem
+    prefix = f"{first} + {len(files) - 1} more" if len(files) > 1 else first
+    return f"{prefix} - {suffix}.pdf"
+
+
+def _flatten_label(ctx: JobContext) -> str:
+    return "Flattened Searchable" if ctx.settings.use_ocr else "Flattened"
+
+
+def _flatten_each(files: list[Path], scratch: Path, ctx: JobContext) -> list[Path]:
+    """Prepare and flatten every input; return the flattened PDFs in order."""
+    flattened = []
+    for index, source in enumerate(files, 1):
+        ctx.file_index = index
+        work = scratch / f"item_{index:03d}"
+        pdf = prepare_pdf(source, work, ctx)
+        target = work / "flattened.pdf"
+        flatten_pdf(pdf, target, work / "pages", ctx, source.name)
+        flattened.append(target)
+    return flattened
+
+
+# --- One handler per action --------------------------------------------------------
+
+
+def _flatten(files: list[Path], scratch: Path, ctx: JobContext) -> list[OutputFile]:
+    ctx.begin_phase(0.0, 1.0, len(files))
+    flattened = _flatten_each(files, scratch, ctx)
+    label = _flatten_label(ctx)
+    return [_output(f"{src.stem} - {label}.pdf", out) for src, out in zip(files, flattened)]
+
+
+def _flatten_merge(files: list[Path], scratch: Path, ctx: JobContext) -> list[OutputFile]:
+    ctx.begin_phase(0.0, 0.9, len(files))
+    flattened = _flatten_each(files, scratch, ctx)
+    ctx.begin_phase(0.9, 0.1, len(files))
+    target = scratch / "merged.pdf"
+    parts = [Part(src.stem, pdf) for src, pdf in zip(files, flattened)]
+    merge_documents(parts, target, ctx, contents_page=ctx.settings.contents_page)
+    return [_output(_merged_name(files, f"{_flatten_label(ctx)} Merged"), target)]
+
+
+def _merge(files: list[Path], scratch: Path, ctx: JobContext) -> list[OutputFile]:
+    ctx.begin_phase(0.0, 0.8 if ctx.settings.use_ocr else 0.5, len(files))
+    parts = []
+    for index, source in enumerate(files, 1):
+        ctx.file_index = index
+        work = scratch / f"item_{index:03d}"
+        pdf = _with_ocr(prepare_pdf(source, work, ctx), work, ctx, source.name)
+        parts.append(Part(source.stem, pdf))
+    done = ctx.phase_start + ctx.phase_span
+    ctx.begin_phase(done, 1.0 - done, len(files))
+    target = scratch / "merged.pdf"
+    merge_documents(parts, target, ctx, contents_page=ctx.settings.contents_page)
+    return [_output(_merged_name(files, "Merged"), target)]
+
+
+def _split(files: list[Path], scratch: Path, ctx: JobContext) -> list[OutputFile]:
+    ctx.begin_phase(0.0, 1.0, len(files))
+    outputs = []
+    for index, source in enumerate(files, 1):
+        ctx.file_index = index
+        work = scratch / f"item_{index:03d}"
+        pdf = _with_ocr(prepare_pdf(source, work, ctx), work, ctx, source.name)
+        outputs += split_pdf(pdf, work / "parts", source.stem, ctx.settings.split, ctx)
+    return outputs
+
+
+def _images(files: list[Path], scratch: Path, ctx: JobContext) -> list[OutputFile]:
+    ctx.begin_phase(0.0, 0.5 if ctx.settings.use_ocr else 1.0, len(files))
+    outputs = images_to_pdf(files, scratch / "images", ctx.settings.combine_images, ctx)
+    if not ctx.settings.use_ocr:
+        return outputs
+    ctx.begin_phase(0.5, 0.5, len(outputs))
+    searchable = []
+    for index, output in enumerate(outputs, 1):
+        ctx.file_index = index
+        work = scratch / f"ocr_{index:03d}"
+        target = work / output.path.name
+        add_text_layer(output.path, target, work / "pages", ctx, output.name)
+        searchable.append(_output(output.name, target))
+    return searchable
+
+
+def _compress(files: list[Path], scratch: Path, ctx: JobContext) -> list[OutputFile]:
+    ctx.begin_phase(0.0, 1.0, len(files))
+    outputs = []
+    for index, source in enumerate(files, 1):
+        ctx.file_index = index
+        check_pdf(source, source.name)
+        target = scratch / f"item_{index:03d}" / "compressed.pdf"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        compress_pdf(source, target, ctx.settings.compress_level, ctx)
+        outputs.append(_output(f"{source.stem} - Compressed.pdf", target))
+    return outputs

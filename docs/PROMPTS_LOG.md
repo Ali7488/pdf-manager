@@ -19,12 +19,12 @@ A short, summarized record of each request made to the coding agent, and what ca
     - [x] Add `AGENTS.md`, `CLAUDE.md` and this prompts log.
     - [ ] **PowerPoint quitting:** only close PowerPoint if the converter started it, so the user's open PowerPoint and presentations are never closed.
     - [ ] **PowerPoint errors:** keep the real PowerPoint error. If conversion fails completely, show it in a popup; if LibreOffice rescued it, return it as a structured warning instead.
-    - [ ] **Error logs:** write errors and warnings to a logs folder on the user's machine, and add a button that opens that folder in File Explorer.
+    - [ ] **Error logs:** write errors and warnings to a logs folder next to the installed app, and add a button that opens that folder in File Explorer.
     - [ ] **Cancel:** a manual Cancel button that stops a running job, including killing Tesseract or LibreOffice mid-run.
     - [ ] **Automatic timeouts:** give up on a page that takes too long to OCR (default to be chosen, likely about 2 minutes, configurable), and on a PowerPoint export that hangs.
     - [ ] **Keep bookmarks** when merging (and when flattening), with one top-level bookmark per input file.
-    - [ ] **Contents page (optional, on by default):** for merged output, add an index page at the start listing every input file with its page range and clickable links.
-    - [ ] **Page numbering** for merged output (details to confirm).
+    - [ ] **Contents page (can be turned off; default to be confirmed):** for merged output, add an index page at the start listing every input file with its page range and clickable links.
+    - [ ] **Page numbering** for merged output, using viewer page labels.
     - [ ] **Stricter flatten check:** every page must be image-backed and the page count must match the input.
     - [ ] **Registry path fix:** handle unquoted `tesseract.exe,0` values in `find_tesseract`.
     - [ ] **Installer:** detect Microsoft PowerPoint first; offer LibreOffice as an optional backup instead of always installing it.

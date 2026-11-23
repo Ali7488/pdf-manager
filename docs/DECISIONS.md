@@ -20,6 +20,7 @@ Decisions made by the project owner, in their own direction (summarized, not quo
 | P12 | 2026-11-22 | Restate the plan and list clarifications before starting work; never assume anything that wasn't stated clearly. |
 | P14 | 2026-11-22 | **Roadmap:** v1 is a Windows product. It will then expand to Linux packages: an Ubuntu `.deb` and an Arch `PKGBUILD`. Later versions target Qt, then GNOME. Code should stay portable so these are possible. |
 | P15 | 2026-11-22 | **One codebase for Windows, Ubuntu/Debian and Arch-based Linux:** a shared React/TypeScript frontend and Python conversion engine. Platform-specific functionality sits behind minimal interfaces; shared application logic has no Windows-only assumptions. Windows PowerPoint (COM) stays **optional**; **LibreOffice** is the cross-platform slide renderer. **Linux packaging is not implemented yet**; its constraints and requirements are documented in `docs/PORTABILITY.md`. Running subagents are not interrupted for this. |
+| P16 | 2026-11-22 | **Documentation for a post-build review:** keep accurate, proportional docs tied to the actual code: architecture decisions, dependencies, execution flows, non-obvious choices, significant bugs, tests and CI. The owner must be able to understand, debug, modify and defend the app independently. No excessive docs, and never claim generated code was reviewed when it wasn't. |
 
 ## Converter (Python backend)
 

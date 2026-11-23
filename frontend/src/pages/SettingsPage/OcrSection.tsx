@@ -3,7 +3,7 @@
  * (with live progress), the OCR language and the per-page timeout.
  */
 import { useEffect, useId, useState } from "react";
-import { Action, type Issue } from "../../api/types";
+import type { Issue } from "../../api/types";
 import { Button } from "../../components/Button/Button";
 import fieldStyles from "../../components/Field/Field.module.css";
 import { Icon } from "../../components/Icon/Icon";
@@ -11,7 +11,6 @@ import { InfoTip } from "../../components/InfoTip/InfoTip";
 import { IssuePopup } from "../../components/Issue/IssuePopup";
 import { Section } from "../../components/Page/Page";
 import { Spinner } from "../../components/Progress/Progress";
-import { defaultActionSettings } from "../../lib/actions";
 import { languageName } from "../../lib/format";
 import { useApp } from "../../state/AppContext";
 import { NumberSetting } from "./NumberSetting";
@@ -25,8 +24,9 @@ interface OcrStatus {
 }
 
 /**
- * The OCR part of Settings. The status comes from a tool check for a job that
- * uses OCR and has no files, so only the OCR row matters.
+ * The OCR part of Settings. The status comes from `getOcrStatus`, and the
+ * language list from `getOcrLanguages`; both refresh after an install or a
+ * successful search.
  */
 export function OcrSection() {
   const { api, state, updateSettings, ocrInstall, startOcrInstall, ocrVersion, bumpOcrVersion } = useApp();
@@ -39,13 +39,10 @@ export function OcrSection() {
   // Refresh the status on open and whenever OCR may have become available.
   useEffect(() => {
     let active = true;
-    const settings = { ...defaultActionSettings(), useOcr: true };
-    void Promise.all([api.checkTools(Action.Flatten, settings, { files: [] }), api.getOcrLanguages()]).then(
-      ([check, languages]) => {
-        if (!active) return;
-        setStatus({ loading: false, present: check.ocr.present, path: check.ocr.path, languages });
-      },
-    );
+    void Promise.all([api.getOcrStatus(), api.getOcrLanguages()]).then(([ocr, languages]) => {
+      if (!active) return;
+      setStatus({ loading: false, present: ocr.present, path: ocr.path, languages });
+    });
     return () => {
       active = false;
     };

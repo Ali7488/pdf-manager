@@ -1,5 +1,6 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
 import { renderApp } from "../../test/renderApp";
 
 const FOLDER = "D:\\Results";
@@ -60,6 +61,17 @@ describe("SettingsPage", () => {
     await user.clear(timeout);
     await user.type(timeout, "5{Enter}");
     await waitFor(async () => expect((await mock.getSettings()).ocrPageTimeoutSec).toBe(300));
+  });
+
+  it("reads the OCR status with getOcrStatus", async () => {
+    const { mock } = await renderApp({ mock: { tools: { ocr: true } } });
+    const getOcrStatus = vi.spyOn(mock, "getOcrStatus");
+    const checkTools = vi.spyOn(mock, "checkTools");
+    await userEvent.click(screen.getByRole("button", { name: "Settings" }));
+    expect(await screen.findByText("OCR is installed")).toBeInTheDocument();
+    expect(screen.getByText("C:\\Program Files\\Tesseract-OCR\\tesseract.exe")).toBeInTheDocument();
+    expect(getOcrStatus).toHaveBeenCalled();
+    expect(checkTools).not.toHaveBeenCalled();
   });
 
   it("shows English when no OCR languages are installed", async () => {

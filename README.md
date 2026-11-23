@@ -30,7 +30,10 @@ Also: drag and drop, drag to reorder, optional **OCR** (Tesseract) on every tool
 3. Follow the short wizard. It installs for your user only (no administrator rights needed) and can optionally install:
    - **Tesseract OCR**, to make pages searchable (Windows may ask for permission);
    - **LibreOffice**, only needed if Microsoft PowerPoint isn't installed.
-4. Start **PDF Manager** from the Start menu or the desktop icon.
+4. PDF Manager needs the free **Microsoft Visual C++ Redistributable (x64)**, version 14.44 or newer, which many Windows programs already installed. If it's missing, the wizard says so and offers Microsoft's download (`https://aka.ms/vc14/vc_redist.x64.exe`); run `vc_redist.x64.exe` to install it. That step needs administrator permission.
+5. Start **PDF Manager** from the Start menu or the desktop icon.
+
+If PDF Manager shows **"Failed to load Python DLL"** when it starts, the Microsoft Visual C++ Redistributable is missing or out of date: install it from the link above, then start PDF Manager again.
 
 You can install OCR later from the app's **Settings**. Logs are written to a `logs` folder next to the installed app (open it from Settings); settings are in `%LOCALAPPDATA%\PDFManager`.
 

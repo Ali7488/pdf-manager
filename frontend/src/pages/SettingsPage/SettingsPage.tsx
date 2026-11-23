@@ -120,7 +120,7 @@ export function SettingsPage() {
         </p>
         <p>
           It includes third-party components, each under its own licence: among them PyMuPDF and MuPDF
-          ({APP_LICENSE}) and, on Windows, Microsoft's WebView2 and Visual C++ runtime files. The author's own
+          ({APP_LICENSE}) and, on Windows, Microsoft's WebView2 SDK files. The author's own
           source code is also available under the MIT License. The full licence texts, the third-party notices
           and the build instructions come with the app; the third-party source code is attached to each release.
         </p>

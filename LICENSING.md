@@ -53,8 +53,8 @@ The installer puts these next to the app: `LICENSE.txt` (MIT, the original code)
 
 These aren't settled, and this page doesn't claim they are:
 
-1. **Microsoft files inside the Windows app.** The app carries Microsoft binaries whose source isn't published: the **WebView2 SDK files** inside pywebview (`Microsoft.Web.WebView2.Core.dll`, `Microsoft.Web.WebView2.WinForms.dll`, `WebView2Loader.dll`), licensed by Microsoft under BSD-3-Clause-style terms, and the **Visual C++ runtime** (`vcruntime140*.dll`, `msvcp140*.dll`), redistributed under Visual Studio's "Distributable Code" terms. The AGPL-3.0 excludes "System Libraries" from the source it requires, but the GNU FAQ says runtime libraries shipped *with* the program no longer count as System Libraries. Whether these files are acceptable in an AGPL-3.0 distribution of PyMuPDF hasn't been confirmed by Artifex (PyMuPDF's copyright holder) or a lawyer.
-2. **Visual Studio's redistribution terms** limit redistribution of the C++ runtime files to licensed Visual Studio users.
+1. **Microsoft files inside the Windows app.** The app carries Microsoft binaries whose source isn't published: the **WebView2 SDK files** inside pywebview (`Microsoft.Web.WebView2.Core.dll`, `Microsoft.Web.WebView2.WinForms.dll`, `WebView2Loader.dll`), licensed by Microsoft under BSD-3-Clause-style terms, The AGPL-3.0 excludes "System Libraries" from the source it requires, but the GNU FAQ says runtime libraries shipped *with* the program no longer count as System Libraries. (The **Visual C++ runtime** DLLs aren't shipped: the app uses Microsoft's separately installed Visual C++ Redistributable, which the installer checks for; decision P32.) Whether these files are acceptable in an AGPL-3.0 distribution of PyMuPDF hasn't been confirmed by Artifex (PyMuPDF's copyright holder) or a lawyer.
+2. **Visual Studio's redistribution terms** limit redistribution of the C++ runtime files to licensed Visual Studio users. The installer contains none of those files (P32); users install Microsoft's redistributable from Microsoft.
 
 Details and options: [`docs/LICENSING_AUDIT_2026-11-23.md`](docs/LICENSING_AUDIT_2026-11-23.md).
 

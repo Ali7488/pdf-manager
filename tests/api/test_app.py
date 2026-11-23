@@ -40,9 +40,10 @@ def test_missing_ui_page_production_and_escaping(monkeypatch, tmp_path):
     """The production page asks for a reinstall and escapes the path."""
     monkeypatch.setattr(logging_setup, "dev_mode", lambda: False)
     monkeypatch.setattr(app, "dev_mode", lambda: False)
-    page = app.missing_ui_page(tmp_path / "<b>odd</b>" / "index.html")
+    # No "/" in the hostile name: Windows would treat it as a folder separator.
+    page = app.missing_ui_page(tmp_path / "<script>alert(1)" / "index.html")
     assert "reinstall" in page and "npm" not in page
-    assert "<b>odd</b>" not in page and "&lt;b&gt;odd&lt;/b&gt;" in page
+    assert "<script>alert(1)" not in page and "&lt;script&gt;alert(1)" in page
 
 
 def test_dev_url_override(index, monkeypatch):

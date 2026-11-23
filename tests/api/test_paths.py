@@ -56,7 +56,8 @@ def test_settings_path_xdg(monkeypatch, tmp_path):
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
     assert paths.settings_path() == tmp_path / "pdf-manager" / "settings.json"
     monkeypatch.delenv("XDG_CONFIG_HOME")
-    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    # Patch the home lookup itself: Windows finds home via USERPROFILE, not HOME.
+    monkeypatch.setattr(paths.Path, "home", classmethod(lambda cls: tmp_path / "home"))
     expected = tmp_path / "home" / ".config" / "pdf-manager" / "settings.json"
     assert paths.settings_path() == expected
 

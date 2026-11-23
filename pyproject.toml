@@ -9,7 +9,7 @@ license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.11"
 # What browser mode needs (uv run main.py --browser). pywin32 provides the Windows
-# file pickers there, and PowerPoint automation in both modes.
+# file pickers there.
 dependencies = [
     "PyMuPDF>=1.25,<2",
     "pywin32>=308; sys_platform == 'win32'",

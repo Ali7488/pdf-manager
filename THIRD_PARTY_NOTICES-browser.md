@@ -22,7 +22,7 @@ date. It is not legal advice.
 | Component | Version | Licence | Bundled on | Used for | Licence text |
 | --- | --- | --- | --- | --- | --- |
 | pymupdf | 1.28.2 | AGPL-3.0-only | Linux, Windows | All PDF work (rendering, OCR placement, merging, splitting, compressing) | [`pymupdf-1.28.2/COPYING`](licenses/python/pymupdf-1.28.2/COPYING), [`pymupdf-1.28.2/AGPL-3.0-only.txt`](licenses/python/pymupdf-1.28.2/AGPL-3.0-only.txt) |
-| pywin32 | 312 | PSF | Windows | Optional Microsoft PowerPoint automation; browser mode's file pickers (Windows) | [`pywin32-312/adodbapi/license.txt`](licenses/python/pywin32-312/adodbapi/license.txt), [`pywin32-312/pythonwin/License.txt`](licenses/python/pywin32-312/pythonwin/License.txt), [`pywin32-312/pythonwin/pywin/idle/LICENSE.txt`](licenses/python/pywin32-312/pythonwin/pywin/idle/LICENSE.txt), [`pywin32-312/com/License.txt`](licenses/python/pywin32-312/com/License.txt), [`pywin32-312/com/win32comext/mapi/src/MAPIStubLibrary/LICENSE`](licenses/python/pywin32-312/com/win32comext/mapi/src/MAPIStubLibrary/LICENSE), [`pywin32-312/pythonwin/Scintilla/License.txt`](licenses/python/pywin32-312/pythonwin/Scintilla/License.txt), [`pywin32-312/win32/License.txt`](licenses/python/pywin32-312/win32/License.txt), [`pywin32-312/win32com/License.txt`](licenses/python/pywin32-312/win32com/License.txt), [`pywin32-312/win32comext/License.txt`](licenses/python/pywin32-312/win32comext/License.txt), [`pywin32-312/win32comext/mapi/NOTICE.md`](licenses/python/pywin32-312/win32comext/mapi/NOTICE.md) |
+| pywin32 | 312 | PSF | Windows | Browser mode's native file pickers (Windows) | [`pywin32-312/adodbapi/license.txt`](licenses/python/pywin32-312/adodbapi/license.txt), [`pywin32-312/pythonwin/License.txt`](licenses/python/pywin32-312/pythonwin/License.txt), [`pywin32-312/pythonwin/pywin/idle/LICENSE.txt`](licenses/python/pywin32-312/pythonwin/pywin/idle/LICENSE.txt), [`pywin32-312/com/License.txt`](licenses/python/pywin32-312/com/License.txt), [`pywin32-312/com/win32comext/mapi/src/MAPIStubLibrary/LICENSE`](licenses/python/pywin32-312/com/win32comext/mapi/src/MAPIStubLibrary/LICENSE), [`pywin32-312/pythonwin/Scintilla/License.txt`](licenses/python/pywin32-312/pythonwin/Scintilla/License.txt), [`pywin32-312/win32/License.txt`](licenses/python/pywin32-312/win32/License.txt), [`pywin32-312/win32com/License.txt`](licenses/python/pywin32-312/win32com/License.txt), [`pywin32-312/win32comext/License.txt`](licenses/python/pywin32-312/win32comext/License.txt), [`pywin32-312/win32comext/mapi/NOTICE.md`](licenses/python/pywin32-312/win32comext/mapi/NOTICE.md) |
 
 ## Inside PyMuPDF: MuPDF and the libraries and fonts it compiles in
 
@@ -87,8 +87,7 @@ Runtime is part of Windows 10 and 11.
 | --- | --- | --- |
 | Your web browser (Microsoft Edge, Google Chrome, Brave, Chromium, Firefox or another) | Its own licence | PDF Manager opens in it; never shipped. |
 | Tesseract OCR program | Apache-2.0 | Optional; installed with winget or a package manager. |
-| LibreOffice | MPL-2.0 | Optional; installed separately. |
-| Microsoft PowerPoint | Proprietary | Optional; used only if already installed. |
+| LibreOffice | MPL-2.0 | Optional, for PowerPoint files; installed separately. |
 | Microsoft Visual C++ Redistributable (x64) | Microsoft software licence | Required on Windows; see note. |
 | Segoe UI font | Proprietary | Used only if Windows provides it; never bundled. |
 

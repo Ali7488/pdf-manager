@@ -353,7 +353,7 @@ USED_FOR = {
     "pywebview": "The desktop window and the JavaScript ↔ Python bridge",
     "pythonnet": "Edge WebView2 window on Windows (via pywebview)",
     "clr-loader": "Loads .NET for pythonnet",
-    "pywin32": "Optional Microsoft PowerPoint automation; browser mode's file pickers (Windows)",
+    "pywin32": "Browser mode's native file pickers (Windows)",
     "pyside6": "Qt window on Linux (via pywebview)",
     "react": "User interface",
     "react-dom": "User interface",
@@ -723,8 +723,7 @@ OPTIONAL_PROGRAMS = [
         "Apache-2.0",
         "Optional; installed with winget or a package manager.",
     ),
-    ("LibreOffice", "MPL-2.0", "Optional; installed separately."),
-    ("Microsoft PowerPoint", "Proprietary", "Optional; used only if already installed."),
+    ("LibreOffice", "MPL-2.0", "Optional, for PowerPoint files; installed separately."),
 ]
 
 

@@ -59,6 +59,22 @@ ACTIONS = {
 }
 
 
+def bounded_int(low: int, high: int | None = None):
+    """An argparse type: an integer within ``low..high`` (same limits as the app's Settings)."""
+
+    def parse(text: str) -> int:
+        try:
+            value = int(text)
+        except ValueError:
+            raise argparse.ArgumentTypeError(f"{text!r} isn't a whole number") from None
+        if value < low or (high is not None and value > high):
+            limit = f"between {low} and {high}" if high is not None else f"at least {low}"
+            raise argparse.ArgumentTypeError(f"must be {limit}, got {value}")
+        return value
+
+    return parse
+
+
 def build_settings(args: argparse.Namespace) -> ActionSettings:
     """Turn command-line options into the job's settings (same fields the UI sends)."""
     settings = ActionSettings(
@@ -71,7 +87,7 @@ def build_settings(args: argparse.Namespace) -> ActionSettings:
         ocr_page_timeout_sec=args.ocr_timeout,
         tesseract_path=args.tesseract,
     )
-    if args.every:
+    if args.every is not None:
         settings.split.method, settings.split.every_n = SplitMethod.EVERY_N, args.every
     elif args.per_page:
         settings.split.method = SplitMethod.PER_PAGE
@@ -245,13 +261,23 @@ def build_parser() -> argparse.ArgumentParser:
         p.add_argument("files", nargs="+", help="Input files, in order.")
         p.add_argument("--out", default="out", help="Folder to save results in (default: out).")
         p.add_argument("--ocr", action="store_true", help="Use OCR (Tesseract).")
-        p.add_argument("--dpi", type=int, default=200, help="Render resolution (default 200).")
+        p.add_argument(
+            "--dpi",
+            type=bounded_int(72, 600),
+            default=200,
+            help="Render resolution, 72-600 (default 200).",
+        )
         p.add_argument("--lang", default="eng", help="OCR language code (default eng).")
-        p.add_argument("--ocr-timeout", type=int, default=120, help="Seconds per OCR page.")
+        p.add_argument(
+            "--ocr-timeout",
+            type=bounded_int(10, 3600),
+            default=120,
+            help="Seconds per OCR page, 10-3600.",
+        )
         p.add_argument("--tesseract", help="Path to the Tesseract executable.")
         p.add_argument("--contents", action="store_true", help="Merge: add a contents page.")
         p.add_argument("--ranges", help='Split: page ranges, e.g. "1-3, 5, 8-10".')
-        p.add_argument("--every", type=int, help="Split: every N pages.")
+        p.add_argument("--every", type=bounded_int(1), help="Split: every N pages (N >= 1).")
         p.add_argument("--per-page", action="store_true", help="Split: one file per page.")
         p.add_argument("--separate", action="store_true", help="Images: one PDF per image.")
         p.add_argument(

@@ -200,3 +200,15 @@ def test_usage_errors_exit_2(capsys):
     with pytest.raises(SystemExit) as err:
         cli.main(["compress", "x.pdf", "--level", "extreme"])
     assert err.value.code == 2
+
+
+@pytest.mark.parametrize(
+    "option",
+    [("--dpi", "0"), ("--dpi", "601"), ("--ocr-timeout", "5"), ("--every", "0"), ("--dpi", "x")],
+)
+def test_out_of_range_numbers_are_usage_errors(samples, tmp_path, capsys, option):
+    with pytest.raises(SystemExit) as err:
+        cli.main(["split", str(samples / "13-long-document.pdf"), *option, "--out", str(tmp_path)])
+    assert err.value.code == 2
+    message = capsys.readouterr().err
+    assert "must be" in message or "whole number" in message

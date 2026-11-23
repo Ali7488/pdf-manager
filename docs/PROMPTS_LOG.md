@@ -1,0 +1,31 @@
+# Prompts log
+
+A short, summarized record of each request made to the coding agent, and what came of it. These are summaries, not verbatim quotes. Newest entries are at the bottom.
+
+## 2026-11-22
+
+1. **Review and explain the code.** Explain every function and run a code review. → Walkthrough of the converter and UI, plus a ranked list of bugs. No code changed.
+2. **Project purpose.** The tool flattens PDFs that cause compatibility problems in tablet note-taking apps, OCRs them back into searchable PDFs, and merges files. Windows is the target.
+3. **Make it generic.** Remove every personal name and use-case-specific wording; it should be a general PDF tool. → Done across code, tests and docs.
+4. **Rename and clean history.** Rename the app, replace the old git history with fresh, individual commits, keep the local folder name, and create the GitHub repo (private). → Done; old objects purged.
+5. **Split the converter by functionality** and list the dependencies with reasons. → `converter/` package plus a dependency table in the README.
+6. **Commit as you go** under the user's git identity, in small meaningful commits.
+7. **Remove speaker notes** entirely. → Feature, module and runtime dependencies removed.
+8. **Name the app "PDF Manager".** → Renamed everywhere.
+9. **Use uv** for the project. → `pyproject.toml`, `uv.lock` and `.python-version`; the installer uses `uv sync`.
+10. **Rename the GitHub repo** to match (`pdf-manager`), explain the open problems in detail, and plan a TypeScript + React frontend (drag and drop, editable settings, optional default save folder) with the Python converter as the backend.
+11. **Add docstrings and comments** so the intended behaviour can be read from the code. → Every function documented; known issues flagged inline.
+12. **Converter fixes and project docs** (this batch). Restate the plan and log it before starting, then discuss frontend v1, which will be built by a parallel agent while the converter work continues. Checklist:
+    - [x] Add `AGENTS.md`, `CLAUDE.md` and this prompts log.
+    - [ ] **PowerPoint quitting:** only close PowerPoint if the converter started it, so the user's open PowerPoint and presentations are never closed.
+    - [ ] **PowerPoint errors:** keep the real PowerPoint error. If conversion fails completely, show it in a popup; if LibreOffice rescued it, return it as a structured warning instead.
+    - [ ] **Error logs:** write errors and warnings to a logs folder on the user's machine, and add a button that opens that folder in File Explorer.
+    - [ ] **Cancel:** a manual Cancel button that stops a running job, including killing Tesseract or LibreOffice mid-run.
+    - [ ] **Automatic timeouts:** give up on a page that takes too long to OCR (default to be chosen, likely about 2 minutes, configurable), and on a PowerPoint export that hangs.
+    - [ ] **Keep bookmarks** when merging (and when flattening), with one top-level bookmark per input file.
+    - [ ] **Contents page (optional, on by default):** for merged output, add an index page at the start listing every input file with its page range and clickable links.
+    - [ ] **Page numbering** for merged output (details to confirm).
+    - [ ] **Stricter flatten check:** every page must be image-backed and the page count must match the input.
+    - [ ] **Registry path fix:** handle unquoted `tesseract.exe,0` values in `find_tesseract`.
+    - [ ] **Installer:** detect Microsoft PowerPoint first; offer LibreOffice as an optional backup instead of always installing it.
+    - [ ] **Investigate PowerPoint falling back to LibreOffice too often:** check whether the success check is too strict, and look at the documented "Waiting for printer connection" popup during PowerPoint's PDF export.

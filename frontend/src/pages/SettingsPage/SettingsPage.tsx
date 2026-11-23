@@ -17,7 +17,7 @@ import { APP_LICENSE, COPYRIGHT, SOURCE_URL } from "../../lib/about";
 
 /** The Settings page. */
 export function SettingsPage() {
-  const { api, state, updateSettings } = useApp();
+  const { api, state, dispatch, updateSettings } = useApp();
   const { settings, appInfo, settingsSaveIssue } = state;
 
   const chooseFolder = async () => {
@@ -65,14 +65,18 @@ export function SettingsPage() {
               <p className={styles.path} title={settings.defaultSaveFolder}>
                 {settings.defaultSaveFolder}
               </p>
+            ) : api.saveMode === "download" ? (
+              <p className={styles.help}>Results go to your browser's downloads.</p>
             ) : (
               <p className={styles.help}>Not set. You'll choose a folder each time you save.</p>
             )}
           </div>
           <div className={styles.buttons}>
-            <Button icon="folder" onClick={chooseFolder}>
-              Choose folder
-            </Button>
+            {api.saveMode === "folder" && (
+              <Button icon="folder" onClick={chooseFolder}>
+                Choose folder
+              </Button>
+            )}
             {settings.defaultSaveFolder && (
               <Button variant="ghost" onClick={() => void updateSettings({ defaultSaveFolder: null })}>
                 Clear
@@ -110,6 +114,20 @@ export function SettingsPage() {
         </div>
       </Section>
 
+      {api.mode === "browser" && (
+        <Section title="Close PDF Manager">
+          <div className={styles.folderRow}>
+            <p className={styles.help}>
+              PDF Manager keeps running after you close this window, so it opens again quickly. Quit it here when
+              you're done.
+            </p>
+            <Button onClick={() => void api.quit().then(() => dispatch({ type: "appClosed" }), () => undefined)}>
+              Quit PDF Manager
+            </Button>
+          </div>
+        </Section>
+      )}
+
       <Section title="About">
         <p>
           PDF Manager {appInfo ? `version ${appInfo.version}` : ""} · {COPYRIGHT}
@@ -120,7 +138,7 @@ export function SettingsPage() {
         </p>
         <p>
           It includes third-party components, each under its own licence: among them PyMuPDF and MuPDF
-          ({APP_LICENSE}) and, on Windows, Microsoft's WebView2 SDK files. The author's own
+          ({APP_LICENSE}){api.mode === "browser" ? "" : ", and, on Windows, Microsoft's WebView2 SDK files"}. The author's own
           source code is also available under the MIT License. The full licence texts, the third-party notices
           and the build instructions come with the app; the third-party source code is attached to each release.
         </p>

@@ -25,7 +25,10 @@ export type FileKind = "pdf" | "pptx" | "ppt" | "image";
 
 /** A file in the shared file list. */
 export interface InputFile {
-  /** Full absolute path on disk. Unique key for the list. */
+  /**
+   * Unique key for the list. The desktop window gets the full path on disk;
+   * browser mode gets an opaque file ID instead (the page never sees or sends paths).
+   */
   path: string;
   /** File name shown to the user, e.g. "Report.pdf". */
   name: string;
@@ -226,6 +229,8 @@ export interface SaveOptions {
 }
 
 export interface SaveOutcome {
+  /** Browser mode without a folder picker: the files went to the browser's downloads. */
+  downloaded?: boolean;
   /** True if the user closed the folder picker; results are kept. */
   cancelled: boolean;
   /** Full paths written. */
@@ -237,8 +242,34 @@ export interface SaveOutcome {
 
 export type StartJobResult = { jobId: string; issue?: undefined } | { jobId?: undefined; issue: Issue };
 
-/** Typed client used by the UI. Implemented by the pywebview bridge and by the dev mock. */
+/** A job found after the page was reloaded (browser mode only). */
+export interface RecoveredJob {
+  jobId: string;
+  action: Action | null;
+  progress: JobProgress | null;
+  finished: JobFinished | null;
+}
+
+/**
+ * Typed client used by the UI. Implemented by the pywebview bridge (desktop),
+ * the local HTTP client (browser mode) and the dev mock.
+ */
 export interface PdfManagerApi {
+  /** Which front end this is. */
+  readonly mode: "desktop" | "browser" | "mock";
+  /** How results are saved: into a folder (a picker or the default folder) or as browser downloads. */
+  readonly saveMode: "folder" | "download";
+  /**
+   * Files dropped on the page: browser mode uploads them to the app and returns them. The
+   * desktop window gets drops from Python (the `filesAdded` event) and returns nothing here.
+   */
+  addDroppedFiles(files: File[]): Promise<InputFile[]>;
+  /** Browser mode, after a reload: the newest job whose results weren't discarded. Null elsewhere. */
+  latestJob(): Promise<RecoveredJob | null>;
+  /** Start (again) delivering `jobProgress`/`jobFinished` for a job. Browser mode polls; a no-op elsewhere. */
+  watchJob(jobId: string): void;
+  /** Browser mode: quit the app. A no-op elsewhere (the window's close button quits). */
+  quit(): Promise<void>;
   getAppInfo(): Promise<AppInfo>;
   getSettings(): Promise<Settings>;
   /**
@@ -273,4 +304,6 @@ export interface PdfManagerEvents {
   jobFinished: JobFinished;
   ocrInstallProgress: { message: string };
   ocrInstallFinished: { ok: boolean; issue: Issue | null };
+  /** Browser mode: the app stopped answering (`jobId` while a job was being watched). */
+  connectionLost: { jobId: string | null };
 }

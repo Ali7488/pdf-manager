@@ -36,6 +36,10 @@ export interface AppState {
   actionSettings: Record<Action, ActionSettings>;
   /** Each tab's "Save to default folder" box. Starts ticked (F32). */
   saveToDefault: Record<Action, boolean>;
+  /** Browser mode, after a reload: a job to show again in its tab's Convert window. */
+  recoveredJob: { jobId: string; action: Action } | null;
+  /** Browser mode: the user quit PDF Manager from Settings. */
+  closed: boolean;
 }
 
 /** Everything that can change the state. */
@@ -51,7 +55,10 @@ export type AppEvent =
   | { type: "settingsSaved"; settings: Settings | null; issue: Issue | null }
   | { type: "appInfoLoaded"; appInfo: AppInfo }
   | { type: "actionSettingsChanged"; action: Action; patch: Partial<ActionSettings> }
-  | { type: "saveToDefaultChanged"; action: Action; value: boolean };
+  | { type: "saveToDefaultChanged"; action: Action; value: boolean }
+  | { type: "jobRecovered"; jobId: string; action: Action }
+  | { type: "recoveredJobClosed" }
+  | { type: "appClosed" };
 
 const ALL_ACTIONS = Object.values(Action);
 
@@ -71,6 +78,8 @@ export function initialAppState(): AppState {
     appInfo: null,
     actionSettings: perAction(defaultActionSettings),
     saveToDefault: perAction(() => true),
+    recoveredJob: null,
+    closed: false,
   };
 }
 
@@ -128,5 +137,11 @@ export function appReducer(state: AppState, event: AppEvent): AppState {
       };
     case "saveToDefaultChanged":
       return { ...state, saveToDefault: { ...state.saveToDefault, [event.action]: event.value } };
+    case "jobRecovered":
+      return { ...state, page: event.action, recoveredJob: { jobId: event.jobId, action: event.action } };
+    case "recoveredJobClosed":
+      return { ...state, recoveredJob: null };
+    case "appClosed":
+      return { ...state, closed: true };
   }
 }

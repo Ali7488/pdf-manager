@@ -4,6 +4,7 @@
  */
 import type { onEvent as onEventType } from "./api/bridge";
 import type { PdfManagerApi } from "./api/types";
+import { AppNotice } from "./components/AppNotice/AppNotice";
 import { DropOverlay } from "./components/DropOverlay/DropOverlay";
 import { Sidebar } from "./components/Sidebar/Sidebar";
 import { ActionPage } from "./pages/ActionPage/ActionPage";
@@ -50,6 +51,7 @@ function Shell() {
         </div>
       </main>
       <DropOverlay />
+      <AppNotice />
     </div>
   );
 }

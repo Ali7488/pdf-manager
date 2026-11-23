@@ -3,7 +3,6 @@
  * while files are dragged over it.
  */
 import { useEffect, useState } from "react";
-import { isMockApi } from "../../api/mock";
 import { useApp } from "../../state/AppContext";
 import { Icon } from "../Icon/Icon";
 import styles from "./DropOverlay.module.css";
@@ -17,13 +16,13 @@ function hasFiles(event: DragEvent): boolean {
  * Listens on `window` for file drags.
  *
  * It calls `preventDefault()` on `dragover` and `drop` so the window doesn't
- * navigate to the file. In the desktop app, Python reads the real paths from
- * the drop and sends `filesAdded`. With the dev mock, the browser's File
- * objects are turned into fake files instead, so drag and drop can be tried
- * in `npm run dev`.
+ * navigate to the file, then hands the files to `addDroppedFiles`. In the
+ * desktop app, Python reads the real paths from the drop itself and sends
+ * `filesAdded` (so that returns nothing). Browser mode uploads them to the app
+ * as working copies; the dev mock turns them into fake files.
  */
 export function DropOverlay() {
-  const { api } = useApp();
+  const { api, dispatch } = useApp();
   const [dragging, setDragging] = useState(false);
 
   useEffect(() => {
@@ -50,7 +49,14 @@ export function DropOverlay() {
       event.preventDefault();
       depth = 0;
       setDragging(false);
-      if (isMockApi(api) && event.dataTransfer) api.simulateDrop(event.dataTransfer.files);
+      const files = Array.from(event.dataTransfer?.files ?? []);
+      if (files.length === 0) return;
+      api.addDroppedFiles(files).then(
+        (added) => {
+          if (added.length > 0) dispatch({ type: "filesAdded", files: added });
+        },
+        () => undefined, // Browser mode reports a lost connection itself.
+      );
     };
     window.addEventListener("dragenter", onEnter);
     window.addEventListener("dragover", onOver);
@@ -62,7 +68,7 @@ export function DropOverlay() {
       window.removeEventListener("dragleave", onLeave);
       window.removeEventListener("drop", onDrop);
     };
-  }, [api]);
+  }, [api, dispatch]);
 
   return (
     <div className={`${styles.overlay} ${dragging ? styles.active : ""}`} aria-hidden={!dragging}>

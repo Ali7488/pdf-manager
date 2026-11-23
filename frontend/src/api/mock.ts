@@ -432,12 +432,10 @@ export function createMockApi(options: MockOptions = {}): MockApi {
     setTimeout(tick, tickMs);
   }
 
-  return {
-    isMock: true,
-
-    simulateDrop(files: ArrayLike<File>) {
-      const added: InputFile[] = [];
-      for (const file of Array.from(files)) {
+  /** Turns browser File objects into fake InputFiles (unsupported ones are skipped, as Python does). */
+  const describeDropped = (files: ArrayLike<File>): InputFile[] => {
+    const added: InputFile[] = [];
+    for (const file of Array.from(files)) {
         const kind = kindFromName(file.name);
         if (!kind) continue; // Python would skip unsupported files too.
         added.push(
@@ -449,9 +447,28 @@ export function createMockApi(options: MockOptions = {}): MockApi {
             pageCount: kind === "pdf" ? Math.min(200, Math.max(1, Math.round(file.size / 100_000))) : null,
           }),
         );
-      }
+    }
+    return added;
+  };
+
+  return {
+    isMock: true,
+    mode: "mock",
+    saveMode: "folder",
+
+    simulateDrop(files: ArrayLike<File>) {
+      const added = describeDropped(files);
       if (added.length > 0) emitEvent("filesAdded", { files: added });
     },
+
+    addDroppedFiles: async (files: File[]) => {
+      await latency();
+      return describeDropped(files);
+    },
+    latestJob: () => Promise.resolve(null),
+    // The mock sends job events by itself.
+    watchJob: () => undefined,
+    quit: () => Promise.resolve(),
 
     setTools(next: Partial<MockTools>) {
       Object.assign(tools, next);

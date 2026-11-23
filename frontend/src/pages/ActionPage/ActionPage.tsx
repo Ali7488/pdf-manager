@@ -34,6 +34,7 @@ interface ConvertRequest {
  */
 export function ActionPage({ action }: ActionPageProps) {
   const { state, dispatch } = useApp();
+  const recovered = state.recoveredJob?.action === action ? state.recoveredJob : null;
   const info = getActionInfo(action);
   const settings = state.actionSettings[action];
   const usedFiles = state.files.filter((file) =>
@@ -122,6 +123,16 @@ export function ActionPage({ action }: ActionPageProps) {
           files={usedFiles}
           autoSaveFolder={request.autoSaveFolder}
           onClose={() => setRequest(null)}
+        />
+      )}
+      {!request && recovered && (
+        <ConvertModal
+          action={action}
+          settings={settings}
+          files={[]}
+          autoSaveFolder={null}
+          resumeJobId={recovered.jobId}
+          onClose={() => dispatch({ type: "recoveredJobClosed" })}
         />
       )}
     </>

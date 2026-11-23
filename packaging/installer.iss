@@ -243,7 +243,7 @@ begin
 end;
 
 { The folder to look for the Visual C++ runtime in: the 64-bit System32, where the
-  redistributable installs it (setup runs in 64-bit mode, so {sys} is that folder).
+  redistributable installs it (setup runs in 64-bit mode, so the sys constant is that folder).
   /VCRUNTIMEDIR=<folder> on the command line replaces it, so automated tests can
   simulate a computer without the runtime; it has no other use. }
 function VCRuntimeDir: String;

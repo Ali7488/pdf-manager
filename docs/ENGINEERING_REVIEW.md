@@ -11,4 +11,4 @@ These are **issues to investigate**, not claims that fixes are already complete.
 7. **Testing depth:** add corrupt PDFs, locked files, password protected PDFs, output collision, cancellation, image-only scans, order preservation, large page counts, and QA for scientific notation and non-Latin text.
 8. **Public release:** pick license, replace private example language with synthetic examples, CI, packaging and binaries, versioning and source integrity.
 
-**Apart from rebranding and code formatting, the v1.1.1 app/converter logic is unchanged from the baseline.** Historical originals are in `.migration/` locally but are Git-ignored to keep the first tracked tree clean.
+**Apart from rebranding, code formatting and splitting `converter.py` into the `converter/` package, the v1.1.1 app/converter logic is unchanged from the baseline.** Historical originals are in `.migration/` locally but are Git-ignored to keep the first tracked tree clean.

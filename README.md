@@ -31,10 +31,40 @@ python -m venv .venv
 .venv/bin/python app.py
 ```
 
+## Dependencies
+
+Python packages (`requirements.txt`):
+
+| Package | Used in | Why |
+| --- | --- | --- |
+| PyMuPDF (`fitz`) | `flatten.py`, `merge.py`, `pipeline.py` | Opens and validates PDFs, renders pages to images, stamps OCR pages into the output, merges documents. |
+| python-pptx | `notes.py` | Reads speaker notes from PPTX files. |
+| ReportLab | `notes.py` | Typesets the speaker-notes appendix as a PDF. |
+| pywin32 (Windows only) | `powerpoint.py` | Drives Microsoft PowerPoint through COM to export slides as PDF. |
+
+External programs:
+
+| Program | Required for | Why |
+| --- | --- | --- |
+| Tesseract OCR (English) | Flatten, Flatten + Merge | Turns each page image back into searchable text. |
+| Microsoft PowerPoint | PowerPoint inputs (preferred) | Gives the most faithful slide rendering on Windows. |
+| LibreOffice | PowerPoint inputs (fallback), notes from `.ppt` | Converts slides to PDF when PowerPoint isn't available, and converts old `.ppt` files to `.pptx` so their notes can be read. |
+| winget | Optional | Lets the app and installer install Tesseract automatically. |
+
+The GUI uses only the standard library (Tkinter).
+
 ## Layout
 
 - `app.py`: Tkinter dashboard and local settings.
-- `converter.py`: PowerPoint/PDF preparation, flattening, OCR, merging, notes appendix and output naming.
+- `converter/`: the conversion engine, split by responsibility. `from converter import ...` exposes the public API.
+  - `common.py`: shared constants (modes, supported extensions, DPI) and the progress-callback type.
+  - `tools.py`: finding Tesseract and LibreOffice, and running external programs without a console window.
+  - `powerpoint.py`: rendering PPT/PPTX to PDF with Microsoft PowerPoint, falling back to LibreOffice.
+  - `notes.py`: extracting speaker notes and building the notes appendix PDF.
+  - `flatten.py`: rasterizing pages and adding the OCR text layer.
+  - `merge.py`: combining PDFs in order.
+  - `pipeline.py`: preparing and validating each input, then running the chosen mode.
+  - `output.py`: collision-safe output filenames.
 - `SlideStitch.ico`: application icon (`app.py` loads it from the repository root).
 - `assets/`: preview images (not needed at runtime).
 - `tests/`: integration test and Windows file-lock regression test.

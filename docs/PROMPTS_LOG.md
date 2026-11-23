@@ -138,9 +138,27 @@ A short, summarized record of each request made to the coding agent, and what ca
     - [x] Draft pull request #1; vault audit note (`75 Home Lab and System/BOTH DEVICES/Audits/2026-11-23 - PDF Manager Visual C++ Runtime Prerequisite.md`).
     - [x] Owner asked to finish and merge PR #1 (item 41).
     - [ ] Clean-machine test without the redistributable (carried over to the Windows 11 acceptance test, R10).
-41. **Browser-window app (branch `migrate/browser-app`).** Answers given: the original code can stay MIT, but the distributed app must be AGPL-3.0 while it includes PyMuPDF (or needs Artifex's commercial licence). Brave gets app mode like Edge and Chrome. Firefox has no app mode, so it gets a normal window or tab. Drag and drop works in a browser, but as file uploads, because browsers never reveal file paths. Requests: finish PR #1. Convert the app from a pywebview window to a local web app on 127.0.0.1, opened as a separate app-mode window (no tabs) in Edge or another Chromium-based browser (Chrome, Brave, Chromium). Otherwise open a normal tab in the default browser, and say so explicitly in the documentation. Do it on a separate migration branch for the owner to test and review before it is merged into main. Checklist:
-    - [ ] Merge PR #1.
-    - [ ] Local server, browser launcher, native dialogs, upload for drag and drop; pywebview, Qt and WebView2 removed.
-    - [ ] Frontend transport; tests; packaging, licence inventory and checks; docs and decisions.
-    - [ ] CI and Windows build; draft pull request for review.
+41. **Local browser mode (branch `migration/local-browser-mode`, base `9f58e64`).** Answers given:
+    - The original code can stay MIT, but the distributed app must be AGPL-3.0 while it includes PyMuPDF (or needs Artifex's commercial licence).
+    - Brave gets app mode like Edge and Chrome. Firefox has no app mode, so it gets a normal localhost tab.
+    - Drag and drop works in a browser as file uploads, because browsers never reveal file paths.
+
+    The owner then supplied a second audit and a detailed implementation brief:
+    - Finish PR #1 first.
+    - Add a browser mode next to the existing pywebview desktop mode, which stays usable for comparison.
+    - Open the OS default browser in app mode when it is Edge, Chrome, Brave or Chromium; otherwise open a normal localhost tab, and document that.
+    - Use a small, explicit HTTP API on 127.0.0.1: an exact Host/Origin check, a per-launch session, opaque file and destination IDs (no raw host paths from the browser), status polling while work is active (no event stream or heartbeats), bounded bodies and timeouts.
+    - For drag and drop and browser file selection, upload copies into private staging. Treat uploaded presentations as unknown provenance (LibreOffice, never PowerPoint). Use native pickers where available, and browser downloads as the save fallback.
+    - Package a portable ZIP per OS that is actually built, with its own licence checks.
+    - Add a real browser-to-Python integration suite.
+    - Keep styling and conversion behaviour unchanged. Don't merge or publish; leave the branch for the owner's review.
+    - The CLI save race is a separate fix.
+
+    Checklist:
+    - [x] Merge PR #1 (`9f58e64`).
+    - [ ] Shared workflow extracted from the desktop bridge; browser-mode server, session, operations and launcher; native dialogs; `main.py --browser` / `--no-browser`.
+    - [ ] Frontend HTTP adapter (server bootstrap, polling, uploads, download fallback, connection errors).
+    - [ ] Browser-only dependency set; portable ZIP build; artifact licence checks.
+    - [ ] Tests: unit, security, real browser integration; CI and Windows build.
+    - [ ] Docs and decisions; draft pull request for review.
 

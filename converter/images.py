@@ -173,7 +173,15 @@ def images_to_pdf(
     outputs: list[OutputFile] = []
 
     def step(index: int, image: Path) -> None:
-        """Check for cancel and report progress before image ``index`` (1-based)."""
+        """Check for cancel, then report that an image is being added.
+
+        Args:
+            index: 1-based position of the image.
+            image: The image about to be added.
+
+        Raises:
+            Cancelled: The user pressed Cancel.
+        """
         ctx.check_cancel()
         ctx.report(
             Stage.PREPARING,

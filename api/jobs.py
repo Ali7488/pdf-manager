@@ -7,6 +7,12 @@ until :meth:`JobManager.save` or :meth:`JobManager.discard` (decision F12:
 cancelling the folder picker never loses results). Every scratch folder is
 removed on :meth:`JobManager.shutdown`.
 
+Save, discard and shutdown can be called from different threads at once
+(pywebview runs each bridge call on its own thread), so they coordinate
+through each job's ``state`` (see :class:`_Job`): a scratch folder is never
+deleted while a save is copying from it, and a save never leaves a partial
+file in the user's folder (audit R4).
+
 The manager knows nothing about pywebview: it emits events through a plain
 ``emit(name, payload)`` callback supplied by the bridge.
 """
@@ -24,7 +30,7 @@ import zipfile
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, BinaryIO
 
 from . import dto, service
 from .logging_setup import log_issue
@@ -52,7 +58,13 @@ Emit = Callable[[str, dict], None]
 # At most this many progress events per second reach the UI (the last one always does).
 PROGRESS_INTERVAL_SEC = 0.1
 SCRATCH_PREFIX = "pdf-manager-"
+COPY_CHUNK = 1024 * 1024  # Bytes per read when saving; an abort is noticed between chunks.
+
+# _Job.state values. RUNNING is also the job's status while it runs.
 RUNNING = "running"
+READY = "ready"  # Finished; results (if any) wait in scratch.
+SAVING = "saving"  # A save is copying from scratch: nothing may delete it now.
+GONE = "gone"  # Saved, discarded or shut down: the scratch folder is (being) deleted.
 
 # Used in zip names: "<first input name> - <label>.zip".
 ZIP_LABELS: dict[Action, str] = {
@@ -140,9 +152,28 @@ class ProgressThrottle:
             log.exception("Couldn't deliver a progress update")
 
 
+class SaveAborted(Exception):
+    """A save was stopped between chunks because the app is closing."""
+
+
 @dataclass
 class _Job:
-    """One job's state. Only the manager touches it, under its lock."""
+    """One job's state. Only the manager touches it, under its lock.
+
+    ``state`` is the results' lifecycle, the single place save, discard and
+    shutdown agree on who may touch the scratch folder::
+
+        running -> ready              the worker finished
+        ready   -> saving -> ready    a save failed: results kept for a retry
+        ready   -> saving -> gone     a save succeeded, or a discard/shutdown
+                                      asked for the results during it
+        ready   -> gone               discard or shutdown
+        running -> gone               shutdown (it cancels the job first)
+
+    While ``saving``, a discard or shutdown only sets ``drop_requested``; the
+    save deletes the scratch folder itself once it ends. Shutdown may also set
+    ``abort`` so that a long save stops (and rolls back) between chunks.
+    """
 
     id: str
     action: Action
@@ -152,6 +183,9 @@ class _Job:
     thread: threading.Thread | None = None
     status: str = RUNNING  # Then dto.SUCCEEDED, dto.FAILED or dto.CANCELLED.
     outputs: list[OutputFile] = field(default_factory=list)
+    state: str = RUNNING
+    drop_requested: bool = False  # Delete the results as soon as the save ends.
+    abort: threading.Event = field(default_factory=threading.Event)  # Stop saving now.
 
 
 def _remove_tree(path: Path) -> None:
@@ -190,7 +224,8 @@ class JobManager:
         self._progress_interval = progress_interval
         self._temp_dir = temp_dir
         self._lock = threading.Lock()
-        self._save_lock = threading.Lock()  # One save at a time.
+        # Signalled on every change of a job's state, under _lock.
+        self._changed = threading.Condition(self._lock)
         self._jobs: dict[str, _Job] = {}
 
     def running_job(self) -> str | None:
@@ -326,8 +361,11 @@ class JobManager:
         finally:
             throttle.close()  # The last progress update goes out before jobFinished.
         warnings = [log_issue(w) for w in warnings]
-        with self._lock:
+        with self._changed:
             job.status, job.outputs = status, outputs
+            if job.state == RUNNING:  # Not if shutdown already marked it gone.
+                job.state = READY
+            self._changed.notify_all()
         log.info(
             "Job %s %s after %.1fs with %d output(s) and %d warning(s)",
             job.id,
@@ -344,20 +382,46 @@ class JobManager:
         except Exception:
             log.exception("Couldn't send jobFinished for job %s", job.id)
 
-    def _finished_job(self, job_id: str) -> _Job:
-        """Look up a job whose results can be saved.
+    def _begin_save(self, job_id: str) -> _Job:
+        """Claim a job's results for saving: move it from ``ready`` to ``saving``.
+
+        If another save of the same job is under way, this waits for it to end
+        first (then either its results are gone, or they were kept for a retry).
 
         Raises:
             ConversionError: ``SAVE_FAILED`` if the job is unknown, still
                 running, failed, or its results were already saved or discarded.
         """
-        with self._lock:
+        with self._changed:
             job = self._jobs.get(job_id)
-        if job is None:
-            raise ConversionError(save_failed(f"No results found for job {job_id}."))
-        if job.status != dto.SUCCEEDED or not job.outputs:
-            raise ConversionError(save_failed(f"Job {job_id} has no results ({job.status})."))
-        return job
+            while job is not None and job.state == SAVING:
+                self._changed.wait()
+                job = self._jobs.get(job_id)
+            if job is None or job.state == GONE:
+                raise ConversionError(save_failed(f"No results found for job {job_id}."))
+            if job.status != dto.SUCCEEDED or not job.outputs:
+                raise ConversionError(save_failed(f"Job {job_id} has no results ({job.status})."))
+            job.state = SAVING
+            self._changed.notify_all()
+            return job
+
+    def _end_save(self, job: _Job, saved: bool) -> None:
+        """Leave the ``saving`` state; delete the results if saved or no longer wanted.
+
+        Args:
+            job: The job :meth:`_begin_save` returned.
+            saved: Whether every file was written.
+        """
+        with self._changed:
+            drop = saved or job.drop_requested
+            job.state = GONE if drop else READY
+            if drop and self._jobs.get(job.id) is job:
+                del self._jobs[job.id]
+            self._changed.notify_all()
+        if drop:
+            if not saved:
+                log.info("Job %s results dropped after its save ended", job.id)
+            _remove_tree(job.scratch)
 
     def save(self, job_id: str, folder: Path, as_zip: bool) -> list[Path]:
         """Copy a finished job's results into a folder, never overwriting anything.
@@ -369,6 +433,10 @@ class JobManager:
         folder is deleted; after a failed one, results are kept so the user
         can try again, and any files written by the failed attempt are removed.
 
+        A discard or shutdown that arrives meanwhile is applied when the save
+        ends (see :class:`_Job`), so the scratch files are never deleted
+        mid-copy. A shutdown may abort a long save; it is then rolled back.
+
         Args:
             job_id: The finished job.
             folder: Destination folder; must exist.
@@ -378,29 +446,37 @@ class JobManager:
             Full paths written.
 
         Raises:
-            ConversionError: ``SAVE_FAILED`` (results are kept).
+            ConversionError: ``SAVE_FAILED`` (results are kept unless a
+                discard or shutdown asked for them meanwhile).
         """
-        with self._save_lock:
-            job = self._finished_job(job_id)
+        job = self._begin_save(job_id)
+        written: list[Path] = []
+        saved = False
+        try:
             if not folder.is_dir():
                 raise ConversionError(save_failed(f"Folder not found: {folder}"))
-            written: list[Path] = []
             try:
                 if as_zip:
                     written.append(self._write_zip(job, folder))
                 else:
                     reserved: set[str] = set()
                     for output in job.outputs:
-                        written.append(_copy_new(output.path, folder, output.name, reserved))
-            except (OSError, RuntimeError, zipfile.BadZipFile) as exc:
+                        written.append(
+                            _copy_new(output.path, folder, output.name, reserved, job.abort)
+                        )
+            except BaseException as exc:
+                # Roll back the files this attempt completed (the one being
+                # written when it failed was already removed by its writer).
                 for path in written:
                     path.unlink(missing_ok=True)
-                raise ConversionError(save_failed(f"{type(exc).__name__}: {exc}")) from exc
-            with self._lock:
-                self._jobs.pop(job_id, None)
-            _remove_tree(job.scratch)
-            log.info("Job %s saved: %s", job_id, [str(p) for p in written])
-            return written
+                if isinstance(exc, (OSError, RuntimeError, zipfile.BadZipFile, SaveAborted)):
+                    raise ConversionError(save_failed(f"{type(exc).__name__}: {exc}")) from exc
+                raise
+            saved = True
+        finally:
+            self._end_save(job, saved)
+        log.info("Job %s saved: %s", job_id, [str(p) for p in written])
+        return written
 
     def _write_zip(self, job: _Job, folder: Path) -> Path:
         """Write all outputs of a job into one new zip file in ``folder``.
@@ -425,7 +501,11 @@ class JobManager:
                 with handle, zipfile.ZipFile(handle, "w", zipfile.ZIP_DEFLATED) as archive:
                     for output in job.outputs:
                         entry = safe_destination(no_folder, output.name, names).name
-                        archive.write(output.path, entry)
+                        info = zipfile.ZipInfo.from_file(output.path, entry)
+                        info.compress_type = zipfile.ZIP_DEFLATED
+                        # Streamed in chunks (not archive.write) so an abort is noticed.
+                        with open(output.path, "rb") as src, archive.open(info, "w") as dst:
+                            _copy_stream(src, dst, job.abort)
             except BaseException:
                 target.unlink(missing_ok=True)
                 raise
@@ -437,41 +517,111 @@ class JobManager:
 
         Safe to call more than once and after :meth:`save` (which already removed
         the results): unknown ids are a no-op. A running job is left alone.
+        During a save, the discard is applied as soon as the save ends (the
+        files being copied are never deleted mid-copy); this returns at once.
 
         Args:
             job_id: The job.
         """
-        with self._lock:
+        with self._changed:
             job = self._jobs.get(job_id)
             if job is None:
                 return
-            if job.status == RUNNING:
+            if job.state == RUNNING:
                 log.info("Discard ignored: job %s is still running", job_id)
                 return
-            self._jobs.pop(job_id)
+            if job.state == SAVING:
+                job.drop_requested = True
+                self._changed.notify_all()
+                log.info("Discard of job %s deferred until its save ends", job_id)
+                return
+            job.state = GONE
+            del self._jobs[job_id]
+            self._changed.notify_all()
         _remove_tree(job.scratch)
         log.info("Job %s results discarded", job_id)
 
     def shutdown(self, timeout: float = 5.0) -> None:
         """Cancel a running job and delete every scratch folder. Never raises.
 
+        A save in progress gets ``timeout`` seconds to finish. If it hasn't, it
+        is aborted (it stops between chunks and removes what it wrote) and
+        waited for again. Either way the save itself deletes its scratch folder
+        when it ends, so nothing is deleted while it is being copied.
+
         Args:
-            timeout: Seconds to wait for a running job to stop.
+            timeout: Seconds to wait for a running job to stop, and for a save
+                to finish (and again for an aborted save to roll back).
         """
-        with self._lock:
+        with self._changed:
             jobs = list(self._jobs.values())
             self._jobs.clear()
-        for job in jobs:
-            if job.status == RUNNING:
-                log.info("Shutting down: cancelling job %s", job.id)
-                job.cancel.cancel()
-                if job.thread is not None and job.thread.is_alive():
-                    job.thread.join(timeout)
-        for job in jobs:
+            saving = [job for job in jobs if job.state == SAVING]
+            running = [job for job in jobs if job.state == RUNNING]
+            others = [job for job in jobs if job.state != SAVING]  # Shutdown deletes these.
+            for job in saving:
+                job.drop_requested = True  # The save deletes the folder when it ends.
+            for job in others:
+                job.state = GONE  # A running job's worker keeps this when it ends.
+            self._changed.notify_all()
+        for job in running:
+            log.info("Shutting down: cancelling job %s", job.id)
+            job.cancel.cancel()
+            if job.thread is not None and job.thread.is_alive():
+                job.thread.join(timeout)
+        if saving:
+            self._wait_for_saves(saving, timeout)
+        for job in others:
             _remove_tree(job.scratch)
 
+    def _wait_for_saves(self, saving: list[_Job], timeout: float) -> None:
+        """Shutdown helper: let saves finish, abort the ones that don't, wait again.
 
-def _copy_new(source: Path, folder: Path, name: str, reserved: set[str]) -> Path:
+        Args:
+            saving: Jobs that were being saved when shutdown began.
+            timeout: Seconds for each of the two waits.
+        """
+
+        def done() -> bool:
+            return all(job.state != SAVING for job in saving)
+
+        with self._changed:
+            if self._changed.wait_for(done, timeout):
+                return
+            late = [job for job in saving if job.state == SAVING]
+        for job in late:
+            log.warning("Shutting down: aborting the save of job %s", job.id)
+            job.abort.set()
+        with self._changed:
+            if not self._changed.wait_for(done, timeout):
+                # It still deletes its scratch folder when it ends (drop_requested).
+                log.warning("Shutting down while a save is still running")
+
+
+def _copy_stream(src: BinaryIO, dst: BinaryIO, abort: threading.Event) -> None:
+    """Copy one stream into another in chunks, checking ``abort`` before each one.
+
+    Args:
+        src: Readable binary stream.
+        dst: Writable binary stream.
+        abort: Once set, the copy stops.
+
+    Raises:
+        SaveAborted: ``abort`` was set (the caller removes the partial file).
+        OSError: Reading or writing failed.
+    """
+    while True:
+        if abort.is_set():
+            raise SaveAborted("Saving was stopped because PDF Manager is closing.")
+        chunk = src.read(COPY_CHUNK)
+        if not chunk:
+            return
+        dst.write(chunk)
+
+
+def _copy_new(
+    source: Path, folder: Path, name: str, reserved: set[str], abort: threading.Event
+) -> Path:
     """Copy one file into ``folder`` under a collision-safe name, never overwriting.
 
     Args:
@@ -479,12 +629,14 @@ def _copy_new(source: Path, folder: Path, name: str, reserved: set[str]) -> Path
         folder: Destination folder.
         name: Suggested file name.
         reserved: Names already used in this save batch (see safe_destination).
+        abort: Once set, the copy stops between chunks.
 
     Returns:
         The path written.
 
     Raises:
         OSError: The copy failed (a partial file is removed).
+        SaveAborted: ``abort`` was set (a partial file is removed).
         RuntimeError: No free file name.
     """
     for _ in range(3):  # Retry if another program grabs the name meanwhile.
@@ -495,7 +647,7 @@ def _copy_new(source: Path, folder: Path, name: str, reserved: set[str]) -> Path
             continue
         try:
             with handle, open(source, "rb") as src:
-                shutil.copyfileobj(src, handle, 1024 * 1024)
+                _copy_stream(src, handle, abort)
         except BaseException:
             target.unlink(missing_ok=True)
             raise

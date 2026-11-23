@@ -49,7 +49,7 @@ Decisions made by the project owner, in their own direction (summarized, not quo
 | F7 | 2026-11-22 | Look: basic and user-friendly, rounded corners, smooth but uncomplicated animations. |
 | F8 | 2026-11-22 | Files: drag and drop to add, drag to reorder, remove. Uploaded files persist across tabs. |
 | F9 | 2026-11-22 | Modes: Flatten, Flatten + Merge, Merge, **Split** (select page ranges). v1 also adds **Images to PDF** (PNG/JPG) and **Compress PDF**. Word export is **after v1**, as an optional separate add-on install because of its extra dependency. |
-| F10 | 2026-11-22 | A **"Use OCR" checkbox** with a short plain-language explanation. **Unchecked by default.** Offered in Flatten, Flatten + Merge, Merge and Split (merged or split PDFs may be image-based). The first time it's checked, the Convert button is greyed out while the app checks that OCR is installed. Settings has a **"Search for OCR"** button. Installing OCR stays available in both places. |
+| F10 | 2026-11-22 | A **"Use OCR" checkbox** with a short plain-language explanation. **Unchecked by default.** Offered in Flatten, Flatten + Merge, Merge and Split (merged or split PDFs may be image-based). OCR availability is checked by the Convert modal (F14); there is **no separate first-time check** when the box is ticked (dropped, see F33). Settings has a **"Search for OCR"** button. Installing OCR stays available in both places. |
 | F11 | 2026-11-22 | Settings panel approved: DPI, OCR language, OCR page timeout, contents page on/off, page numbering, optional default save folder, plus the OCR items in F10. |
 | F12 | 2026-11-22 | Results approved: save to the default folder or choose one, keep results until saved, list warnings. |
 | F13 | 2026-11-22 | Warnings and errors (OCR, conversion, merging and so on) appear in a **simple popup** with basic troubleshooting steps for the likely cause. |
@@ -65,18 +65,15 @@ Decisions made by the project owner, in their own direction (summarized, not quo
 | F23 | 2026-11-22 | Drag to reorder uses **`@dnd-kit/sortable`**: smooth, intuitive animations are worth the ~15 KB. |
 | F24 | 2026-11-22 | Frontend tests: **Vitest + React Testing Library**, kept in each feature folder. |
 | F25 | 2026-11-22 | **Delete the Tkinter app** once the new app works. |
+| F26 | 2026-11-22 | **Contents page** is available for **Merge and Flatten + Merge**, **off by default**. |
+| F27 | 2026-11-22 | **First-launch theme follows Windows** light/dark. Burgundy and green are chosen manually in Settings. |
+| F28 | 2026-11-22 | **Split** offers custom page ranges, **every N pages** and **one file per page**, and **accepts PowerPoint files** (rendered to PDF first). |
+| F29 | 2026-11-22 | **Images to PDF:** the user chooses between one combined PDF and one PDF per image. **"Use OCR" is offered** here too. |
+| F30 | 2026-11-22 | **Compress PDF** offers **levels: Light / Balanced / Strong**, each with a (?) tooltip. |
+| F31 | 2026-11-22 | The **install wizard offers both** optional components: Tesseract OCR (unchecked) and LibreOffice (checked only if PowerPoint isn't found). |
+| F32 | 2026-11-22 | Once a default folder is set, each mode page's **"Save to default folder" starts ticked**. |
+| F33 | 2026-11-22 | **No separate first-time OCR check**; the Convert modal's check is enough. |
 
 ## Open questions
 
-Not yet decided. Do not assume an answer.
-
-| # | Question |
-| --- | --- |
-| O1 | Contents page: on or off by default? Does it apply to both Merge and Flatten + Merge? |
-| O2 | Which colour scheme is used on first launch? Should light/dark follow the Windows setting by default? |
-| O3 | Split: besides custom page ranges, also offer "every N pages" and/or "one file per page"? Should Split accept PowerPoint files (rendered first)? |
-| O4 | Images to PDF: one PDF per image, all images combined into one PDF, or a user choice? Is OCR offered for it? |
-| O5 | Compress PDF: a single setting, or user-facing levels (for example Light / Balanced / Strong)? |
-| O6 | Install wizard: should it offer Tesseract OCR and LibreOffice as optional components during install, or leave OCR installation to the app? |
-| O7 | With the tool-check modal on every Convert, is the separate first-time OCR check (Convert button greyed out when "Use OCR" is first ticked) still wanted? |
-| O8 | When a default folder is set, is each mode page's "Save to default folder" option on or off by default? |
+None right now. Add new ones here as they come up, and never assume their answers.

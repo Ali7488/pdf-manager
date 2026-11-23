@@ -8,6 +8,7 @@ LibreOffice is the slide renderer.
 from __future__ import annotations
 
 import os
+import shutil
 import signal
 import subprocess
 from pathlib import Path
@@ -54,3 +55,13 @@ def powerpoint_installed() -> bool:
 def powerpoint_path() -> Path | None:
     """Microsoft PowerPoint is never available off Windows."""
     return None
+
+
+def is_untrusted(path: Path) -> bool:
+    """No Mark-of-the-Web here; PowerPoint (which uses it) isn't available anyway."""
+    return False
+
+
+def copy_with_provenance(source: Path, target: Path) -> None:
+    """Plain copy: there's no Windows provenance stream to keep."""
+    shutil.copyfile(source, target)

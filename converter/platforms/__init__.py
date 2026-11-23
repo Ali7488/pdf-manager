@@ -18,6 +18,11 @@ Interface:
         Whether Microsoft PowerPoint can be automated (always False off Windows).
     powerpoint_path() -> Path | None
         Path of PowerPoint's executable, for display only.
+    is_untrusted(path) -> bool
+        Whether the file came from the Internet or a restricted site
+        (Windows Mark-of-the-Web). Always False where there's no such marker.
+    copy_with_provenance(source, target) -> None
+        Copy a file keeping its provenance marker (never strip it, audit R1).
     export_slides_with_powerpoint: Callable | None
         ``(source, output, timeout, cancel) -> None``: the optional PowerPoint
         slide renderer on Windows; ``None`` elsewhere. LibreOffice is always
@@ -30,6 +35,8 @@ import os
 
 if os.name == "nt":
     from .windows import (
+        copy_with_provenance,
+        is_untrusted,
         kill_process_tree,
         libreoffice_candidates,
         popen_options,
@@ -40,6 +47,8 @@ if os.name == "nt":
     from .windows_powerpoint import export_slides as export_slides_with_powerpoint
 else:
     from .posix import (
+        copy_with_provenance,
+        is_untrusted,
         kill_process_tree,
         libreoffice_candidates,
         popen_options,
@@ -51,7 +60,9 @@ else:
     export_slides_with_powerpoint = None
 
 __all__ = [
+    "copy_with_provenance",
     "export_slides_with_powerpoint",
+    "is_untrusted",
     "kill_process_tree",
     "libreoffice_candidates",
     "popen_options",

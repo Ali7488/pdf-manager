@@ -3,7 +3,7 @@
  * saved settings, and each action tab's own choices (kept while switching tabs).
  */
 import { arrayMove } from "@dnd-kit/sortable";
-import { Action, type ActionSettings, type AppInfo, type InputFile, type Settings } from "../api/types";
+import { Action, type ActionSettings, type AppInfo, type InputFile, type Issue, type Settings } from "../api/types";
 import { defaultActionSettings } from "../lib/actions";
 
 /** A sidebar destination. */
@@ -26,6 +26,11 @@ export interface AppState {
   files: InputFile[];
   settings: Settings;
   settingsLoaded: boolean;
+  /**
+   * Set (SETTINGS_SAVE_FAILED) when the latest settings save didn't reach the
+   * disk: the values apply until PDF Manager closes. Cleared by a later save that works.
+   */
+  settingsSaveIssue: Issue | null;
   appInfo: AppInfo | null;
   /** Each tab's options, so they survive switching tabs. */
   actionSettings: Record<Action, ActionSettings>;
@@ -43,7 +48,7 @@ export type AppEvent =
   | { type: "settingsLoaded"; settings: Settings }
   | { type: "settingsPatched"; patch: Partial<Settings> }
   /** A save finished; `settings` is null when the call failed and local values stay. */
-  | { type: "settingsSaved"; settings: Settings | null }
+  | { type: "settingsSaved"; settings: Settings | null; issue: Issue | null }
   | { type: "appInfoLoaded"; appInfo: AppInfo }
   | { type: "actionSettingsChanged"; action: Action; patch: Partial<ActionSettings> }
   | { type: "saveToDefaultChanged"; action: Action; value: boolean };
@@ -62,6 +67,7 @@ export function initialAppState(): AppState {
     files: [],
     settings: DEFAULT_SETTINGS,
     settingsLoaded: false,
+    settingsSaveIssue: null,
     appInfo: null,
     actionSettings: perAction(defaultActionSettings),
     saveToDefault: perAction(() => true),
@@ -107,7 +113,9 @@ export function appReducer(state: AppState, event: AppEvent): AppState {
     case "settingsPatched":
       return { ...state, settings: { ...state.settings, ...event.patch } };
     case "settingsSaved":
-      return event.settings ? { ...state, settings: event.settings, settingsLoaded: true } : state;
+      return event.settings
+        ? { ...state, settings: event.settings, settingsLoaded: true, settingsSaveIssue: event.issue }
+        : { ...state, settingsSaveIssue: event.issue };
     case "appInfoLoaded":
       return { ...state, appInfo: event.appInfo };
     case "actionSettingsChanged":

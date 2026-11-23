@@ -52,8 +52,8 @@ describe("appReducer", () => {
 
   it("takes the settings a save returns, and keeps local ones when the call failed", () => {
     const patched = appReducer(initialAppState(), { type: "settingsPatched", patch: { theme: "green" } });
-    expect(appReducer(patched, { type: "settingsSaved", settings: null })).toBe(patched);
-    const saved = appReducer(patched, { type: "settingsSaved", settings: { ...patched.settings, dpi: 300 } });
+    expect(appReducer(patched, { type: "settingsSaved", settings: null, issue: null }).settings).toBe(patched.settings);
+    const saved = appReducer(patched, { type: "settingsSaved", settings: { ...patched.settings, dpi: 300 }, issue: null });
     expect(saved.settings).toMatchObject({ theme: "green", dpi: 300 });
     expect(saved.settingsLoaded).toBe(true);
   });

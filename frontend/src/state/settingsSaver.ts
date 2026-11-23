@@ -90,6 +90,9 @@ export function createSettingsSaver(
       let outcome: SettingsSaveOutcome;
       try {
         const result = await save(sending);
+        if (typeof result?.settings !== "object" || result.settings === null) {
+          throw new Error("saveSettings returned something other than { settings, issue }.");
+        }
         outcome = { settings: { ...result.settings, ...stillQueued() }, issue: result.issue };
       } catch (error) {
         outcome = { settings: null, issue: settingsCallFailedIssue(error) };

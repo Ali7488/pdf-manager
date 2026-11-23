@@ -39,7 +39,7 @@ export function AppProvider({ children, api = defaultApi, onEvent = defaultOnEve
     () =>
       createSettingsSaver(
         (patch) => api.saveSettings(patch),
-        ({ settings }) => dispatch({ type: "settingsSaved", settings }),
+        ({ settings, issue }) => dispatch({ type: "settingsSaved", settings, issue }),
       ),
     [api],
   );

@@ -97,8 +97,12 @@ def main(argv: list[str] | None = None) -> int:
         mupdf["url"],
         fetch(mupdf["url"], out / "other", mupdf["sha256"]),
     )
-    runtime = sources["python_runtime"]["url"]
-    add(f"CPython {manifest['python_windows']}", runtime, fetch(runtime, out / "other"))
+    runtime = sources["python_runtime"]
+    add(
+        f"CPython {manifest['python_windows']}",
+        runtime["url"],
+        fetch(runtime["url"], out / "other", runtime["sha256"]),
+    )
     pyinstaller = sources["pyinstaller"]
     add(
         f"PyInstaller {manifest['pyinstaller']}",
@@ -128,6 +132,13 @@ def main(argv: list[str] | None = None) -> int:
     ]
     if args.platform == "windows":
         lines += [
+            "**Provenance note:** the pywin32 source archive is fetched from the "
+            "upstream GitHub release tag. The other listed Windows Python and runtime "
+            "source archives use their pinned SHA-256 digests; npm archives use the "
+            "lockfile integrity values. The generated SHA256SUMS records every "
+            "downloaded file, but does not independently authenticate an upstream "
+            "archive that has no pre-published digest.",
+            "",
             "**Not included:** the Microsoft WebView2 SDK files inside pywebview "
             f"(Microsoft.Web.WebView2 {manifest['webview2_sdk']['version']}). Microsoft "
             "licenses them under BSD-3-Clause-style terms but publishes no source code; "

@@ -2,37 +2,143 @@
 
 from __future__ import annotations
 
+import logging
 import os
+import re
 import shutil
+import signal
 import subprocess
+import time
 from collections.abc import Sequence
 from pathlib import Path
 
+from .context import CancelToken
+from .issues import Cancelled
 
-def run_command(cmd: Sequence[str], timeout: int = 600) -> subprocess.CompletedProcess[str]:
+# Verbose (DEBUG) records are written in development mode; the API layer
+# chooses the level. Errors are always logged with full details.
+log = logging.getLogger(__name__)
+
+
+def kill_process_tree(process: subprocess.Popen) -> None:
+    """Stop a program and every program it started. Never raises.
+
+    LibreOffice's ``soffice`` launches a child process (``soffice.bin``), so
+    killing only the parent would leave the real worker running.
+    """
+    if process.poll() is not None:
+        return
+    try:
+        if os.name == "nt":
+            # /T kills the whole tree, /F forces it.
+            subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(process.pid)],
+                capture_output=True,
+                creationflags=subprocess.CREATE_NO_WINDOW,
+            )
+        else:
+            # The program was started in its own session, so its process
+            # group id equals its pid and covers all of its children.
+            os.killpg(process.pid, signal.SIGKILL)
+    except (OSError, subprocess.SubprocessError):
+        pass
+    try:
+        process.kill()
+    except OSError:
+        pass
+
+
+def run_command(
+    cmd: Sequence[str], timeout: float = 600, cancel: CancelToken | None = None
+) -> subprocess.CompletedProcess[str]:
     """Run an external program and wait for it to finish.
 
     Output is captured as text instead of being printed. On Windows the program
     is started without a console window, so no black terminal flashes up while
-    the GUI is running.
+    the app is running. If the job is cancelled while the program runs, the
+    program (and anything it started) is killed straight away.
 
     Args:
         cmd: The program and its arguments. Items may be paths; they are
             converted to strings.
         timeout: Seconds to wait before giving up.
+        cancel: The job's cancel token, so Cancel can stop the program.
 
     Returns:
         The finished process, with ``returncode``, ``stdout`` and ``stderr``.
         A non-zero exit code is not raised as an error; callers check it.
 
     Raises:
-        subprocess.TimeoutExpired: The program ran longer than ``timeout``.
+        subprocess.TimeoutExpired: The program ran longer than ``timeout``
+            (it has been killed).
+        Cancelled: The job was cancelled while the program ran.
         FileNotFoundError: The program does not exist.
     """
-    options = {"capture_output": True, "text": True, "timeout": timeout}
+    args = list(map(str, cmd))
+    options: dict = {
+        "stdout": subprocess.PIPE,
+        "stderr": subprocess.PIPE,
+        "text": True,
+        # Tool output isn't always UTF-8 on Windows; never fail on decoding.
+        "encoding": "utf-8",
+        "errors": "replace",
+    }
     if os.name == "nt":
         options["creationflags"] = subprocess.CREATE_NO_WINDOW
-    return subprocess.run(list(map(str, cmd)), **options)
+    else:
+        options["start_new_session"] = True  # Own process group, see kill_process_tree.
+    log.debug("Running (timeout %ss): %s", timeout, subprocess.list2cmdline(args))
+    started = time.monotonic()
+    process = subprocess.Popen(args, **options)
+    if cancel is not None:
+        cancel.attach(process, kill_process_tree)
+    try:
+        try:
+            stdout, stderr = process.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            log.warning("Timed out after %ss, killing: %s", timeout, args[0])
+            kill_process_tree(process)
+            process.communicate()
+            raise
+    finally:
+        if cancel is not None:
+            cancel.detach()
+    log.debug(
+        "Exit code %s after %.1fs: %s\n--- stdout ---\n%s\n--- stderr ---\n%s",
+        process.returncode,
+        time.monotonic() - started,
+        args[0],
+        (stdout or "").strip(),
+        (stderr or "").strip(),
+    )
+    if cancel is not None and cancel.cancelled:
+        log.info("Cancelled while running: %s", args[0])
+        raise Cancelled()
+    return subprocess.CompletedProcess(args, process.returncode, stdout, stderr)
+
+
+def exe_from_registry_value(value: str, exe_name: str = "tesseract.exe") -> Path:
+    """Turn a registry value into the path of an executable.
+
+    Installers store paths in several shapes; all of these give
+    ``C:\\Tools\\tesseract.exe``:
+
+    * ``C:\\Tools\\tesseract.exe`` (plain path)
+    * ``"C:\\Tools\\tesseract.exe",0`` (quoted, with an icon index)
+    * ``C:\\Tools\\tesseract.exe,0`` (unquoted, with an icon index)
+    * ``C:\\Tools`` (a folder: ``exe_name`` is appended)
+
+    Environment variables such as ``%ProgramFiles%`` are expanded.
+    """
+    text = os.path.expandvars(value.strip())
+    if text.startswith('"'):
+        # Quoted: the path is everything up to the closing quote.
+        text = text[1:].split('"', 1)[0]
+    else:
+        # Unquoted: drop a trailing icon index such as ",0" or ",-101".
+        text = re.sub(r",\s*-?\d+$", "", text)
+    path = Path(text)
+    return path if path.suffix.lower() == ".exe" else path / exe_name
 
 
 def find_tesseract(configured: str | Path | None = None) -> Path | None:
@@ -103,34 +209,23 @@ def find_tesseract(configured: str | Path | None = None) -> Path | None:
                                     continue
                                 if not isinstance(value, str) or not value.strip():
                                     continue
-                                # Strip quotes and a trailing icon index, e.g.
-                                # '"C:\...\tesseract.exe",0' -> 'C:\...\tesseract.exe',
-                                # then expand variables like %ProgramFiles%.
-                                # Note: an unquoted 'C:\...\tesseract.exe,0' is not
-                                # handled and yields a wrong candidate (harmless,
-                                # since it just won't exist).
-                                cleaned = os.path.expandvars(
-                                    value.strip().strip('"').split('",')[0]
-                                )
-                                path = Path(cleaned)
-                                # A folder value gets "tesseract.exe" appended.
-                                possible.append(
-                                    path
-                                    if path.suffix.lower() == ".exe"
-                                    else path / "tesseract.exe"
-                                )
+                                # Handles quoted/unquoted paths, icon indexes
+                                # and folders; see exe_from_registry_value.
+                                possible.append(exe_from_registry_value(value))
                     except OSError:
                         continue  # Key doesn't exist on this machine.
         except ImportError:
             pass
-    # Return the first candidate that exists. The "seen" set skips duplicate
-    # paths (compared case-insensitively, as Windows does).
-    seen = set()
+    # Return the first candidate that exists, checking each distinct path
+    # (compared case-insensitively, as Windows does) only once.
+    seen: set[str] = set()
     for path in possible:
         normalized = str(path).casefold()
-        if normalized not in seen and path.is_file():
-            return path
+        if normalized in seen:
+            continue
         seen.add(normalized)
+        if path.is_file():
+            return path
     return None
 
 
@@ -182,4 +277,62 @@ def find_libreoffice() -> Path | None:
                     value = Path(root) / sub
                     if value.is_file():
                         return value
+    return None
+
+
+def tesseract_languages(tesseract: Path) -> list[str]:
+    """List the OCR languages installed for Tesseract, e.g. ``["deu", "eng"]``.
+
+    The ``osd`` entry (orientation detection, not a language) is left out.
+    Returns an empty list if Tesseract can't be run.
+    """
+    try:
+        proc = run_command([tesseract, "--list-langs"], timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return []
+    # Output: a header line ("List of available languages ..."), then one code per line.
+    lines = (proc.stdout or proc.stderr or "").splitlines()[1:]
+    return sorted({line.strip() for line in lines if line.strip() and line.strip() != "osd"})
+
+
+def powerpoint_installed() -> bool:
+    """Whether Microsoft PowerPoint can be automated on this computer (Windows only).
+
+    Checks that the ``PowerPoint.Application`` automation class is registered,
+    which is what the converter uses. Doesn't start PowerPoint.
+    """
+    if os.name != "nt":
+        return False
+    try:
+        import winreg
+
+        with winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, r"PowerPoint.Application\CLSID"):
+            return True
+    except (ImportError, OSError):
+        return False
+
+
+def find_powerpoint() -> Path | None:
+    """Path to ``POWERPNT.EXE`` if PowerPoint is installed, for display in the tool check.
+
+    Uses the "App Paths" registry entry Office writes. Returns ``None`` if
+    PowerPoint isn't installed or the path isn't recorded.
+    """
+    if not powerpoint_installed():
+        return None
+    try:
+        import winreg
+
+        for hive in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
+            try:
+                key_name = r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\powerpnt.exe"
+                with winreg.OpenKey(hive, key_name) as key:
+                    value, _ = winreg.QueryValueEx(key, "")
+                    path = exe_from_registry_value(value, "POWERPNT.EXE")
+                    if path.is_file():
+                        return path
+            except OSError:
+                continue
+    except ImportError:
+        pass
     return None

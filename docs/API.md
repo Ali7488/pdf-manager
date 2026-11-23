@@ -32,11 +32,11 @@ A web page can't see real file paths, so dropped files are handled on the Python
 | `save_settings(patch)` | `saveSettings(patch)` | Merge and persist a partial settings object; returns the full settings. |
 | `pick_files(kind)` | `pickFiles(kind)` | Native file picker. `kind`: `"documents"` (PDF/PPTX/PPT) or `"images"` (PNG/JPG). Returns `InputFile[]` (empty if cancelled). |
 | `pick_folder()` | `pickFolder()` | Native folder picker. Returns a path or `null`. |
-| `check_tools(request)` | `checkTools(request)` | Tool check for the Convert modal. Checks **only what this job needs** (see below). Returns `ToolCheckResult`. |
+| `check_tools(action, settings, data)` | `checkTools(action, settings, data)` | Tool check for the Convert modal. Same arguments as `start_job`. Checks **only what this job needs** (see below). Returns `ToolCheckResult`. |
 | `get_ocr_languages()` | `getOcrLanguages()` | Installed Tesseract languages, e.g. `["eng", "deu"]`. Empty if OCR isn't found. |
 | `search_ocr()` | `searchOcr()` | Settings → "Search for OCR": search the usual places; if not found, open a picker for `tesseract.exe`. Saves the path. Returns `OcrSearchResult`. |
 | `install_ocr()` | `installOcr()` | Start installing Tesseract (winget). Progress via `ocrInstallProgress`, end via `ocrInstallFinished`. Returns immediately. |
-| `start_job(request)` | `startJob(request)` | Start a conversion. Returns `{ jobId }`, or `{ issue }` if it can't start (for example a job is already running). Only one job runs at a time. |
+| `start_job(action, settings, data)` | `startJob(action, settings, data)` | **The single entry point for every conversion** (see below). Returns `{ jobId }`, or `{ issue }` if it can't start (for example a job is already running). Only one job runs at a time. |
 | `cancel_job(job_id)` | `cancelJob(jobId)` | Request cancellation. The job ends with status `"cancelled"`. |
 | `save_results(job_id, options)` | `saveResults(jobId, options)` | Copy results out of the scratch folder. Never overwrites (adds ` (2)` and so on). Returns `SaveOutcome`. |
 | `discard_results(job_id)` | `discardResults(jobId)` | Delete a finished job's scratch folder. |
@@ -53,9 +53,23 @@ A web page can't see real file paths, so dropped files are handled on the Python
 | `ocrInstallProgress` | `{ message: string }` | During an OCR install. |
 | `ocrInstallFinished` | `{ ok: boolean, issue: Issue \| null }` | OCR install ended. |
 
-## Modes and what each accepts
+## One function for all actions
 
-| Mode | Accepts | Output | OCR option |
+Every conversion (Flatten, Merge, Split and so on) goes through **one function**:
+
+```ts
+startJob(action: Action, settings: ActionSettings, data: ActionData)
+```
+
+- `action`: an enum value (`Action.Flatten`, `Action.FlattenMerge`, `Action.Merge`, `Action.Split`, `Action.ImagesToPdf`, `Action.Compress`) that decides what the job does.
+- `settings`: one `ActionSettings` object. Each action reads only the fields relevant to it (for example `split` for Split, `compressLevel` for Compress).
+- `data`: what the job works on: `{ files }`, the accepted file paths in display order.
+
+The Python side mirrors this: `converter.run_action(action, settings, data, ...)` with an `Action` string enum, and the bridge's `start_job(action, settings, data)` simply forwards to it.
+
+## Actions and what each accepts
+
+| Action | Accepts | Output | OCR option |
 | --- | --- | --- | --- |
 | `flatten` | PDF, PPTX, PPT | One flattened PDF per input | Yes |
 | `flatten_merge` | PDF, PPTX, PPT | One flattened, merged PDF | Yes |
@@ -64,16 +78,16 @@ A web page can't see real file paths, so dropped files are handled on the Python
 | `images_to_pdf` | PNG, JPG | One combined PDF, or one PDF per image | Yes |
 | `compress` | PDF | One smaller PDF per input | No |
 
-The file list is shared, so it can hold files a mode doesn't accept. The UI shows those as not applicable on that tab and leaves them out of the request; `files` in a request only contains accepted files, in display order.
+The file list is shared, so it can hold files a mode doesn't accept. The UI shows those as not applicable on that tab and leaves them out; `data.files` only contains accepted files, in display order.
 
-"Use OCR" is unchecked by default. For non-flatten modes, OCR adds a searchable text layer to pages that have no text (image-based pages), leaving pages that already have text alone.
+"Use OCR" is unchecked by default. For non-flatten actions, OCR adds a searchable text layer to pages that have no text (image-based pages), leaving pages that already have text alone.
 
 ## Tool check
 
-`check_tools(request)` decides what the job needs:
+`check_tools(action, settings, data)` decides what the job needs:
 
-- **OCR (Tesseract)** is required only if `options.useOcr` is true.
-- **PowerPoint or LibreOffice** is needed only if the request contains PPT/PPTX files. Microsoft PowerPoint is preferred. If PowerPoint is present, a missing LibreOffice is reported as `"not present"` but **doesn't block**. If neither is present, the check fails.
+- **OCR (Tesseract)** is required only if `settings.useOcr` is true (never for Compress).
+- **PowerPoint or LibreOffice** is needed only if `data.files` contains PPT/PPTX files. Microsoft PowerPoint is preferred. If PowerPoint is present, a missing LibreOffice is reported as `"not present"` but **doesn't block**. If neither is present, the check fails.
 
 The Convert modal runs this on **every Convert** and only starts the job if `ok` is true. Otherwise it shows the returned issues.
 

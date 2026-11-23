@@ -3,14 +3,22 @@
  * JSON keys are camelCase in both directions.
  */
 
-/** Conversion modes. Each one is its own sidebar tab. */
-export type Mode =
-  | "flatten"
-  | "flatten_merge"
-  | "merge"
-  | "split"
-  | "images_to_pdf"
-  | "compress";
+/**
+ * The action a job performs. Every conversion goes through one function,
+ * `startJob(action, settings, data)`; this enum decides what it does.
+ * Each action is its own sidebar tab.
+ *
+ * (A const object rather than a TS `enum`, so it works with erasable-syntax-only builds.)
+ */
+export const Action = {
+  Flatten: "flatten",
+  FlattenMerge: "flatten_merge",
+  Merge: "merge",
+  Split: "split",
+  ImagesToPdf: "images_to_pdf",
+  Compress: "compress",
+} as const;
+export type Action = (typeof Action)[keyof typeof Action];
 
 /** Kind of input file, detected by Python from the extension. */
 export type FileKind = "pdf" | "pptx" | "ppt" | "image";
@@ -48,11 +56,11 @@ export interface Settings {
 export type SplitMethod = "ranges" | "every_n" | "per_page";
 export type CompressLevel = "light" | "balanced" | "strong";
 
-/** Options for one job. Only the fields relevant to the mode are used. */
-export interface JobOptions {
+/** Settings for one job. Only the fields relevant to the action are used. */
+export interface ActionSettings {
   /** Add a searchable OCR text layer. Unchecked by default. Ignored for "compress". */
   useOcr: boolean;
-  /** Merge modes only: clickable contents page at the start. Off by default. */
+  /** Merge actions only: clickable contents page at the start. Off by default. */
   contentsPage: boolean;
   /** Split only. */
   split: {
@@ -68,11 +76,10 @@ export interface JobOptions {
   compressLevel: CompressLevel;
 }
 
-export interface JobRequest {
-  mode: Mode;
-  /** Absolute paths of the accepted files, in display order. */
+/** The data a job works on. */
+export interface ActionData {
+  /** Absolute paths of the files this action accepts, in display order. */
   files: string[];
-  options: JobOptions;
 }
 
 /** Problem shown to the user in a simple popup. */
@@ -215,11 +222,13 @@ export interface PdfManagerApi {
   saveSettings(patch: Partial<Settings>): Promise<Settings>;
   pickFiles(kind: "documents" | "images"): Promise<InputFile[]>;
   pickFolder(): Promise<string | null>;
-  checkTools(request: JobRequest): Promise<ToolCheckResult>;
+  /** Tool check for the Convert modal; checks only what this action needs. */
+  checkTools(action: Action, settings: ActionSettings, data: ActionData): Promise<ToolCheckResult>;
   getOcrLanguages(): Promise<string[]>;
   searchOcr(): Promise<OcrSearchResult>;
   installOcr(): Promise<void>;
-  startJob(request: JobRequest): Promise<StartJobResult>;
+  /** The single entry point for every conversion action. */
+  startJob(action: Action, settings: ActionSettings, data: ActionData): Promise<StartJobResult>;
   cancelJob(jobId: string): Promise<void>;
   saveResults(jobId: string, options: SaveOptions): Promise<SaveOutcome>;
   discardResults(jobId: string): Promise<void>;

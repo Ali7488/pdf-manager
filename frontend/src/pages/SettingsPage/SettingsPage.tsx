@@ -132,7 +132,12 @@ export function SettingsPage() {
           and the build instructions come with the app; the third-party source code is attached to each release.
         </p>
         <p>
-          Complete source code: {appInfo ? `${sourceUrlFor(appInfo.version)} (this version)` : SOURCE_URL}
+          Complete source code:{" "}
+          {appInfo?.sourceRevision
+            ? `${sourceUrlFor(appInfo.sourceRevision)} (the exact source of this build${
+                appInfo.sourceModified ? ", which also has local changes not in that commit" : ""
+              })`
+            : SOURCE_URL}
         </p>
         <div>
           <Button

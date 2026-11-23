@@ -5,9 +5,11 @@
 
 The AGPL-3.0 (section 6) requires the complete corresponding source of the app to be
 available to everyone who gets the installer. The app's own code, UI and build scripts
-are the repository at the release tag. This script gathers the rest, from the exact
-versions listed in ``licenses/manifest.json`` (which ``scripts/collect_licenses.py``
-takes from ``uv.lock`` and ``frontend/package-lock.json``):
+are archived from the exact commit being built (``git archive``; the same commit the
+app's Settings > About links to, decision P37), with that commit in ``SOURCE_REVISION``.
+The checkout must have no changes to tracked files. This script gathers the rest, from
+the exact versions listed in ``licenses/manifest.json`` (which
+``scripts/collect_licenses.py`` takes from ``uv.lock`` and ``frontend/package-lock.json``):
 
 * each bundled Python package's source distribution (checked against uv.lock's hash),
   or its upstream source archive when it publishes none (pywin32);
@@ -28,12 +30,55 @@ import argparse
 import base64
 import hashlib
 import json
+import os
+import subprocess
 import sys
 import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "licenses" / "manifest.json"
+
+
+def _git(*args: str) -> str:
+    return subprocess.run(
+        ["git", "-C", str(ROOT), *args], check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+
+def app_source(out: Path) -> tuple[str, Path]:
+    """Archive the app's own source at the checked-out commit.
+
+    Returns:
+        The commit and the archive (``app/pdf-manager-<commit>-source.tar.gz``).
+
+    Raises:
+        SystemExit: Not a clean Git checkout, or not the commit
+            ``PDF_MANAGER_SOURCE_REVISION`` names (CI sets it to the commit it builds).
+    """
+    try:
+        revision = _git("rev-parse", "HEAD")
+        changes = _git("status", "--porcelain", "--untracked-files=no")
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise SystemExit(f"The app's source needs a Git checkout: {exc}") from exc
+    if changes:
+        raise SystemExit("Tracked files differ from the commit; the source wouldn't match it.")
+    expected = os.environ.get("PDF_MANAGER_SOURCE_REVISION", "").strip().lower()
+    if expected and expected != revision:
+        raise SystemExit(f"PDF_MANAGER_SOURCE_REVISION is {expected}, the checkout {revision}.")
+    folder = out / "app"
+    folder.mkdir(parents=True, exist_ok=True)
+    archive = folder / f"pdf-manager-{revision}-source.tar.gz"
+    _git(
+        "archive",
+        "--format=tar.gz",
+        f"--prefix=pdf-manager-{revision}/",
+        "-o",
+        str(archive),
+        "HEAD",
+    )
+    (out / "SOURCE_REVISION").write_text(revision + "\n", encoding="ascii")
+    return revision, archive
 
 
 def fetch(url: str, folder: Path, sha256: str = "", integrity: str = "") -> Path:
@@ -92,6 +137,9 @@ def main(argv: list[str] | None = None) -> int:
         if args.build in c.get("builds", ["desktop", "browser"])
     }
     out = args.output
+    out.mkdir(parents=True, exist_ok=True)
+    revision, archive = app_source(out)
+    print(f"App source: commit {revision}")
     rows: list[tuple[str, str, str]] = []
 
     def add(component: str, url: str, path: Path) -> None:
@@ -138,12 +186,17 @@ def main(argv: list[str] | None = None) -> int:
         )
     (out / "SHA256SUMS").write_text("\n".join(sums) + "\n", encoding="utf-8")
     lines = [
-        "# PDF Manager: third-party source code",
+        "# PDF Manager: corresponding source code",
+        "",
+        f"**The app's own source:** `{archive.relative_to(out).as_posix()}`, an archive of "
+        f"commit `{revision}` (also in `SOURCE_REVISION`), the commit the "
+        f"{'browser-mode ZIP' if args.build == 'browser' else 'app'} was built from. Its "
+        "Settings > About links to the same commit: "
+        f"https://github.com/Ali7488/pdf-manager/tree/{revision}",
         "",
         f"Source code of the third-party components in the {args.platform.capitalize()} "
         f"{'browser-mode ZIP' if args.build == 'browser' else 'app'}, "
-        "at the exact bundled versions. The app's own source is the repository at the "
-        "release tag (https://github.com/Ali7488/pdf-manager). Checksums: SHA256SUMS.",
+        "at the exact bundled versions. Checksums: SHA256SUMS.",
         "",
         "| Component | File | Downloaded from |",
         "| --- | --- | --- |",

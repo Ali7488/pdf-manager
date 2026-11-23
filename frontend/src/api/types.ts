@@ -172,6 +172,10 @@ export interface AppInfo {
   /** Folder with the licence texts (LICENSING.md, THIRD_PARTY_NOTICES.md, licenses/). */
   licensesDir: string;
   platform: "windows" | "linux" | "mac";
+  /** The exact Git commit this copy was built from (40 hex digits), or null if unknown. */
+  sourceRevision: string | null;
+  /** True if it was built with local changes not in that commit (development builds only). */
+  sourceModified: boolean;
 }
 
 export type JobStage =

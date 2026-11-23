@@ -1,7 +1,7 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { LINUX_OCR_INSTALL_COMMAND } from "../../api/mock";
+import { LINUX_OCR_INSTALL_COMMAND, MOCK_REVISION } from "../../api/mock";
 import { renderApp } from "../../test/renderApp";
 
 const FOLDER = "D:\\Results";
@@ -198,6 +198,24 @@ describe("SettingsPage", () => {
       expect(about.getByText(/ABSOLUTELY NO WARRANTY/)).toBeInTheDocument();
       expect(about.getByText(/PyMuPDF/)).toBeInTheDocument();
       expect(about.getByText(/github\.com\/Ali7488\/pdf-manager/)).toBeInTheDocument();
+    });
+
+    it("links to the exact commit this build was made from, not a version tag", async () => {
+      await renderApp({ state: { page: "settings" } });
+      const about = within(screen.getByRole("region", { name: "About" }));
+      expect(
+        await about.findByText(
+          `Complete source code: https://github.com/Ali7488/pdf-manager/tree/${MOCK_REVISION} (the exact source of this build)`,
+        ),
+      ).toBeInTheDocument();
+      expect(about.queryByText(/\/tree\/v\d/)).not.toBeInTheDocument();
+    });
+
+    it("doesn't claim an exact version when the revision is unknown", async () => {
+      await renderApp({ state: { page: "settings" }, mock: { sourceRevision: null } });
+      const about = within(screen.getByRole("region", { name: "About" }));
+      await waitFor(() => expect(about.getByText(/^PDF Manager version/)).toBeInTheDocument());
+      expect(about.getByText("Complete source code: https://github.com/Ali7488/pdf-manager")).toBeInTheDocument();
     });
 
     it("opens the licences folder", async () => {

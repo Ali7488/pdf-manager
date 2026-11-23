@@ -71,6 +71,19 @@ _require(
 )
 _require(ICON, "The app icon 'PDF Manager.ico' must be at the repository root.")
 
+# The exact commit this build is made from, for Settings > About's source link
+# (decision P37). Stops the build if tracked files differ from that commit.
+sys.path.insert(0, str(REPO))
+from api.build_info import BUILD_INFO_FILE, BuildInfoError, write_build_info  # noqa: E402
+
+BUILD_INFO = REPO / "build" / f"build-info-{BUILD}" / BUILD_INFO_FILE
+try:
+    _build_info = write_build_info(REPO, BUILD_INFO)
+except BuildInfoError as exc:
+    raise SystemExit(f"[pdf-manager.spec] {exc}")
+print(f"[pdf-manager.spec] Source revision {_build_info['revision']}"
+      f"{' (modified)' if _build_info['modified'] else ''}")
+
 
 def _read_version() -> str:
     """Read the app version from ``pyproject.toml``.
@@ -254,8 +267,9 @@ a = Analysis(
     [str(ENTRY)],
     pathex=[str(REPO)],  # Lets browser_main.py import the api package.
     binaries=[],
-    # Copy the whole built frontend so it lands at <_MEIPASS>/frontend/dist/.
-    datas=[(str(FRONTEND_DIST), "frontend/dist")],
+    # Copy the whole built frontend so it lands at <_MEIPASS>/frontend/dist/, and the
+    # build's source revision at <_MEIPASS>/build-info.json.
+    datas=[(str(FRONTEND_DIST), "frontend/dist"), (str(BUILD_INFO), ".")],
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},

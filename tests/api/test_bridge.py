@@ -225,7 +225,14 @@ def test_emit_failure_is_swallowed(api_obj, window):
 def test_get_app_info(api_obj, logs):
     """AppInfo has version, logs and licences folders, and platform."""
     info = api_obj.get_app_info()
-    assert set(info) == {"version", "logsDir", "licensesDir", "platform"}
+    assert set(info) == {
+        "version",
+        "logsDir",
+        "licensesDir",
+        "platform",
+        "sourceRevision",
+        "sourceModified",
+    }
     # From source the licence texts are at the repository root.
     licenses_dir = Path(info["licensesDir"])
     assert (licenses_dir / "LICENSE").is_file()

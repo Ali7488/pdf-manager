@@ -448,3 +448,18 @@ def test_quit_asks_before_deleting_unsaved_results(page, inputs, server):
     alert.get_by_role("button", name="Quit anyway").click()
     other.get_by_role("heading", name="PDF Manager has closed").wait_for()
     assert server.proc.wait(15) == 0
+
+
+def test_about_links_to_the_exact_commit_of_this_build(page):
+    """Decision P37. Packaged: PDF_MANAGER_E2E_REVISION is the commit the ZIP was built from."""
+    expected = os.environ.get("PDF_MANAGER_E2E_REVISION")
+    if not expected:
+        if os.environ.get("PDF_MANAGER_E2E_APP") or shutil.which("git") is None:
+            pytest.skip("set PDF_MANAGER_E2E_REVISION to check a built app")
+        expected = subprocess.run(
+            ["git", "-C", str(ROOT), "rev-parse", "HEAD"], capture_output=True, text=True
+        ).stdout.strip()
+    go(page, "Settings")
+    about = page.get_by_role("region", name="About")
+    about.get_by_text(f"/tree/{expected}", exact=False).wait_for()
+    assert f"https://github.com/Ali7488/pdf-manager/tree/{expected}" in about.inner_text()

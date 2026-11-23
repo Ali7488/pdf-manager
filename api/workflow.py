@@ -29,7 +29,7 @@ from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import Any
 
-from . import __version__, dto, logging_setup, paths, platforms, service
+from . import __version__, build_info, dto, logging_setup, paths, platforms, service
 from .jobs import JobManager
 from .logging_setup import log_issue
 from .service import ConversionError, Issue, ocr_install_failed, ocr_missing, unexpected_error
@@ -165,11 +165,15 @@ class Workflow:
         """The app version, logs and licences folders, and platform (``AppInfo``)."""
 
         def body() -> dict[str, Any]:
+            source = build_info.source_revision()
             return {
                 "version": __version__,
                 "logsDir": str(self.logs_folder()),
                 "licensesDir": str(paths.licenses_dir()),
                 "platform": platforms.platform_name(),
+                # The exact commit this copy was built from (decision P37), or null.
+                "sourceRevision": source["revision"] if source else None,
+                "sourceModified": bool(source and source["modified"]),
             }
 
         return self.guard(
@@ -179,6 +183,8 @@ class Workflow:
                 "logsDir": "",
                 "licensesDir": "",
                 "platform": platforms.platform_name(),
+                "sourceRevision": None,
+                "sourceModified": False,
             },
             body,
         )

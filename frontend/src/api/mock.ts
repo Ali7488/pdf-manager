@@ -65,7 +65,12 @@ export interface MockOptions {
   settingsSaveFails?: boolean;
   /** Simulated operating system, reported by `getAppInfo`. Default "windows". */
   platform?: AppInfo["platform"];
+  /** The source revision `getAppInfo` reports (null: unknown). Default {@link MOCK_REVISION}. */
+  sourceRevision?: string | null;
 }
+
+/** The commit the mock says it was built from. */
+export const MOCK_REVISION = "0123456789abcdef0123456789abcdef01234567";
 
 /** Extra controls only the mock has. */
 export interface MockControls {
@@ -493,7 +498,14 @@ export function createMockApi(options: MockOptions = {}): MockApi {
       await latency();
       const logsDir = platform === "windows" ? "C:\\Users\\Public\\PDF Manager\\logs" : "/home/user/.local/state/pdf-manager/logs";
       const licensesDir = platform === "windows" ? "C:\\Users\\Public\\PDF Manager" : "/opt/pdf-manager";
-      return { version: "1.0.0 (preview)", logsDir, licensesDir, platform };
+      return {
+        version: "1.0.0 (preview)",
+        logsDir,
+        licensesDir,
+        platform,
+        sourceRevision: options.sourceRevision === undefined ? MOCK_REVISION : options.sourceRevision,
+        sourceModified: false,
+      };
     },
 
     async getSettings() {

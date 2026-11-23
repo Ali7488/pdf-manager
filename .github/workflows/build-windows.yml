@@ -3,7 +3,10 @@
 # Manual trigger only (Actions > "Build Windows installer" > Run workflow).
 # After building, it installs the app silently on the runner and starts it in
 # smoke-test mode (api/smoke.py): the installed app must open its window,
-# render the UI and answer through the bridge, then quit.
+# render the UI and answer through the bridge, then quit. The licence check
+# (scripts/check_licenses.py) runs on the bundle and on the installed app.
+# A second job gathers the third-party source code for the release (AGPL-3.0
+# section 6; see LICENSING.md). Neither job publishes anything.
 name: Build Windows installer
 
 on:
@@ -16,9 +19,19 @@ jobs:
   build:
     runs-on: windows-latest
     timeout-minutes: 30
+    env:
+      UV_PYTHON: '3.13.17'
+      UV_PYTHON_PREFERENCE: only-system
     steps:
       - name: Check out the code
         uses: actions/checkout@v5
+
+      # The exact python.org CPython whose licence ships with the app
+      # (PYTHON_WINDOWS_VERSION in scripts/collect_licenses.py).
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13.17'
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v6
@@ -59,6 +72,9 @@ jobs:
           # Qt (PySide6) is Linux-only (decision P19); it must not be in the Windows app.
           $qt = Get-ChildItem -Path $appDir -Recurse -Include 'Qt6*.dll', 'PySide6', 'shiboken6' -ErrorAction SilentlyContinue
           if ($qt) { $qt | Select-Object -First 5 FullName; throw 'Qt/PySide6 files found in the Windows app' }
+          # Every native file has a notice, and the installed licence files match the repo.
+          & uv run --frozen --no-sync python scripts/check_licenses.py bundle $appDir --installed
+          if ($LASTEXITCODE -ne 0) { throw 'Licence check of the installed app failed' }
           $env:PDF_MANAGER_SMOKE_TEST = '1'
           $run = Start-Process $app -Wait -PassThru
           $log = Join-Path $appDir 'logs\pdf-manager.log'
@@ -87,5 +103,31 @@ jobs:
         with:
           name: PDF-Manager-Setup
           path: dist/installer/*.exe
+          if-no-files-found: error
+          retention-days: 14
+
+  sources:
+    # The third-party source code for the release (attach it to the release by hand,
+    # with the installer, after the owner approves publishing).
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v5
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Check the licence inventory
+        run: uv run --no-project python scripts/check_licenses.py repo
+
+      - name: Download the third-party sources
+        run: uv run --no-project python scripts/collect_sources.py build/sources --platform windows
+
+      - name: Upload the source bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: PDF-Manager-third-party-sources
+          path: build/sources/
           if-no-files-found: error
           retention-days: 14

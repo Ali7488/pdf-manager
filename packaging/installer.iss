@@ -112,6 +112,9 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 ; Remove the old bundle on upgrade so stale libraries from an earlier version
 ; can't be loaded. The folder is fully replaced by [Files] below.
 Type: filesandordirs; Name: "{app}\_internal"
+; Same for the licence files, so an upgrade doesn't leave notices for components
+; the new version no longer ships.
+Type: filesandordirs; Name: "{app}\licenses"
 
 [Files]
 Source: "{#BuildDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs

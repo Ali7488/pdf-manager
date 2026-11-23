@@ -8,7 +8,8 @@
       2. Build the React frontend (npm ci, npm run build) into frontend\dist.
       3. Install the Python dependencies from uv.lock (uv sync --frozen --no-dev).
       4. Bundle the app with PyInstaller (packaging\pdf-manager.spec)
-         into dist\PDF Manager.
+         into dist\PDF Manager, then check the bundle against the licence
+         notices (scripts\check_licenses.py).
       5. Compile the install wizard (packaging\installer.iss) into
          dist\installer\PDF-Manager-Setup-<version>.exe.
 
@@ -184,6 +185,16 @@ try {
     }
     $appExe = Join-Path $appDir 'PDF Manager.exe'
     if (-not (Test-Path -LiteralPath $appExe)) { throw "PyInstaller finished but $appExe is missing." }
+
+    Write-Step 'Checking the bundle against the licence notices'
+    # Fails when a bundled file has no notice, the WebView2 or Python files aren't the
+    # ones whose licences we ship, or the notices are out of date (LICENSING.md).
+    Invoke-Native 'Licence check (repository)' {
+        & uv run --frozen --no-sync python scripts\check_licenses.py repo
+    }
+    Invoke-Native 'Licence check (bundle)' {
+        & uv run --frozen --no-sync python scripts\check_licenses.py bundle $appDir
+    }
 
     Write-Step 'Compiling the installer (Inno Setup)'
     $installerDir = Join-Path $RepoRoot 'dist\installer'

@@ -203,12 +203,10 @@ def _unneeded(dest: str) -> bool:
     path = dest.replace("\\", "/").lower()
     if path.endswith("pywebview-android.jar"):
         return True
-    # WebView2Loader.dll for other CPU architectures.
-    if "webview/lib/runtimes/" in path and f"/runtimes/{_RID}/" not in path:
-        return True
-    # The old IE (mshtml) fallback only needs the interop DLL for its own bitness.
-    if _RID != "win-x86" and path.endswith("webbrowserinterop.x86.dll"):
-        return True
+    # Keep every WebView2Loader.dll runtime folder (win-x64, win-x86, win-arm64):
+    # pywebview's EdgeChromium backend looks them all up at import time and raises
+    # "Cannot find win-arm64" if one is missing (found by the installed-app smoke
+    # test on the Windows runner). They're small.
     # PyMuPDF 2.x wheels ship C headers for developers; the app never needs them.
     if "/mupdf-devel/" in f"/{path}":
         return True

@@ -12,6 +12,9 @@
  * - `checkTools` applies the contract's rules to a configurable set of tools.
  * - `saveSettings` can be told to fail (`settingsSaveFails`), returning
  *   SETTINGS_SAVE_FAILED while still applying the change in memory, as Python does.
+ * - `platform` picks the simulated operating system. On `"linux"`, Install OCR
+ *   doesn't install anything: it ends with an issue carrying the apt command to
+ *   copy and run (decision C16), because the app never runs `sudo` itself.
  */
 import { emitEvent } from "./bridge";
 import {
@@ -60,6 +63,8 @@ export interface MockOptions {
   ocrInstallFails?: boolean;
   /** Make `saveSettings` report that the settings couldn't be written to disk. */
   settingsSaveFails?: boolean;
+  /** Simulated operating system, reported by `getAppInfo`. Default "windows". */
+  platform?: AppInfo["platform"];
 }
 
 /** Extra controls only the mock has. */
@@ -149,6 +154,24 @@ const OCR_MISSING = (): Issue =>
     ],
   );
 
+/** The Ubuntu/Debian command that installs Tesseract with English (decision C16). */
+export const LINUX_OCR_INSTALL_COMMAND = "sudo apt install tesseract-ocr tesseract-ocr-eng";
+
+/** What Install OCR ends with on Linux: the command for the user to run (decision C16). */
+const OCR_INSTALL_LINUX = (): Issue =>
+  makeIssue(
+    "OCR_INSTALL_FAILED",
+    "warning",
+    "Install OCR with one command",
+    "PDF Manager can't install OCR by itself on Linux. Your files are not affected.",
+    [
+      "Copy the command, paste it into a Terminal window and press Enter.",
+      "Type your password if asked, and wait until it finishes.",
+      "Then click Search for OCR in Settings.",
+    ],
+    { command: LINUX_OCR_INSTALL_COMMAND },
+  );
+
 /** Detects a file kind from its name, as Python does. */
 function kindFromName(name: string): FileKind | null {
   const ext = name.toLowerCase().split(".").pop() ?? "";
@@ -194,6 +217,7 @@ export function createMockApi(options: MockOptions = {}): MockApi {
   const jobs = new Map<string, MockJob>();
   let runningJob: MockJob | null = null;
   let settingsSaveFails = options.settingsSaveFails ?? false;
+  const platform = options.platform ?? "windows";
   let jobCounter = 0;
   const pickCounts = { all: 0, documents: 0, images: 0 };
 
@@ -439,7 +463,8 @@ export function createMockApi(options: MockOptions = {}): MockApi {
 
     async getAppInfo(): Promise<AppInfo> {
       await latency();
-      return { version: "1.0.0 (preview)", logsDir: "C:\\Users\\Public\\PDF Manager\\logs", platform: "windows" };
+      const logsDir = platform === "windows" ? "C:\\Users\\Public\\PDF Manager\\logs" : "/home/user/.local/state/pdf-manager/logs";
+      return { version: "1.0.0 (preview)", logsDir, platform };
     },
 
     async getSettings() {
@@ -560,6 +585,11 @@ export function createMockApi(options: MockOptions = {}): MockApi {
 
     async installOcr() {
       await latency();
+      if (platform === "linux") {
+        // Like Python: nothing is installed; it finishes straight away with the command to copy.
+        setTimeout(() => emitEvent("ocrInstallFinished", { ok: false, issue: OCR_INSTALL_LINUX() }), tickMs);
+        return;
+      }
       const messages = ["Downloading Tesseract OCR", "Installing", "Adding languages", "Checking the installation"];
       messages.forEach((message, index) => {
         setTimeout(() => emitEvent("ocrInstallProgress", { message }), tickMs * (index + 1) * 2);

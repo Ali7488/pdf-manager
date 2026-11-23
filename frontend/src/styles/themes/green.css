@@ -1,28 +1,14 @@
-/*
- * Green theme: forest green, cream and coral, dark. Proposed palette
- * (not specified by the owner): deep forest-green ground, cream text,
- * coral for buttons and accents.
- */
+/* Green theme: forest green, cream and coral. Base colours only. */
 [data-theme="green"] {
   color-scheme: dark;
-  --color-background: #11201a;
-  --color-surface: #192c23;
-  --color-surface-muted: #22392d;
-  --color-text: #f6f0dd;
-  --color-text-muted: #c4bfa6;
-  --color-text-inverse: #11201a;
-  --color-border: #36513f;
-  --color-border-strong: #557459;
-  --color-primary: #f08c6e;
-  --color-primary-hover: #f6a486;
-  --color-primary-soft: #3e3226;
-  --color-on-primary: #2a1109;
-  --color-link: #f6a585;
-  --color-link-hover: #ffc4ab;
-  --color-success: #86d9a6;
-  --color-warning: #ebc56c;
-  --color-danger: #ff9aa2;
-  --color-overlay: rgb(5 12 9 / 0.6);
-  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
-  --shadow-lg: 0 12px 40px rgb(0 0 0 / 0.55);
+  --band: #1f4a37;
+  --on-band: #f6f0dd;
+  --accent: #f08c6e;
+  --on-accent: #2a1109;
+  --paper: #192c23;
+  --canvas: #11201a;
+  --ink: #f6f0dd;
+  --line: #36513f;
+  --alert: #ff9aa2;
+  --shadow-lg: 0 2px 12px rgb(0 0 0 / 0.5);
 }

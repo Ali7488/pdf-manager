@@ -1,8 +1,9 @@
-/* Global stylesheet entry: font, tokens, then themes, then element styles. */
+/* Global stylesheet entry: font, tokens, theme base colours, derived palette, then element styles. */
 @import "./fonts.css";
 @import "./tokens.css";
 @import "./themes/dark.css";
 @import "./themes/light.css";
 @import "./themes/burgundy.css";
 @import "./themes/green.css";
+@import "./palette.css";
 @import "./global.css";

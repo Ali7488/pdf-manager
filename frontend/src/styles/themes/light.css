@@ -1,24 +1,14 @@
-/* Light theme: gold on white (the owner's template colours). */
+/* Light theme: gold on white (the owner's template colours). Base colours only. */
 [data-theme="light"] {
   color-scheme: light;
-  --color-background: #ffffff;
-  --color-surface: #faf9f5;
-  --color-surface-muted: #f1ecdf;
-  --color-text: #1b1a16;
-  --color-text-muted: #625b4e;
-  --color-text-inverse: #ffffff;
-  --color-border: #ded5c2;
-  --color-border-strong: #b9a98b;
-  --color-primary: #8c600c;
-  --color-primary-hover: #704907;
-  --color-primary-soft: #f8ecd0;
-  --color-on-primary: #ffffff;
-  --color-link: #82570a;
-  --color-link-hover: #624108;
-  --color-success: #167044;
-  --color-warning: #986000;
-  --color-danger: #b42e36;
-  --color-overlay: rgb(27 26 22 / 0.45);
-  --shadow-sm: 0 1px 2px rgb(27 26 22 / 0.08);
-  --shadow-lg: 0 12px 40px rgb(27 26 22 / 0.18);
+  --band: #7a5410;
+  --on-band: #ffffff;
+  --accent: #8c600c;
+  --on-accent: #ffffff;
+  --paper: #ffffff;
+  --canvas: #f3f2ee;
+  --ink: #1b1a16;
+  --line: #d9d3c4;
+  --alert: #b42e36;
+  --shadow-lg: 0 2px 10px rgb(27 26 22 / 0.18);
 }

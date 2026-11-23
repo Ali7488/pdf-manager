@@ -1,27 +1,14 @@
-/*
- * Burgundy theme: burgundy and pink, dark. Based on the previous app's
- * palette; the remaining tokens are derived to match.
- */
+/* Burgundy theme: burgundy and pink. Base colours only. */
 [data-theme="burgundy"] {
   color-scheme: dark;
-  --color-background: #1b141b;
-  --color-surface: #2b1e29;
-  --color-surface-muted: #352431;
-  --color-text: #fff7fa;
-  --color-text-muted: #d0bbc6;
-  --color-text-inverse: #1b141b;
-  --color-border: #694557;
-  --color-border-strong: #8d6278;
-  --color-primary: #c96789;
-  --color-primary-hover: #df789b;
-  --color-primary-soft: #43243a;
-  --color-on-primary: #1e0a14;
-  --color-link: #eb92b1;
-  --color-link-hover: #f7b6cc;
-  --color-success: #74d6a5;
-  --color-warning: #f1c36a;
-  --color-danger: #ff8f95;
-  --color-overlay: rgb(10 4 9 / 0.6);
-  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
-  --shadow-lg: 0 12px 40px rgb(0 0 0 / 0.55);
+  --band: #6b2742;
+  --on-band: #fff7fa;
+  --accent: #df789b;
+  --on-accent: #1b141b;
+  --paper: #2b1e29;
+  --canvas: #1b141b;
+  --ink: #fff7fa;
+  --line: #694557;
+  --alert: #ff8f95;
+  --shadow-lg: 0 2px 12px rgb(0 0 0 / 0.5);
 }

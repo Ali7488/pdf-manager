@@ -1,0 +1,42 @@
+/*
+ * Every colour the components use, derived from each theme's few base colours
+ * (themes/*.css): band, accent, paper, canvas, ink, line, alert, plus the text
+ * colours used on band and accent. Components only use these --color-* names.
+ */
+:root,
+[data-theme] {
+  /* Surfaces */
+  --color-workspace: var(--canvas);
+  --color-background: var(--paper);
+  --color-surface: var(--paper);
+  --color-surface-muted: color-mix(in srgb, var(--ink) 7%, var(--paper));
+  --color-overlay: color-mix(in srgb, var(--canvas) 55%, transparent);
+
+  /* Text and lines */
+  --color-text: var(--ink);
+  --color-text-muted: color-mix(in srgb, var(--ink) 68%, var(--paper));
+  --color-text-inverse: var(--paper);
+  --color-border: var(--line);
+  --color-border-strong: color-mix(in srgb, var(--ink) 35%, var(--line));
+
+  /* App band: title bar, side pane, main buttons */
+  --color-band: var(--band);
+  --color-band-hover: color-mix(in srgb, var(--on-band) 12%, var(--band));
+  --color-band-active: color-mix(in srgb, black 18%, var(--band));
+  --color-on-band: var(--on-band);
+
+  /* Accent: links, focus, selection, checkboxes, progress */
+  --color-primary: var(--accent);
+  --color-primary-hover: var(--accent);
+  --color-primary-soft: color-mix(in srgb, var(--accent) 16%, var(--paper));
+  --color-on-primary: var(--on-accent);
+  --color-link: var(--accent);
+  --color-link-hover: var(--accent);
+
+  /* Status: accent for "good / note", alert for errors */
+  --color-success: var(--accent);
+  --color-warning: var(--accent);
+  --color-danger: var(--alert);
+
+  --shadow-sm: none;
+}

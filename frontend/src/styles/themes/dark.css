@@ -1,28 +1,19 @@
 /*
  * Dark theme: gold on charcoal (the owner's template colours).
- * Also the default before a theme is applied.
+ * Also the default before a theme is applied. Only base colours here;
+ * everything else is derived in ../palette.css.
  */
 :root,
 [data-theme="dark"] {
   color-scheme: dark;
-  --color-background: #10100f;
-  --color-surface: #1d1c18;
-  --color-surface-muted: #29261e;
-  --color-text: #f6f1e4;
-  --color-text-muted: #b5ad9b;
-  --color-text-inverse: #17120a;
-  --color-border: #423c30;
-  --color-border-strong: #64583f;
-  --color-primary: #dfb64f;
-  --color-primary-hover: #f0ca6d;
-  --color-primary-soft: #342b17;
-  --color-on-primary: #211806;
-  --color-link: #e6bd59;
-  --color-link-hover: #ffda86;
-  --color-success: #65d39b;
-  --color-warning: #f2c05b;
-  --color-danger: #fb8b86;
-  --color-overlay: rgb(0 0 0 / 0.6);
-  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
-  --shadow-lg: 0 12px 40px rgb(0 0 0 / 0.55);
+  --band: #2b2820;
+  --on-band: #f6f1e4;
+  --accent: #dfb64f;
+  --on-accent: #10100f;
+  --paper: #1d1c18;
+  --canvas: #10100f;
+  --ink: #f6f1e4;
+  --line: #423c30;
+  --alert: #fb8b86;
+  --shadow-lg: 0 2px 12px rgb(0 0 0 / 0.5);
 }

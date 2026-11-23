@@ -96,4 +96,11 @@ A short, summarized record of each request made to the coding agent, and what ca
 27. **Overnight small items (P21).** Checklist:
     - [x] Platform-aware troubleshooting text (service layer), with tests.
     - [x] Remove six finished, merged agent worktrees and branches.
+28. **Review guide, full reread, pruning, tests, CLI and samples.** After everything is done: a local-only, Git-ignored `docs.local/` guide summarizing everything (functions, files, use cases, API contracts, end-to-end flows with call sites, request bodies, destinations, return values and how they're used; total functions and APIs). Reread the whole repo end to end; prune functions left over from drift (testing thoroughly if anything is pruned); write tests for all appropriate files; provide a CLI way to test the software, with test documents for every function, on Windows and Linux. Checklist:
+    - [ ] Merge and verify the running Linux/API and frontend work.
+    - [ ] CLI for running every action without the window.
+    - [ ] Sample-document generator covering every function and the error cases.
+    - [ ] Dead-code review (Python and TypeScript) and pruning, with tests.
+    - [ ] Coverage review and new tests where missing.
+    - [ ] `docs.local/` review guide, including a CLI test plan for Windows and Linux.
 

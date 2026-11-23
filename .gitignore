@@ -54,3 +54,7 @@ dist/
 # Agent worktrees and local Claude Code settings
 .claude/worktrees/
 .claude/settings.local.json
+
+# Local-only review guide and generated test documents
+docs.local/
+samples/

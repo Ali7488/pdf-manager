@@ -244,6 +244,41 @@ def test_source_download_rejects_a_wrong_checksum(tmp_path):
         sources.fetch(url, out, integrity=integrity)
 
 
+def test_collector_deduplicates_license_paths(monkeypatch):
+    monkeypatch.setattr(
+        collect,
+        "runtime_python_packages",
+        lambda: {"example": ("1.0", {"windows"})},
+    )
+    monkeypatch.setattr(
+        collect,
+        "_from_installed",
+        lambda name, target: ("MIT", ["LICENSE", "LICENSE"]),
+    )
+    result = collect.python_components()
+    assert result[0].files == ["python/example-1.0/LICENSE"]
+
+
+@pytest.mark.skipif(shutil.which("uv") is None, reason="needs uv")
+def test_duplicate_manifest_license_paths_fail(monkeypatch):
+    manifest = check.load_manifest()
+    component = next(c for c in manifest["components"] if c["name"] == "pywin32")
+    component["files"].append(component["files"][0])
+    monkeypatch.setattr(check, "load_manifest", lambda: manifest)
+    assert any(
+        "duplicate licence paths" in failure for failure in _failures(check.check_repo)
+    )
+
+
+def test_cpython_source_archive_has_pinned_sha256():
+    item = check.load_manifest()["sources"]["python_runtime"]
+    assert item["url"].endswith("Python-3.13.17.tar.xz")
+    assert item["sha256"] == (
+        "6020bd10aff3bf4821be16f088ebb159"
+        "1beb7b811dcd8fab1da8f7c22a7b27e7"
+    )
+
+
 def test_every_bundled_python_package_has_a_source_location():
     manifest = check.load_manifest()
     listed = {check._norm(s["component"]) for s in manifest["sources"]["python"]}

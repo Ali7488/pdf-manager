@@ -328,7 +328,7 @@ def test_reports_progress(tmp_path):
     images = [_png(tmp_path / f"p{i}.png", 10, 10) for i in range(3)]
     events = []
     _convert(images, tmp_path, True, JobContext(progress=events.append))
-    assert {event.stage for event in events} == {Stage.PREPARING}
+    assert {event.stage for event in events} == {Stage.CONVERTING_IMAGES}
     assert events[0].message == "Adding image 1 of 3: p0.png"
     fractions = [event.fraction for event in events]
     assert fractions == sorted(fractions)

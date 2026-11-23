@@ -121,5 +121,6 @@ A short, summarized record of each request made to the coding agent, and what ca
     - [x] `LICENSING.md`, `LICENSE-AGPL-3.0.txt`, full copyleft texts, Python runtime, PyInstaller (pinned 6.22.3), Feather and WebView2 entries in the notices.
     - [x] Settings → About with the AGPL's appropriate legal notices and "Open licences folder"; footer no longer says MIT.
     - [x] Installer ships every licence file; the Windows build checks them and that no Qt is bundled.
-    - [ ] Verify on the Windows runner; compliance report in `docs.local/`.
+    - [x] Verified on the Windows runner (run 45162114777: build, silent install, licence files present, no Qt, installed app starts); compliance report in `docs.local/LICENSING_REPORT.md`.
+38. **Review guide (from item 28).** `docs.local/REVIEW_GUIDE.md` (flows, contract, inventory, totals, use cases, risks, drift, dead-code candidates, test map) and `docs.local/CLI_TEST_PLAN.md` (Windows and Linux; Linux half run). Fixed what it found: CLI number validation (`--dpi 0` crashed; `--every 0` was ignored) and documentation drift across ARCHITECTURE, PORTABILITY, ENGINEERING_REVIEW, API, README, AGENTS and docstrings. Dead-code pruning and coverage work remain for after the releases.
 

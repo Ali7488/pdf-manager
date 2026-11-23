@@ -93,4 +93,7 @@ A short, summarized record of each request made to the coding agent, and what ca
     - [ ] Run from source on Linux with the Qt backend (optional dependency, logs, OCR-install command popup).
     - [ ] CI job that starts the app on Linux in a virtual display.
 26. **Overnight decisions.** Linux Qt backend uses PySide6 (P19); MIT licence (P20, added); after Linux work continue with small open items (P21); don't run the Windows installer build workflow, and keep CI minutes low (P22). Explained how GitHub Actions minutes are counted and where to check them.
+27. **Overnight small items (P21).** Checklist:
+    - [x] Platform-aware troubleshooting text (service layer), with tests.
+    - [x] Remove six finished, merged agent worktrees and branches.
 

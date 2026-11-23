@@ -8,6 +8,7 @@ import { api as defaultApi, onEvent as defaultOnEvent } from "../api/client";
 import type { PdfManagerApi, Settings } from "../api/types";
 import { AppContext, type AppContextValue, type OcrInstallState } from "./AppContext";
 import { appReducer, initialAppState, type AppState } from "./appReducer";
+import { createSettingsSaver } from "./settingsSaver";
 
 /** Props for {@link AppProvider}. */
 export interface AppProviderProps {
@@ -24,19 +25,33 @@ export interface AppProviderProps {
  * Provides {@link AppContext} to the app.
  *
  * Settings changes are applied in memory first (so a theme switch is instant)
- * and then saved with `saveSettings`; the full settings Python returns replace
- * the local copy.
+ * and then saved with `saveSettings`, one call at a time (see
+ * `settingsSaver.ts`), so a late response from an older change can't undo a
+ * newer one. The settings Python returns replace the local copy, except for
+ * fields the user has changed again since.
  */
 export function AppProvider({ children, api = defaultApi, onEvent = defaultOnEvent, initialState }: AppProviderProps) {
   const [state, dispatch] = useReducer(appReducer, undefined, () => ({ ...initialAppState(), ...initialState }));
   const [ocrInstall, setOcrInstall] = useState<OcrInstallState>({ status: "idle", message: "", issue: null });
   const [ocrVersion, setOcrVersion] = useState(0);
 
+  const saver = useMemo(
+    () =>
+      createSettingsSaver(
+        (patch) => api.saveSettings(patch),
+        ({ settings }) => dispatch({ type: "settingsSaved", settings }),
+      ),
+    [api],
+  );
+
   // Load saved settings and app info once.
   useEffect(() => {
     let active = true;
     void api.getSettings().then((settings) => {
-      if (active) dispatch({ type: "settingsLoaded", settings });
+      // A save that has already returned carries newer settings than this load.
+      if (!active || saver.hasAnswered()) return;
+      // Keep changes the user made while the load was on its way.
+      dispatch({ type: "settingsLoaded", settings: { ...settings, ...saver.unconfirmed() } });
     });
     void api.getAppInfo().then((appInfo) => {
       if (active) dispatch({ type: "appInfoLoaded", appInfo });
@@ -44,7 +59,7 @@ export function AppProvider({ children, api = defaultApi, onEvent = defaultOnEve
     return () => {
       active = false;
     };
-  }, [api]);
+  }, [api, saver]);
 
   // Files dropped onto the window arrive from Python as filesAdded.
   useEffect(() => onEvent("filesAdded", ({ files }) => dispatch({ type: "filesAdded", files })), [onEvent]);
@@ -65,12 +80,11 @@ export function AppProvider({ children, api = defaultApi, onEvent = defaultOnEve
   }, [onEvent]);
 
   const updateSettings = useCallback(
-    async (patch: Partial<Settings>) => {
+    (patch: Partial<Settings>) => {
       dispatch({ type: "settingsPatched", patch });
-      const saved = await api.saveSettings(patch);
-      dispatch({ type: "settingsLoaded", settings: saved.settings });
+      return saver.save(patch);
     },
-    [api],
+    [saver],
   );
 
   const startOcrInstall = useCallback(async () => {

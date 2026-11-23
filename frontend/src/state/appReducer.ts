@@ -42,6 +42,8 @@ export type AppEvent =
   | { type: "fileMoved"; fromPath: string; toPath: string }
   | { type: "settingsLoaded"; settings: Settings }
   | { type: "settingsPatched"; patch: Partial<Settings> }
+  /** A save finished; `settings` is null when the call failed and local values stay. */
+  | { type: "settingsSaved"; settings: Settings | null }
   | { type: "appInfoLoaded"; appInfo: AppInfo }
   | { type: "actionSettingsChanged"; action: Action; patch: Partial<ActionSettings> }
   | { type: "saveToDefaultChanged"; action: Action; value: boolean };
@@ -104,6 +106,8 @@ export function appReducer(state: AppState, event: AppEvent): AppState {
       return { ...state, settings: event.settings, settingsLoaded: true };
     case "settingsPatched":
       return { ...state, settings: { ...state.settings, ...event.patch } };
+    case "settingsSaved":
+      return event.settings ? { ...state, settings: event.settings, settingsLoaded: true } : state;
     case "appInfoLoaded":
       return { ...state, appInfo: event.appInfo };
     case "actionSettingsChanged":

@@ -35,5 +35,6 @@ A short, summarized record of each request made to the coding agent, and what ca
     - [x] Present the full plan and open questions; wait for confirmation before starting.
 14. **Answers to the frontend questions.** Per-user, unsigned installer with a simple install wizard. pywebview shell confirmed. Split saves each range as its own file, optionally zipped. v1 adds Images to PDF and Compress PDF; Word export comes later as an optional add-on. "Use OCR" is unchecked by default and also offered for Merge and Split. The tool-check modal runs on every Convert and checks only what the job needs. Navigation option C with one sidebar tab per mode. Bundle IBM Plex Sans, use dnd-kit, Vitest + React Testing Library, four colour schemes, a (?) tooltip next to anything that needs explaining, save to the default folder without asking when enabled, and delete Tkinter once the new app works. Checklist:
     - [x] Record all answers in `docs/DECISIONS.md` and list the remaining open questions.
-    - [ ] Get answers to the open questions (O1 to O8) and final confirmation of the plan.
+    - [x] Get answers to the open questions (O1 to O8); recorded as F26 to F33.
+    - [ ] Final confirmation of the plan before starting work.
 

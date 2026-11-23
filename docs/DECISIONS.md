@@ -103,6 +103,7 @@ Decisions made by the project owner, in their own direction (summarized, not quo
 | F40 | 2026-11-23 | **Classic desktop look**, after 2016-era Microsoft Office software but with our own colour schemes: a band-coloured side pane with the app name (like Office's File menu), one plain page, sections marked by a heading and thin rule (no boxes), flat compact controls, almost square corners, no shadows, minimal animation. Supersedes the rounded, modern look in F7. |
 | F41 | 2026-11-23 | **Few colours per scheme:** each theme defines only base colours (band, accent, paper, canvas, ink, line, alert, and text on band/accent); every other shade is derived from them. |
 | F42 | 2026-11-23 | **Font:** Segoe UI (what Office used) where Windows already provides it, since it's proprietary and can't be bundled; otherwise bundled **Open Sans** (OFL), the closest freely licensed match (same designer). All text weights one step heavier (500 body, 600 emphasis). Supersedes IBM Plex Sans in F6. |
+| F43 | 2026-11-23 | **Three tones per scheme, high contrast, complementary** (refines F41): base, text, accent. Dark: near-black and gold (warm white text). Light: white and gold (near-black text). Burgundy: burgundy and bright pink (white text). Green: forest green and coral (cream text). The accent is the side pane, main buttons and lines; hovers are tints of the same tones. **Buttons have soft rounded corners (6px); borders are 2px.** |
 
 ## Open questions
 

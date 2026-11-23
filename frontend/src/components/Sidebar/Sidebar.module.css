@@ -27,7 +27,7 @@
 
 .logo {
   display: inline-flex;
-  color: var(--color-on-band);
+  color: var(--color-primary);
 }
 
 .list {
@@ -73,7 +73,7 @@
 
 .current,
 .current:hover {
-  border-left-color: var(--color-on-band);
+  border-left-color: var(--color-primary);
   background: var(--color-band-active);
   opacity: 1;
 }

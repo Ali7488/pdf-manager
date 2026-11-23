@@ -33,19 +33,19 @@
   font-size: var(--text-md);
 }
 
-/* Main actions use the app band colour, like an office suite's default button. */
+/* Main actions use the accent colour. */
 .primary {
-  background: var(--color-band);
-  border-color: var(--color-band-active);
-  color: var(--color-on-band);
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
 }
 
 .primary:hover:not(:disabled) {
-  background: var(--color-band-hover);
+  background: color-mix(in srgb, var(--color-text) 12%, var(--color-primary));
 }
 
 .primary:active:not(:disabled) {
-  background: var(--color-band-active);
+  background: color-mix(in srgb, var(--color-background) 15%, var(--color-primary));
 }
 
 .secondary {

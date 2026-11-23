@@ -149,7 +149,7 @@
       {
         "component": "pywin32",
         "version": "312",
-        "url": "https://github.com/mhammond/pywin32/archive/refs/tags/b312.tar.gz",
+        "url": "https://github.com/mhammond/pywin32/archive/2a277cb5552756c2b4d42b524dc36d25e0bb6354.tar.gz",
         "sha256": "",
         "platforms": [
           "windows"

@@ -74,3 +74,17 @@ A short, summarized record of each request made to the coding agent, and what ca
     - [x] Restructure `converter/` into subpackages (the API-layer branch's imports still need updating when it's merged).
 23. **Frontend agent's contract proposals** (engineering follow-up, no new owner request). Adopted: `pickFiles("all")`, `getOcrStatus()`, a `converting_images` stage, and `discardResults` being safe to call twice. Logged as open questions for the owner: O11 (contents page / page numbering in Settings) and O12 (several OCR languages).
 
+## 2026-11-23
+
+24. **Add CI, and fix the post-merge audit findings** (R1–R10 in `docs/ENGINEERING_REVIEW.md`, from the owner's read-only source audit). Checklist:
+    - [ ] R1: stop stripping Mark-of-the-Web; apply an owner-chosen policy for untrusted presentations.
+    - [ ] R2: only kill a PowerPoint process proven to belong to this conversion.
+    - [ ] R3: isolate PowerPoint and LibreOffice outputs so a leftover file can't be mistaken for a result.
+    - [ ] R4: coordinate save, discard and shutdown in the job manager.
+    - [ ] R5: settings updates can't be overwritten by an older response.
+    - [ ] R6: a failed settings save is reported to the UI.
+    - [ ] R7: automatic CI for Python and frontend on push and pull requests, separate from the manual Windows packaging job.
+    - [ ] R8: remove the transitional import fallback in `api/service.py`.
+    - [ ] R9: update `ARCHITECTURE.md`, `SOURCE_INVENTORY.md` and `PORTABILITY.md` against the merged code, with real test counts.
+    - [ ] R10: needs a real Windows 11 machine; can't be closed from Linux.
+

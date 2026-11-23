@@ -23,6 +23,9 @@ Decisions made by the project owner, in their own direction (summarized, not quo
 | P16 | 2026-11-22 | **Documentation for a post-build review:** keep accurate, proportional docs tied to the actual code: architecture decisions, dependencies, execution flows, non-obvious choices, significant bugs, tests and CI. The owner must be able to understand, debug, modify and defend the app independently. No excessive docs, and never claim generated code was reviewed when it wasn't. |
 | P17 | 2026-11-23 | **Linux now (run from source):** refactor the API layer's platform-specific code into `api/platforms/` (Windows and Linux) and make the app run from source on Linux now. Still no Linux packages. |
 | P18 | 2026-11-23 | **"Qt, then GNOME" (was O9)** means pywebview **window backends**, not separate native UIs: one React UI everywhere; Qt backend first (fits KDE), then GTK/WebKitGTK (fits GNOME). |
+| P19 | 2026-11-23 | **Linux Qt backend uses PySide6** (LGPL, via `pywebview[pyside6]`), not PyQt6 (GPL), so no licence is forced on PDF Manager. |
+| P20 | 2026-11-23 | **Licence: MIT.** |
+| P21 | 2026-11-23 | After the Linux work, continue overnight with small open items that need no new decisions (platform-aware troubleshooting text, cleaning up merged agent worktrees and branches). |
 
 ## Converter (Python backend)
 

@@ -1,102 +1,129 @@
-"""Flattening PDF pages to images and adding a searchable Tesseract OCR text layer."""
+"""Flattening: turning every page into a single image, optionally with a searchable OCR layer."""
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import fitz
 
-from .common import DPI, Progress
-from .tools import require_tesseract, run_command
+from .bookmarks import read_bookmarks, set_bookmarks
+from .common import Stage
+from .context import JobContext
+from .issues import (
+    ConversionError,
+    empty_pdf,
+    flatten_check_failed,
+    password_protected,
+    unreadable_file,
+)
+from .ocr import ocr_image_to_pdf, render_page, require_ocr
+
+log = logging.getLogger(__name__)
 
 
-def flatten_searchable(
-    source: Path,
-    target: Path,
-    work: Path,
-    report: Progress,
-    engine: str | Path | None = None,
-    dpi: int = DPI,
-) -> None:
-    """Turn a PDF into an image-only PDF that is still searchable.
+def flatten_pdf(source: Path, target: Path, work: Path, ctx: JobContext, file_label: str) -> None:
+    """Turn a PDF into one where every page is a single image.
 
-    This is the core "Flatten" feature. Each page goes through three steps:
+    This is the core "Flatten" feature: layers, fonts, form fields and
+    annotations are all drawn into one picture per page, which apps that
+    struggle with complex PDFs (such as some tablet note-taking apps) open
+    reliably. Each page goes through:
 
-    1. **Render**: draw the page (text, vector graphics, annotations,
-       everything visible) to a single RGB image at ``dpi``. This removes the
-       layers, fonts and form fields that some PDF apps struggle with.
-    2. **OCR**: run Tesseract on the image. With the ``pdf`` output option,
-       Tesseract writes a one-page PDF holding the image plus an invisible text
-       layer positioned over the words, so the text can be searched and
-       selected.
-    3. **Assemble**: place that OCR page into the output at the original
-       page's size.
+    1. **Render** the page at ``settings.dpi``.
+    2. **OCR** (only if ``settings.use_ocr``): Tesseract writes a one-page PDF
+       holding the image plus an invisible text layer, so the text can still be
+       searched and copied. Without OCR the image is placed on the page as is.
+    3. **Assemble** the new page at the original page's size.
 
-    Afterwards the output is checked for page images.
+    Bookmarks are copied over (pages keep their numbers). The result must pass
+    a strict check: same page count as the input, and every page image-backed.
 
     Args:
         source: PDF to flatten. It is only read, never modified.
         target: Where to save the flattened PDF.
-        work: Scratch folder for the per-page images and OCR PDFs.
-        report: Progress callback; called once per page.
-        engine: Optional user-chosen path to ``tesseract.exe``.
-        dpi: Render resolution. Note: :func:`converter.pipeline.process_files`
-            doesn't pass this, so it is currently always :data:`DPI`.
+        work: Scratch folder for page images and OCR output.
+        ctx: Job context (settings, progress, cancel).
+        file_label: Input file name, for messages.
 
     Raises:
-        RuntimeError: Tesseract is missing or failed on a page, or the output
-            has no page images.
-        ValueError: The PDF is password-protected or has no pages.
-        subprocess.TimeoutExpired: Tesseract took over 5 minutes on one page.
+        ConversionError: Unreadable, password-protected or empty input; OCR
+            missing, failing or timing out; or the final check failed.
+        Cancelled: The user cancelled.
     """
-    tess = require_tesseract(engine)
+    use_ocr = ctx.settings.use_ocr
+    tesseract = require_ocr(ctx) if use_ocr else None
     work.mkdir(parents=True, exist_ok=True)
-    with fitz.open(str(source)) as original:
+    try:
+        original = fitz.open(str(source))
+    except Exception as exc:
+        raise ConversionError(unreadable_file(file_label, str(exc))) from exc
+    with original:
         if original.needs_pass:
-            raise ValueError("Password-protected PDFs are not supported.")
-        if len(original) == 0:
-            raise ValueError("PDF has no pages.")
+            raise ConversionError(password_protected(file_label))
+        count = len(original)
+        if count == 0:
+            raise ConversionError(empty_pdf(file_label))
         with fitz.open() as finished:
-            for page_no, page in enumerate(original, 1):
-                report(f"Flattening and OCR: page {page_no} / {len(original)}")
-                # 1. Render. PDF units are 1/72 inch, so scale by dpi / 72.
-                # No alpha channel: the page is drawn onto a white background.
-                pix = page.get_pixmap(
-                    matrix=fitz.Matrix(dpi / 72, dpi / 72), colorspace=fitz.csRGB, alpha=False
-                )
-                img = work / f"page_{page_no:05d}.png"
-                pix.save(str(img))
-                # 2. OCR. Tesseract appends ".pdf" to the output base name.
-                # "--dpi" tells it the image resolution so the PDF page gets the
-                # right physical size; "-l eng" selects English.
-                ocr_base = work / f"ocr_{page_no:05d}"
-                proc = run_command(
-                    [str(tess), str(img), str(ocr_base), "-l", "eng", "--dpi", str(dpi), "pdf"],
-                    timeout=300,
-                )
-                if proc.returncode:
-                    raise RuntimeError(f"OCR failed on page {page_no}: {proc.stderr.strip()[:400]}")
-                ocr_pdf = Path(str(ocr_base) + ".pdf")
-                if not ocr_pdf.is_file():
-                    raise RuntimeError(f"OCR did not generate a PDF for page {page_no}.")
-                # 3. Assemble. Stamp the OCR page (image + invisible text) onto
-                # a new page with the original dimensions, stretched to fill it
-                # exactly so the text layer stays aligned with the image.
-                with fitz.open(str(ocr_pdf)) as scanned:
-                    output = finished.new_page(width=page.rect.width, height=page.rect.height)
-                    output.show_pdf_page(output.rect, scanned, 0, keep_proportion=False)
-                # Intentionally keep page images and OCR PDFs in the dedicated
-                # scratch folder until the *entire* finished document is saved
-                # and closed. Immediate unlink can raise WinError 32 on Windows
-                # because the OCR PDF may still be locked by a PDF renderer or
-                # real-time scanner. The app cleans scratch only after final
-                # results have been copied to the user-selected save folder.
-            # garbage=4 removes unused and duplicate objects; deflate compresses
-            # streams. Both keep the output file small.
+            for index, page in enumerate(original):
+                ctx.check_cancel()
+                number = index + 1
+                verb = "Flattening and reading text" if use_ocr else "Flattening"
+                stage = Stage.OCR if use_ocr else Stage.FLATTENING
+                ctx.report(stage, f"{verb}: page {number} of {count}", number, count)
+                # 1. Render (rotation is baked into the image, so the new page
+                #    uses the page's displayed size and needs no rotation).
+                image = render_page(page, ctx.settings.dpi, work / f"page_{number:05d}.png")
+                output = finished.new_page(width=page.rect.width, height=page.rect.height)
+                if tesseract is not None:
+                    # 2. OCR, then 3. stamp the OCR page (image + invisible text)
+                    #    stretched to fill the page exactly so the text stays aligned.
+                    ocr_pdf = ocr_image_to_pdf(
+                        tesseract,
+                        image,
+                        work / f"ocr_{number:05d}",
+                        ctx,
+                        file_label=file_label,
+                        page_number=number,
+                    )
+                    with fitz.open(str(ocr_pdf)) as scanned:
+                        output.show_pdf_page(output.rect, scanned, 0, keep_proportion=False)
+                else:
+                    output.insert_image(output.rect, filename=str(image), keep_proportion=False)
+                # Page images and OCR PDFs stay in the scratch folder until the
+                # whole job is finished. Deleting them immediately can fail on
+                # Windows (WinError 32) because a PDF renderer or a real-time
+                # virus scanner may still hold them open. The API layer deletes
+                # the scratch folder after the results are saved or discarded.
+            set_bookmarks(finished, read_bookmarks(original))
+            # garbage=4 removes unused and duplicate objects; deflate compresses streams.
             finished.save(str(target), garbage=4, deflate=True)
 
-    # Sanity check. Note: this passes if *any* page has an image, so it would
-    # not catch a single page that failed to flatten.
-    with fitz.open(str(target)) as check:
-        if not any(page.get_images() for page in check):
-            raise RuntimeError("Flattening failed: no image-backed pages found.")
+    verify_flattened(target, count, file_label)
+
+
+def verify_flattened(path: Path, expected_pages: int, file_label: str) -> None:
+    """Strict final check: the page count matches and every page has an image.
+
+    Raises:
+        ConversionError: ``FLATTEN_CHECK_FAILED`` describing what's wrong.
+    """
+    with fitz.open(str(path)) as check:
+        if len(check) != expected_pages:
+            details = f"Expected {expected_pages} pages, found {len(check)}."
+            raise ConversionError(flatten_check_failed(file_label, details))
+        missing = [i + 1 for i, page in enumerate(check) if not page.get_images()]
+        if missing:
+            details = "Pages without an image: " + ", ".join(map(str, missing[:20]))
+            raise ConversionError(flatten_check_failed(file_label, details))
+    log.debug("Flatten check passed for %s (%d pages)", file_label, expected_pages)
+
+
+def flatten_searchable(source, target, work, report, engine=None, dpi=None) -> None:
+    """Legacy wrapper for the old pipeline and Tkinter app; removed once they're migrated."""
+    from .common import ActionSettings
+
+    settings = ActionSettings(use_ocr=True, tesseract_path=engine)
+    if dpi:
+        settings.dpi = dpi
+    flatten_pdf(Path(source), Path(target), Path(work), JobContext(settings), Path(source).name)

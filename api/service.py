@@ -45,6 +45,7 @@ from converter.core.types import (
     SplitSettings,
     Stage,
 )
-from converter.files import FileInfo, FileKind, inspect_file, safe_destination
+from converter.files import FileInfo, FileKind, file_kind, inspect_file, safe_destination
+from converter.platforms import mark_untrusted
 from converter.tools import find_tesseract, run_command, tesseract_languages
 from converter.tools.check import ToolCheck, ToolStatus, check_tools

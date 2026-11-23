@@ -47,6 +47,8 @@ Browser mode only (``api.web``):
         Edge, Chrome, Brave or Chromium.
     open_url(url) -> None
         Open a URL with the system's handler (a normal tab).
+    start_browser(command) -> None
+        Start a browser command (app mode), detached from the app.
     dialogs_available() -> bool
         Whether native file and folder pickers can be shown.
     ask_files(filters, multiple) -> list[Path]
@@ -59,6 +61,8 @@ from __future__ import annotations
 
 import os
 import sys
+
+from ._common import DefaultBrowser
 
 if os.name == "nt":
     from .windows import (
@@ -76,6 +80,7 @@ if os.name == "nt":
         program_filters,
         run_ocr_install,
         settings_dir,
+        start_browser,
         tesseract_file_name,
     )
 elif sys.platform == "darwin":
@@ -94,6 +99,7 @@ elif sys.platform == "darwin":
         program_filters,
         run_ocr_install,
         settings_dir,
+        start_browser,
         tesseract_file_name,
     )
 else:
@@ -112,10 +118,13 @@ else:
         program_filters,
         run_ocr_install,
         settings_dir,
+        start_browser,
         tesseract_file_name,
     )
 
 __all__ = [
+    "start_browser",
+    "DefaultBrowser",
     "ask_files",
     "ask_folder",
     "default_browser",

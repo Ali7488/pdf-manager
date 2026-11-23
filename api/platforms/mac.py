@@ -94,6 +94,22 @@ def default_browser() -> DefaultBrowser:
     return DefaultBrowser("unknown (macOS)")
 
 
+def start_browser(command: list[str]) -> None:
+    """Start the browser for browser mode, detached from this app.
+
+    Raises:
+        OSError: It couldn't be started.
+    """
+    subprocess.Popen(
+        command,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        close_fds=True,
+        start_new_session=True,
+    )
+
+
 def open_url(url: str) -> None:
     """Open a URL with ``open``."""
     subprocess.Popen(["open", url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

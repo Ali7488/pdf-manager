@@ -304,7 +304,14 @@ def test_mac_fallback(monkeypatch, tmp_path):
 
 @pytest.mark.parametrize("module", MODULES)
 def test_every_platform_offers_the_browser_mode_functions(module):
-    for name in ("default_browser", "open_url", "dialogs_available", "ask_files", "ask_folder"):
+    for name in (
+        "default_browser",
+        "open_url",
+        "start_browser",
+        "dialogs_available",
+        "ask_files",
+        "ask_folder",
+    ):
         assert callable(getattr(module, name))
 
 

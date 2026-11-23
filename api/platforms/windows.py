@@ -216,6 +216,22 @@ def default_browser() -> DefaultBrowser:
     return DefaultBrowser(APP_MODE_BROWSERS[browser], (exe,))
 
 
+def start_browser(command: list[str]) -> None:
+    """Start the browser for browser mode, detached from this app.
+
+    Raises:
+        OSError: It couldn't be started.
+    """
+    subprocess.Popen(
+        command,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        close_fds=True,
+        creationflags=subprocess.DETACHED_PROCESS,
+    )
+
+
 def open_url(url: str) -> None:
     """Open a URL with the system's default handler (a normal browser tab).
 

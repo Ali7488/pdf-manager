@@ -1,5 +1,7 @@
 # Source inventory
 
+> **Historical record.** This file describes the v1.1.1 baseline as it was imported on 2026-11-22, for provenance. None of the files listed below exist in this form any more: the converter was rewritten as the `converter/` package, and the Tkinter `app.py`, `INSTALL.bat`, `OPEN.bat`, `install_windows.ps1` and the old test scripts were removed. For the current layout see `README.md` and `docs/ARCHITECTURE.md`.
+
 Active tracked baseline: v1.1.1 app/converter and lock regression; v1.1.0 dependencies/integration tests/icon; v1.0 installer/launchers.
 
 Original source: a private source repository and its locally generated release artifacts. This bundle is a controlled local import, NOT a GitHub release.
@@ -21,4 +23,4 @@ These hashes describe the baseline at import time. Files have changed since.
 
 Original release sources remain under `.migration/v1.0.0`, `.migration/v1.1.0`, `.migration/v1.1.1`, ignored by Git.
 
-This repository contains **no imported user PDFs/PPTXs**, no secrets, no remote Git URL.
+The import contained **no user PDFs/PPTXs** and no secrets. (The repository now has a private GitHub remote, `Ali7488/pdf-manager`.)

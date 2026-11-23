@@ -32,6 +32,7 @@ PDF Manager ships first on **Windows 11** (v1). The same code base must later su
 | `tesseract_candidates()` | Program Files / LocalAppData folders and installer registry entries. | None beyond `PATH` (packages install to `/usr/bin`). |
 | `libreoffice_candidates()` | Program Files / LocalAppData folders. | None beyond `PATH` (`soffice`, `libreoffice`). |
 | `powerpoint_installed()` / `powerpoint_path()` | Registry checks for PowerPoint's automation class and executable. | Always `False` / `None`. |
+| `is_untrusted(path)` / `copy_with_provenance(src, dst)` | Read the Mark-of-the-Web zone; copy a file with its `Zone.Identifier` stream (never strip it, audit R1). | Always `False`; plain copy. |
 | `export_slides_with_powerpoint` | The optional COM-based renderer (`windows_powerpoint.py`). | `None`: LibreOffice renders slides. |
 
 The service layer's public functions (`find_tesseract`, `find_libreoffice`, `run_command`, `powerpoint_installed` and so on in `converter/tools/`) stay the same on every platform.
@@ -63,7 +64,6 @@ To be done in a later release; not implemented now.
 
 | Where | What | Plan |
 | --- | --- | --- |
-| `app.py`, `INSTALL.bat`, `OPEN.bat`, `install_windows.ps1` | Old Tkinter app and Windows-only installer scripts | Delete once the new app works (F25); the new installer is under `packaging/`. |
 | `converter/core/issues.py` | Troubleshooting text mentions Windows-only fixes (default printer, Windows download page) | Make platform-aware before the Linux release. |
-| `api/` (in progress) | Opening folders, OCR install via winget, settings path | Move behind an API-layer platform module when the branch is merged. |
-| `packaging/` (in progress) | Windows installer (PyInstaller + Inno Setup) | Windows only by design; Linux packaging is separate future work. |
+| `api/bridge.py`, `api/paths.py` | Opening folders (`os.startfile` / `xdg-open`), OCR install via winget, picker filters and the settings path are gated by `paths.on_windows()` checks inside these modules | Move behind one API-layer platform module (P15); tracked in `ENGINEERING_REVIEW.md`. |
+| `packaging/` | Windows installer (PyInstaller + Inno Setup) | Windows only by design; Linux packaging is separate future work. |

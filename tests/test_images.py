@@ -1,4 +1,4 @@
-"""Tests for converter.images: PNG/JPG to PDF, order, naming, page size and EXIF orientation."""
+"""Tests for converter.actions.images: images to PDF, order, naming, page size, EXIF."""
 
 from __future__ import annotations
 
@@ -8,10 +8,10 @@ from pathlib import Path
 import fitz
 import pytest
 
-from converter.common import Stage
-from converter.context import JobContext
-from converter.images import MAX_PAGE_SIDE_PT, images_to_pdf
-from converter.issues import Cancelled, ConversionError, IssueCode
+from converter.actions.images import MAX_PAGE_SIDE_PT, images_to_pdf
+from converter.core.context import JobContext
+from converter.core.issues import Cancelled, ConversionError, IssueCode
+from converter.core.types import Stage
 
 RED = (255, 0, 0)
 BLUE = (0, 0, 255)

@@ -1,4 +1,4 @@
-"""Tests for converter.compress: the three levels, never growing a file, and what is kept."""
+"""Tests for converter.actions.compress: the levels, never growing a file, what is kept."""
 
 from __future__ import annotations
 
@@ -8,10 +8,10 @@ from pathlib import Path
 import fitz
 import pytest
 
-from converter.common import CompressLevel, Stage
-from converter.compress import LEVEL_IMAGES, compress_pdf
-from converter.context import JobContext
-from converter.issues import Cancelled, ConversionError, IssueCode
+from converter.actions.compress import LEVEL_IMAGES, compress_pdf
+from converter.core.context import JobContext
+from converter.core.issues import Cancelled, ConversionError, IssueCode
+from converter.core.types import CompressLevel, Stage
 
 SAMPLE_TEXT = "Sample text for searching"
 

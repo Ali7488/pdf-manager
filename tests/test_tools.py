@@ -9,8 +9,8 @@ import time
 
 import pytest
 
-from converter.context import CancelToken
-from converter.issues import Cancelled
+from converter.core.context import CancelToken
+from converter.core.issues import Cancelled
 from converter.platforms.windows import exe_from_registry_value
 from converter.tools import run_command
 

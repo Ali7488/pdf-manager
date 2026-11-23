@@ -140,7 +140,7 @@ def test_wrong_file_type_for_action(tmp_path, inputs):
 
 
 def test_missing_ocr_stops_before_any_work(tmp_path, inputs, monkeypatch):
-    monkeypatch.setattr("converter.ocr.find_tesseract", lambda configured=None: None)
+    monkeypatch.setattr("converter.ocr.tesseract.find_tesseract", lambda configured=None: None)
     with pytest.raises(ConversionError) as err:
         run(Action.FLATTEN, [inputs[0]], tmp_path, "w", use_ocr=True)
     assert err.value.issue.code is IssueCode.OCR_MISSING

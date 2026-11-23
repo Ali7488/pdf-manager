@@ -5,9 +5,9 @@ from __future__ import annotations
 import fitz
 import pytest
 
-from converter.context import JobContext
-from converter.issues import ConversionError, IssueCode
-from converter.merge import Part, merge_documents
+from converter.actions.merge import Part, merge_documents
+from converter.core.context import JobContext
+from converter.core.issues import ConversionError, IssueCode
 from tests.helpers import page_texts, text_pdf
 
 

@@ -7,10 +7,10 @@ import shutil
 import fitz
 import pytest
 
-from converter.common import ActionSettings
-from converter.context import JobContext
-from converter.flatten import flatten_pdf, verify_flattened
-from converter.issues import ConversionError, IssueCode
+from converter.actions.flatten import flatten_pdf, verify_flattened
+from converter.core.context import JobContext
+from converter.core.issues import ConversionError, IssueCode
+from converter.core.types import ActionSettings
 from tests.helpers import page_texts, text_pdf
 
 needs_tesseract = pytest.mark.skipif(

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import fitz
 
-from converter.bookmarks import normalize_toc, read_bookmarks, set_bookmarks
+from converter.pdf.bookmarks import normalize_toc, read_bookmarks, set_bookmarks
 
 
 def test_normalize_fixes_levels_and_drops_bad_pages():

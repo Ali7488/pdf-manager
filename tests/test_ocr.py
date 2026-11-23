@@ -7,9 +7,9 @@ import shutil
 import fitz
 import pytest
 
-from converter.common import ActionSettings
-from converter.context import JobContext
-from converter.issues import ConversionError, IssueCode
+from converter.core.context import JobContext
+from converter.core.issues import ConversionError, IssueCode
+from converter.core.types import ActionSettings
 from converter.ocr import add_text_layer
 from tests.helpers import page_texts, scanned_pdf, text_pdf
 
@@ -50,7 +50,7 @@ def test_text_layer_lines_up_on_rotated_page(tmp_path):
 
 
 def test_missing_tesseract_is_a_clear_issue(tmp_path, monkeypatch):
-    monkeypatch.setattr("converter.ocr.find_tesseract", lambda configured=None: None)
+    monkeypatch.setattr("converter.ocr.tesseract.find_tesseract", lambda configured=None: None)
     src = scanned_pdf(tmp_path / "scan.pdf", ["x"])
     with pytest.raises(ConversionError) as err:
         add_text_layer(

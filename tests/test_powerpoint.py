@@ -15,10 +15,10 @@ import pytest
 from pptx import Presentation
 
 from converter import platforms
-from converter.context import CancelToken, JobContext
-from converter.issues import Cancelled, ConversionError, IssueCode
+from converter.core.context import CancelToken, JobContext
+from converter.core.issues import Cancelled, ConversionError, IssueCode
 from converter.platforms import windows_powerpoint
-from converter.powerpoint import copy_for_rendering, render_slides
+from converter.slides.render import copy_for_rendering, render_slides
 
 needs_libreoffice = pytest.mark.skipif(
     not (shutil.which("soffice") or shutil.which("libreoffice")), reason="LibreOffice not installed"
@@ -76,7 +76,7 @@ def test_powerpoint_failure_falls_back_with_real_error(tmp_path, pptx, monkeypat
 
 def test_both_renderers_failing_reports_both(tmp_path, pptx, monkeypatch):
     use_fake_powerpoint(monkeypatch, lambda *_: (_ for _ in ()).throw(RuntimeError("PP broke")))
-    monkeypatch.setattr("converter.powerpoint.find_libreoffice", lambda: None)
+    monkeypatch.setattr("converter.slides.render.find_libreoffice", lambda: None)
     with pytest.raises(ConversionError) as err:
         render_slides(pptx, tmp_path / "w", JobContext(), "Deck.pptx")
     assert err.value.issue.code is IssueCode.POWERPOINT_CONVERSION_FAILED
@@ -85,7 +85,7 @@ def test_both_renderers_failing_reports_both(tmp_path, pptx, monkeypatch):
 
 def test_no_renderer_at_all(tmp_path, pptx, monkeypatch):
     monkeypatch.setattr(platforms, "export_slides_with_powerpoint", None)
-    monkeypatch.setattr("converter.powerpoint.find_libreoffice", lambda: None)
+    monkeypatch.setattr("converter.slides.render.find_libreoffice", lambda: None)
     with pytest.raises(ConversionError) as err:
         render_slides(pptx, tmp_path / "w", JobContext(), "Deck.pptx")
     assert err.value.issue.code is IssueCode.SLIDE_RENDERER_MISSING

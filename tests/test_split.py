@@ -1,4 +1,4 @@
-"""Tests for converter.split: range parsing, split planning and writing the parts."""
+"""Tests for converter.actions.split: range parsing, split planning and writing the parts."""
 
 from __future__ import annotations
 
@@ -7,10 +7,10 @@ from pathlib import Path
 import fitz
 import pytest
 
-from converter.common import SplitMethod, SplitSettings, Stage
-from converter.context import JobContext
-from converter.issues import Cancelled, ConversionError, IssueCode
-from converter.split import _fix_toc_levels, parse_page_ranges, plan_split, split_pdf
+from converter.actions.split import _fix_toc_levels, parse_page_ranges, plan_split, split_pdf
+from converter.core.context import JobContext
+from converter.core.issues import Cancelled, ConversionError, IssueCode
+from converter.core.types import SplitMethod, SplitSettings, Stage
 
 
 def _reason(text: str, page_count: int = 10) -> str:

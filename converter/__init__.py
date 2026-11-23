@@ -10,7 +10,7 @@ How a job flows (see ``docs/ARCHITECTURE.md`` for the full picture):
    is the single entry point (decision F34). It validates the inputs and, if
    "Use OCR" is on, that Tesseract is installed.
 2. Each input becomes a PDF: PDFs are used as they are; PowerPoint files are
-   rendered by Microsoft PowerPoint when available (Windows) or LibreOffice.
+   rendered by LibreOffice Impress (decision C17).
 3. The action runs: flatten (optionally with OCR), merge (bookmarks, optional
    contents page, page labels), split, images to PDF, or compress. OCR on
    non-flatten actions only adds a text layer to pages that have no text.
@@ -43,7 +43,7 @@ from .core.types import (
     Stage,
 )
 from .files import FileInfo, FileKind, inspect_file, safe_destination
-from .tools import find_libreoffice, find_powerpoint, find_tesseract, tesseract_languages
+from .tools import find_libreoffice, find_tesseract, tesseract_languages
 from .tools.check import ToolCheck, ToolStatus, check_tools
 
 __all__ = [
@@ -75,7 +75,6 @@ __all__ = [
     "ToolStatus",
     "check_tools",
     "find_libreoffice",
-    "find_powerpoint",
     "find_tesseract",
     "inspect_file",
     "run_action",

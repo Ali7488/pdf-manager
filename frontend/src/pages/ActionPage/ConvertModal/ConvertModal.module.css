@@ -53,8 +53,7 @@
   transition: color var(--duration-normal) var(--ease-standard);
 }
 
-.checking,
-.notNeeded {
+.checking {
   color: var(--color-text-muted);
 }
 

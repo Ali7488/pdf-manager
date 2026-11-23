@@ -17,7 +17,7 @@ export interface ToolRowsProps {
   check: ToolCheckResult | null;
 }
 
-type RowState = "checking" | "found" | "missing" | "notNeeded";
+type RowState = "checking" | "found" | "missing";
 
 interface Row {
   name: string;
@@ -29,7 +29,7 @@ interface Row {
 function buildRows({ needsOcr, hasSlides, check }: ToolRowsProps): Row[] {
   const rows: Row[] = [];
   const showOcr = check ? check.ocr.required : needsOcr;
-  const showSlides = hasSlides || Boolean(check && (check.powerpoint.required || check.libreoffice.required));
+  const showSlides = hasSlides || Boolean(check?.libreoffice.required);
 
   if (showOcr) {
     rows.push(
@@ -40,27 +40,15 @@ function buildRows({ needsOcr, hasSlides, check }: ToolRowsProps): Row[] {
           : { name: "OCR (text recognition)", state: "missing", text: "Missing" },
     );
   }
+  // PowerPoint files are converted by LibreOffice Impress only (decision C17).
   if (showSlides) {
-    if (!check) {
-      rows.push({ name: "Microsoft PowerPoint", state: "checking", text: "Checking" });
-      rows.push({ name: "LibreOffice", state: "checking", text: "Checking" });
-    } else {
-      const { powerpoint, libreoffice } = check;
-      rows.push(
-        powerpoint.present
-          ? { name: "Microsoft PowerPoint", state: "found", text: "Found" }
-          : libreoffice.present
-            ? { name: "Microsoft PowerPoint", state: "notNeeded", text: "Not present (LibreOffice will be used)" }
-            : { name: "Microsoft PowerPoint", state: "missing", text: "Missing" },
-      );
-      rows.push(
-        libreoffice.present
-          ? { name: "LibreOffice", state: "found", text: "Found" }
-          : powerpoint.present
-            ? { name: "LibreOffice", state: "notNeeded", text: "Not present (not needed)" }
-            : { name: "LibreOffice", state: "missing", text: "Missing" },
-      );
-    }
+    rows.push(
+      !check
+        ? { name: "LibreOffice (for PowerPoint files)", state: "checking", text: "Checking" }
+        : check.libreoffice.present
+          ? { name: "LibreOffice (for PowerPoint files)", state: "found", text: "Found" }
+          : { name: "LibreOffice (for PowerPoint files)", state: "missing", text: "Missing" },
+    );
   }
   return rows;
 }
@@ -81,7 +69,6 @@ export function ToolRows(props: ToolRowsProps) {
             {row.state === "checking" && <Spinner size={14} />}
             {row.state === "found" && <Icon name="check" size={16} />}
             {row.state === "missing" && <Icon name="alert" size={16} />}
-            {row.state === "notNeeded" && <Icon name="minus" size={16} />}
             {row.text}
           </span>
         </li>

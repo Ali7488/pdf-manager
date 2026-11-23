@@ -22,7 +22,6 @@ _TESSERACT_KEYS = (
 # "" is a key's default value (App Paths stores the full exe path there). The
 # others hold an install folder or an icon path pointing at the exe.
 _TESSERACT_VALUES = ("InstallLocation", "Path", "DisplayIcon", "")
-_POWERPOINT_APP_PATH = r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\powerpnt.exe"
 
 
 def popen_options() -> dict:
@@ -136,61 +135,13 @@ def libreoffice_candidates() -> list[Path]:
     return candidates
 
 
-def powerpoint_installed() -> bool:
-    """Whether the ``PowerPoint.Application`` automation class is registered.
-
-    That's what the optional PowerPoint renderer uses. Doesn't start PowerPoint.
-    """
-    try:
-        import winreg
-
-        with winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, r"PowerPoint.Application\CLSID"):
-            return True
-    except (ImportError, OSError):
-        return False
-
-
-def powerpoint_path() -> Path | None:
-    """Path to ``POWERPNT.EXE`` from Office's "App Paths" registry entry, for display."""
-    if not powerpoint_installed():
-        return None
-    for value in _registry_strings((_POWERPOINT_APP_PATH,), ("",)):
-        path = exe_from_registry_value(value, "POWERPNT.EXE")
-        if path.is_file():
-            return path
-    return None
-
-
-# Windows security zones (URLZONE): 0 local machine, 1 intranet, 2 trusted
-# sites, 3 Internet, 4 restricted sites. Browsers and mail clients record the
-# zone a file came from in its hidden "Zone.Identifier" stream (Mark-of-the-Web).
-UNTRUSTED_ZONE = 3
-
-
-def zone_from_identifier(text: str) -> int | None:
-    """Read ``ZoneId`` from the contents of a ``Zone.Identifier`` stream, or None."""
-    match = re.search(r"^\s*ZoneId\s*=\s*(\d+)", text, re.MULTILINE)
-    return int(match.group(1)) if match else None
-
-
 def _read_zone_identifier(path: Path) -> str | None:
-    """Contents of ``path``'s Zone.Identifier stream, or None if it has none."""
+    """Contents of ``path``'s Zone.Identifier stream (Mark-of-the-Web), or None if it has none."""
     try:
         with open(f"{path}:Zone.Identifier", encoding="utf-8", errors="replace") as stream:
             return stream.read()
     except OSError:
         return None
-
-
-def is_untrusted(path: Path) -> bool:
-    """True if Windows marked the file as coming from the Internet or a restricted site.
-
-    Such files are opened by Office in Protected View. The converter doesn't
-    automate PowerPoint on them (decision C14); LibreOffice renders them instead.
-    """
-    text = _read_zone_identifier(path)
-    zone = zone_from_identifier(text) if text is not None else None
-    return zone is not None and zone >= UNTRUSTED_ZONE
 
 
 def copy_with_provenance(source: Path, target: Path) -> None:
@@ -205,17 +156,6 @@ def copy_with_provenance(source: Path, target: Path) -> None:
     if text is not None:
         with open(f"{target}:Zone.Identifier", "w", encoding="utf-8") as stream:
             stream.write(text)
-
-
-def mark_untrusted(path: Path) -> None:
-    """Give a file the Internet zone's Mark-of-the-Web.
-
-    Used for copies whose origin is unknown: a file dropped into the browser
-    window arrives as bytes, without its Zone.Identifier stream. Treating it as
-    downloaded keeps decision C14 safe (PowerPoint is never automated on it).
-    """
-    with open(f"{path}:Zone.Identifier", "w", encoding="utf-8") as stream:
-        stream.write(f"[ZoneTransfer]\nZoneId={UNTRUSTED_ZONE}\n")
 
 
 def os_family() -> str:

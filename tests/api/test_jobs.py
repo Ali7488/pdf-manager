@@ -25,7 +25,19 @@ from api.service import (
 )
 
 empty_pdf = service.issues.empty_pdf
-powerpoint_fallback = service.issues.powerpoint_fallback
+
+
+def file_warning(file: str, details: str | None) -> service.Issue:
+    """A warning about one input file (a job may return such warnings with its results)."""
+    return service.Issue(
+        IssueCode.OCR_FAILED,
+        service.issues.Severity.WARNING,
+        "One page wasn't read",
+        "Its text isn't searchable.",
+        (),
+        details,
+        file,
+    )
 
 
 class Recorder:
@@ -121,11 +133,11 @@ def test_default_run_action_is_looked_up_at_call_time(monkeypatch, recorder, tmp
 
 def test_warnings_are_logged_and_sent(make_manager, recorder, logs):
     """Warnings are sent with logFile set, and written to the log."""
-    warning = powerpoint_fallback("Slides.pptx", "raw renderer output")
+    warning = file_warning("Slides.pptx", "raw renderer output")
     manager = make_manager(succeeding("a.pdf", warnings=[warning]))
     manager.start(Action.FLATTEN, ActionSettings(), DATA)
     finished = recorder.finish()
-    assert finished["warnings"][0]["code"] == "POWERPOINT_FALLBACK"
+    assert finished["warnings"][0]["code"] == "OCR_FAILED"
     assert finished["warnings"][0]["logFile"] == str(logs)
     assert "raw renderer output" in logs.read_text(encoding="utf-8")
 

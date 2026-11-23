@@ -28,6 +28,7 @@ import { useApp } from "../../state/AppContext";
 import { Button } from "../Button/Button";
 import { Icon } from "../Icon/Icon";
 import { InfoTip } from "../InfoTip/InfoTip";
+import { SlidesNotice } from "../SlidesNotice/SlidesNotice";
 import styles from "./FileList.module.css";
 
 /** Props for {@link FileList}. */
@@ -136,6 +137,7 @@ export function FileList({ action, headerActions }: FileListProps) {
           </SortableContext>
         </DndContext>
       )}
+      <SlidesNotice action={action} />
     </section>
   );
 }

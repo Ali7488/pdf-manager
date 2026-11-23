@@ -383,7 +383,6 @@ def test_check_tools_shape_and_logged_issues(api_obj, monkeypatch, logs):
             False,
             ToolStatus(True, False, None),
             ToolStatus(False, False, None),
-            ToolStatus(False, False, None),
             [ocr_missing()],
         )
 
@@ -392,6 +391,7 @@ def test_check_tools_shape_and_logged_issues(api_obj, monkeypatch, logs):
     assert seen == {"action": "flatten", "ocr": True, "files": [Path("/a.pdf")]}
     assert result["ok"] is False
     assert result["ocr"] == {"required": True, "present": False, "path": None}
+    assert set(result) == {"ok", "ocr", "libreoffice", "issues"}  # No PowerPoint row (C17).
     assert_issue(result["issues"][0], "OCR_MISSING")
     assert result["issues"][0]["logFile"] == str(logs)
 

@@ -118,7 +118,7 @@ export function actionAcceptsFile(action: Action, file: InputFile): boolean {
   return getActionInfo(action).accepts.includes(file.kind);
 }
 
-/** True for PowerPoint files, which need PowerPoint or LibreOffice to render. */
+/** True for PowerPoint files, which LibreOffice Impress converts (decision C17). */
 export function isSlides(kind: FileKind): boolean {
   return kind === "pptx" || kind === "ppt";
 }

@@ -2,6 +2,7 @@
 
 import logging
 import sys
+from dataclasses import replace
 
 from api import logging_setup, paths
 from api.service import issues, unexpected_error
@@ -79,7 +80,10 @@ def test_log_issue_writes_details_and_traceback(logs):
 
 def test_log_issue_warning_level_and_file(logs):
     """Warnings are logged at WARNING level, with the file they are about."""
-    issue = logging_setup.log_issue(issues.powerpoint_fallback("Slides.pptx", None))
+    warning = replace(
+        issues.powerpoint_failed("Slides.pptx", None), severity=issues.Severity.WARNING
+    )
+    issue = logging_setup.log_issue(warning)
     text = logs.read_text(encoding="utf-8")
     assert "WARNING" in text and "File: Slides.pptx" in text
     assert issue.log_file == str(logs)

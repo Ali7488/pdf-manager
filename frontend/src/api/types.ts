@@ -114,8 +114,6 @@ export type IssueCode =
   | "OCR_FAILED"
   | "OCR_TIMEOUT"
   | "OCR_INSTALL_FAILED"
-  | "POWERPOINT_FALLBACK"
-  | "UNTRUSTED_PRESENTATION"
   | "POWERPOINT_CONVERSION_FAILED"
   | "SLIDE_RENDERER_MISSING"
   | "PASSWORD_PROTECTED"
@@ -143,8 +141,7 @@ export interface ToolCheckResult {
   /** True if the job can start. */
   ok: boolean;
   ocr: ToolStatus;
-  powerpoint: ToolStatus;
-  /** When PowerPoint is present, a missing LibreOffice doesn't block (ok stays true). */
+  /** LibreOffice Impress: required whenever the job has PowerPoint files (decision C17). */
   libreoffice: ToolStatus;
   /** Why ok is false (errors), or notes such as "LibreOffice not present" (warnings). */
   issues: Issue[];

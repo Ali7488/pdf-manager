@@ -1,6 +1,6 @@
 """Images to PDF: turn PNG/JPG images into PDF pages.
 
-``pipeline.run_action`` calls :func:`images_to_pdf`.
+``converter.actions.run.run_action`` calls :func:`images_to_pdf`.
 
 Each image becomes one page that is exactly the image's shape (no margins).
 MuPDF reads the image, applies its camera orientation (EXIF rotation and

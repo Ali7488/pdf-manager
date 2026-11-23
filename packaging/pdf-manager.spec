@@ -155,7 +155,7 @@ excludes = [
     "tests",
     "pytest",
     "_pytest",
-    "pptx",  # python-pptx is a test-only dependency (tests/smoke_test.py).
+    "pptx",  # python-pptx is a test-only dependency (tests, scripts/make_samples.py).
     "pydoc_data",
     "ensurepip",
     "webview.platforms.qt",

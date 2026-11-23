@@ -1,6 +1,6 @@
 """Split: divide one PDF into several, by custom page ranges, every N pages, or per page.
 
-``pipeline.run_action`` calls these. :func:`parse_page_ranges` turns the text
+``converter.actions.run.run_action`` calls these. :func:`parse_page_ranges` turns the text
 the user typed into page ranges, :func:`plan_split` turns the Split settings
 into the list of ranges to write, and :func:`split_pdf` writes one PDF per range.
 """

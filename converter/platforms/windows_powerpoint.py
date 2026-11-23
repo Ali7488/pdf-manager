@@ -173,7 +173,7 @@ def export_slides(source: Path, output: Path, timeout: float, cancel: CancelToke
     """Export a presentation to PDF with Microsoft PowerPoint.
 
     Args:
-        source: Presentation to export (a scratch copy; see ``powerpoint.py``).
+        source: Presentation to export (a scratch copy; see ``converter/slides/render.py``).
         output: PDF path to write.
         timeout: Seconds to wait before giving up.
         cancel: The job's cancel token.

@@ -1,6 +1,6 @@
 """Compress PDF: make a PDF smaller at one of three levels.
 
-``pipeline.run_action`` calls :func:`compress_pdf`.
+``converter.actions.run.run_action`` calls :func:`compress_pdf`.
 
 Every level saves the document with PyMuPDF's lossless clean-up (unused and
 duplicate objects removed, streams compressed, small objects packed into

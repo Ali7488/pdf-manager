@@ -1,52 +1,66 @@
 # AGENTS.md
 
-Guidance for AI coding agents (and humans) working in this repository.
+Engineering instructions for people and AI coding agents working on **PDF Manager**.
 
-## Role
+## Product and authority
 
-Act as a **senior full-stack engineer** working on a PDF management application for **Windows 11**. The application prioritizes **ease of use** and a **simple UI** for everyday tasks, and must keep **low overhead** (small dependencies, low memory and disk use, fast startup).
+Build a clear, low-overhead, **offline Windows 11 desktop application** for everyday PDF and PowerPoint processing. The product is intended for nontechnical users: installation, file selection, conversion, saving and troubleshooting must not require a terminal.
 
-Owner decisions are recorded in [`docs/DECISIONS.md`](docs/DECISIONS.md). Follow them, and never assume an answer to an item marked **Open**; ask instead.
+Read [`docs/DECISIONS.md`](docs/DECISIONS.md) before making behavior or design changes. Owner decisions there take precedence. Items marked **Open** need a decision and must not be silently resolved.
 
-## Project
+The repository currently contains a shared React + TypeScript frontend, a pywebview-backed Python API layer, and a UI-independent document conversion engine. The **supported development entry point is `main.py`**, not the retired Tkinter `app.py`.
 
-**PDF Manager** is a Windows desktop tool that converts PowerPoint files (PPT/PPTX) and PDFs into **flattened, searchable PDFs**, and merges files.
+## Architecture and files
 
-- **Flatten**: render every page to an image so the PDF opens cleanly in apps that struggle with complex PDFs (for example tablet note-taking apps), then add an invisible Tesseract OCR text layer so it stays searchable.
-- **Merge**: combine files in a user-chosen order, keeping the original text.
-- **Flatten + Merge**: both.
+- `frontend/`: React, TypeScript, Vite, CSS Modules, UI state and Vitest/Testing Library tests. The production build is a self-contained HTML asset for a pywebview window.
+- `api/`: desktop window, Python↔JavaScript contract, settings, file handling, background jobs, progress and results.
+- `converter/`: pure document processing and platform adapters; no UI-specific behavior.
+- `main.py`: pywebview desktop entry point.
+- `packaging/`: Windows PyInstaller build and Inno Setup wizard.
+- `tests/`: Python unit, integration, portability and regression checks.
+- `docs/`: API contract, decisions, architecture, engineering review, portability and prompts log.
 
-The Python `converter/` package is the engine. The Tkinter `app.py` is the current UI and will be replaced by a TypeScript + React frontend, with the Python converter kept as the backend.
+## Development commands
 
-## Layout
-
-- `converter/`: conversion engine. See the package docstring in `converter/__init__.py` for the job flow and module map.
-- `app.py`: Tkinter dashboard (to be replaced).
-- `tests/`: integration tests (need Tesseract and LibreOffice installed).
-- `install_windows.ps1`, `INSTALL.bat`, `OPEN.bat`: Windows installer and launcher.
-- `docs/`: decisions log, prompts log, API contract (`API.md`), portability rules (`PORTABILITY.md`), engineering backlog and source inventory.
-
-## Commands
+From the repository root:
 
 ```bash
-uv sync                         # set up .venv (Python is pinned in .python-version)
-uv run tests/smoke_test.py      # end-to-end: flatten, merge, OCR, naming, source preservation
-uv run tests/test_temp_lock.py  # Windows file-lock regression
-uv run app.py                   # run the current GUI
-uvx ruff format --line-length 100 .
-uvx ruff check --line-length 100 .
+uv sync --frozen
+cd frontend && npm ci && npm run build && cd ..
+uv run main.py
 ```
 
-Use **uv** for everything (`uv add`, `uv run`, `uv sync`). Never use pip or requirements files.
+Checks:
 
-## Rules
+```bash
+uv run pytest
+uvx ruff check --line-length 100 .
+uvx ruff format --check --line-length 100 .
+cd frontend
+npm run lint
+npm run typecheck
+npm test
+npm run build
+```
 
-- **Generic only.** No personal names, no specific person's workflow, and no domain-specific wording (such as a particular course or subject) in code, UI text, tests, docs or commit messages. Test fixtures use neutral sample text.
-- **Windows first, portable always.** v1 targets Windows 11; prefer correct Windows behaviour. Linux packages (`.deb`, Arch `PKGBUILD`) and Qt/GNOME versions come later (decision P14), so keep the service and API layers portable: guard Windows-only code (COM, registry, `os.startfile`) with platform checks and working fallbacks, and never hard-code Windows paths. Platform-specific code lives only in `converter/platforms/` (and an equivalent API-layer module); see `docs/PORTABILITY.md`.
-- **Originals are never modified.** Inputs are only read. All work happens in a scratch folder, and results are copied out with collision-safe names (`converter.files.naming.safe_destination`).
-- **No speaker notes.** The speaker-notes appendix was removed on purpose. Don't re-add it.
-- **Documentation.** Every function gets a Google-style docstring (summary, Args, Returns, Raises). Add inline comments for non-obvious lines, and flag known issues where they occur.
-- **Commits.** Make small, meaningful commits as you go, one per logical change, under the user's configured git identity. Run the tests before committing code changes, then push to `origin`.
-- **Review-ready documentation (P16).** Keep `docs/ARCHITECTURE.md` (layers, dependencies, execution flows, non-obvious choices, tests, CI) and `docs/ENGINEERING_REVIEW.md` (significant bugs and their status) accurate and tied to the code, updating them in the same change as the code. Keep them proportional: no padding. Never state that code was reviewed or tested on a platform unless it was; record what has and hasn't been verified.
-- **Decisions log.** Record every decision the owner makes in `docs/DECISIONS.md` as soon as it is made.
-- **Prompts log.** Add a short, summarized entry (not a verbatim quote) to `docs/PROMPTS_LOG.md` for each user request, and tick off its checklist as work completes.
+Some Python tests require installed Tesseract or LibreOffice; report skips instead of counting them as passes. Do not claim Windows test success from Linux mocks. The GitHub Windows build is currently a manually triggered packaging workflow, **not** a complete PR CI pipeline.
+
+For the Windows installer, see `packaging/README.md` and `packaging/build.ps1`.
+
+## Engineering rules
+
+- **Never modify originals.** Work in scratch space, validate outputs and save collision-safe new files.
+- **No real user documents or identifying data.** Synthetic fixtures only; local processing only unless expressly approved otherwise.
+- **No speaker notes.** Removed intentionally.
+- **Keep platform-specific code isolated.** Windows PowerPoint COM is optional, LibreOffice is the cross-platform renderer. Linux packages come later; don't compromise Windows v1.
+- **No unnecessary infrastructure.** No database, Docker runtime, web server, telemetry, accounts or new abstraction layers without a demonstrated requirement.
+- **Accessible UI.** Plain-language controls, visible focus, readable contrast, friendly actionable error messages, minimal installation friction.
+- **Coordinate subagents.** Check current working tree and integration contracts before parallel edits. Use focused commits and tests; do not silently change owner decisions.
+- **Documentation is evidence.** Record architecture, tradeoffs, known issues, verifiable commands/results and Windows validation gaps accurately. Do not claim agent-written code has undergone human review unless that happened.
+- **Function documentation.** Provide Google-style docstrings and comments for meaningful non-obvious behavior without filling code with redundant narration.
+- **Git safety.** Before making changes, check `git status`; avoid overwriting uncommitted human/agent work. Keep commits small and meaningful. Do not publish installers, merge unrelated changes or declare release readiness without owner approval.
+- **Prompt/decision records.** Summarize requests in `docs/PROMPTS_LOG.md`, and record newly approved design decisions in `docs/DECISIONS.md`. Respect the existing prompts log rather than duplicating entries.
+
+## Current quality gate
+
+The repo contains a React frontend, API layer, conversion engine and Windows installer source. **Real Windows runtime and installer testing remains outstanding**, including PowerPoint automation, WebView2, optional component installation, upgrades and uninstall. Report the exact tests actually executed, on which platform, and their result.

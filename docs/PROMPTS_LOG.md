@@ -57,4 +57,7 @@ A short, summarized record of each request made to the coding agent, and what ca
     - [x] Record decision C13.
     - [ ] Service layer logs verbosely at DEBUG level (commands, timings, tool output, tracebacks).
     - [ ] API layer: DEBUG level in development mode, INFO in production, with errors always logged in full.
+19. **Roadmap.** Windows first, then an Ubuntu `.deb` and an Arch `PKGBUILD`, then Qt, then GNOME. Checklist:
+    - [x] Record decision P14 and open questions O9 (meaning of "Qt then GNOME") and O10 (Linux log location).
+    - [x] Add a "portable always" rule to `AGENTS.md`.
 

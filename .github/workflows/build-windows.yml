@@ -1,8 +1,9 @@
 # Builds the PDF Manager Windows installer and uploads it as an artifact.
 #
-# Manual trigger only (Actions > "Build Windows installer" > Run workflow):
-# the repository is private and Actions minutes cost money, so there are
-# deliberately no push or pull_request triggers.
+# Manual trigger only (Actions > "Build Windows installer" > Run workflow).
+# After building, it installs the app silently on the runner and starts it in
+# smoke-test mode (api/smoke.py): the installed app must open its window,
+# render the UI and answer through the bridge, then quit.
 name: Build Windows installer
 
 on:
@@ -38,11 +39,44 @@ jobs:
         shell: pwsh
         run: ./packaging/build.ps1
 
+      - name: Install silently and start the installed app (smoke test)
+        shell: pwsh
+        timeout-minutes: 6
+        run: |
+          $setup = Get-ChildItem dist/installer/*.exe | Select-Object -First 1
+          $install = Start-Process $setup.FullName -Wait -PassThru -ArgumentList `
+            '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/NOOPTIONAL=1', '/LOG=install.log'
+          if ($install.ExitCode -ne 0) {
+            Get-Content install.log -Tail 60
+            throw "Installer exit code $($install.ExitCode)"
+          }
+          $appDir = Join-Path $env:LOCALAPPDATA 'Programs\PDF Manager'
+          $app = Join-Path $appDir 'PDF Manager.exe'
+          if (-not (Test-Path $app)) { throw "The app wasn't installed at $app" }
+          $env:PDF_MANAGER_SMOKE_TEST = '1'
+          $run = Start-Process $app -Wait -PassThru
+          $log = Join-Path $appDir 'logs\pdf-manager.log'
+          if (Test-Path $log) { Get-Content $log -Tail 60 } else { Write-Host "No log at $log" }
+          if ($run.ExitCode -ne 0) { throw "Smoke test failed (exit code $($run.ExitCode))" }
+          if (-not (Select-String -Path $log -Pattern 'SMOKE TEST PASSED' -Quiet)) {
+            throw "The log has no SMOKE TEST PASSED line"
+          }
+
+      - name: Keep install and app logs if something failed
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-install-logs
+          path: |
+            install.log
+            ~/AppData/Local/Programs/PDF Manager/logs/
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Upload the installer
         uses: actions/upload-artifact@v4
         with:
           name: PDF-Manager-Setup
           path: dist/installer/*.exe
           if-no-files-found: error
-          # Artifacts count against private-repo storage; keep them briefly.
           retention-days: 14

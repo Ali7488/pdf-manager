@@ -29,6 +29,12 @@ dev = [
     "pytest>=8",
     "python-pptx>=1.0,<2",
 ]
+# Browser-mode integration tests only (tests/e2e): never bundled or distributed.
+# Playwright is Apache-2.0 (its greenlet dependency MIT AND Python-2.0).
+# uv sync --group e2e && uv run playwright install chromium
+e2e = [
+    "playwright>=1.65,<2",
+]
 
 [tool.uv]
 # A desktop app run from source, not an installable library.

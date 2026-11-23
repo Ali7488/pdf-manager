@@ -18,7 +18,9 @@
 
 ``--no-browser`` starts the server without opening a browser (for tests and
 headless use); the launch link is printed and, with ``--url-file``, written
-to a file only this user can read.
+to a file only this user can read. Without a browser on this desktop to put a
+picker in front of, it also uses the browser's own file chooser and downloads,
+as ``--no-native-dialogs`` does.
 """
 
 from __future__ import annotations
@@ -125,6 +127,11 @@ def _parse(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--browser", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--no-browser", action="store_true", help="start without opening a browser")
     parser.add_argument("--url-file", type=Path, help="write the launch link to this file")
+    parser.add_argument(
+        "--no-native-dialogs",
+        action="store_true",
+        help="use the browser's file chooser and downloads instead of native pickers",
+    )
     return parser.parse_args(argv)
 
 
@@ -143,7 +150,8 @@ def main(argv: list[str] | None = None) -> int:
     session = Session()
     workflow = Workflow(store, session.record)
     stop = threading.Event()
-    ctx = Context(workflow, session, platforms.dialogs_available(), request_stop=stop.set)
+    native = platforms.dialogs_available() and not (args.no_browser or args.no_native_dialogs)
+    ctx = Context(workflow, session, native, request_stop=stop.set)
     instance_key = secrets.token_urlsafe(32)
     server = AppServer(ctx, paths.ui_index().parent, instance_key)
     thread = threading.Thread(target=server.serve_forever, name="http", daemon=True)

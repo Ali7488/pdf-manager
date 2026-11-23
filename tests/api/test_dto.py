@@ -173,6 +173,12 @@ def test_progress_to_json_adds_job_id_and_clamps():
     }
 
 
+def test_progress_nan_fraction_becomes_zero():
+    """A NaN fraction (not valid JSON) is sent as 0."""
+    event = ProgressEvent(Stage.OCR, 1, 1, None, None, float("nan"), "Working")
+    assert dto.progress_to_json("job1", event)["fraction"] == 0.0
+
+
 def test_output_to_json_hides_scratch_path():
     """Outputs don't reveal the scratch path."""
     output = OutputFile("Report - Flattened.pdf", Path("/tmp/x.pdf"), 3, 999)

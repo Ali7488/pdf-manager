@@ -12,6 +12,7 @@ The shapes match ``frontend/src/api/types.ts``.
 
 from __future__ import annotations
 
+import math
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
@@ -244,6 +245,9 @@ def progress_to_json(job_id: str, event: ProgressEvent) -> dict[str, Any]:
     Returns:
         The ``JobProgress`` object; ``fraction`` is clamped to 0..1.
     """
+    fraction = float(event.fraction)
+    if not math.isfinite(fraction):  # NaN can't be sent as JSON; show "no progress yet".
+        fraction = 0.0
     return {
         "jobId": job_id,
         "stage": str(event.stage),
@@ -251,7 +255,7 @@ def progress_to_json(job_id: str, event: ProgressEvent) -> dict[str, Any]:
         "fileCount": event.file_count,
         "page": event.page,
         "pageCount": event.page_count,
-        "fraction": min(max(float(event.fraction), 0.0), 1.0),
+        "fraction": min(max(fraction, 0.0), 1.0),
         "message": event.message,
     }
 

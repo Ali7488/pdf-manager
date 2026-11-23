@@ -68,7 +68,7 @@ export function AppProvider({ children, api = defaultApi, onEvent = defaultOnEve
     async (patch: Partial<Settings>) => {
       dispatch({ type: "settingsPatched", patch });
       const saved = await api.saveSettings(patch);
-      dispatch({ type: "settingsLoaded", settings: saved });
+      dispatch({ type: "settingsLoaded", settings: saved.settings });
     },
     [api],
   );

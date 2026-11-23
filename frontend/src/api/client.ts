@@ -9,6 +9,8 @@
  * `pywebviewready` if pywebview injects itself after the page loads.
  * Set `VITE_API=bridge` to force the bridge in development (for example when
  * a pywebview window points at the Vite dev server).
+ * Set `VITE_MOCK_SETTINGS_SAVE_FAILS=1` to make the mock's settings saves fail,
+ * to try the "not saved" state in Settings.
  */
 import { createBridgeApi, isPywebviewPresent, onEvent } from "./bridge";
 import { createMockApi } from "./mock";
@@ -22,6 +24,8 @@ const mockAllowed =
 export const usingMock: boolean = mockAllowed && !isPywebviewPresent();
 
 /** The API client for the whole app. */
-export const api: PdfManagerApi = usingMock ? createMockApi() : createBridgeApi();
+export const api: PdfManagerApi = usingMock
+  ? createMockApi({ settingsSaveFails: import.meta.env.VITE_MOCK_SETTINGS_SAVE_FAILS === "1" })
+  : createBridgeApi();
 
 export { onEvent };

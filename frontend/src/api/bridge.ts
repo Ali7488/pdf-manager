@@ -16,6 +16,7 @@ import type {
   PdfManagerEvents,
   SaveOptions,
   SaveOutcome,
+  SaveSettingsResult,
   Settings,
   StartJobResult,
   ToolCheckResult,
@@ -120,7 +121,7 @@ export function createBridgeApi(): PdfManagerApi {
   return {
     getAppInfo: () => callPython<AppInfo>("get_app_info"),
     getSettings: () => callPython<Settings>("get_settings"),
-    saveSettings: (patch: Partial<Settings>) => callPython<Settings>("save_settings", patch),
+    saveSettings: (patch: Partial<Settings>) => callPython<SaveSettingsResult>("save_settings", patch),
     pickFiles: (kind: "all" | "documents" | "images") => callPython<InputFile[]>("pick_files", kind),
     pickFolder: () => callPython<string | null>("pick_folder"),
     // start_job and check_tools take three positional arguments on the Python side.

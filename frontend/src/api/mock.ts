@@ -10,6 +10,8 @@
  *   `cancelJob`, warn about PowerPoint files (POWERPOINT_FALLBACK), and fail
  *   when an input's name contains "fail".
  * - `checkTools` applies the contract's rules to a configurable set of tools.
+ * - `saveSettings` can be told to fail (`settingsSaveFails`), returning
+ *   SETTINGS_SAVE_FAILED while still applying the change in memory, as Python does.
  */
 import { emitEvent } from "./bridge";
 import {
@@ -30,6 +32,7 @@ import {
   type PdfManagerApi,
   type SaveOptions,
   type SaveOutcome,
+  type SaveSettingsResult,
   type Settings,
   type StartJobResult,
   type ToolCheckResult,
@@ -55,6 +58,8 @@ export interface MockOptions {
   folderPicker?: () => string | null;
   /** Make "Install OCR" fail. */
   ocrInstallFails?: boolean;
+  /** Make `saveSettings` report that the settings couldn't be written to disk. */
+  settingsSaveFails?: boolean;
 }
 
 /** Extra controls only the mock has. */
@@ -65,6 +70,8 @@ export interface MockControls {
   simulateDrop(files: ArrayLike<File>): void;
   /** Changes which tools are "installed". */
   setTools(tools: Partial<MockTools>): void;
+  /** Makes later `saveSettings` calls fail (true) or succeed (false). */
+  setSettingsSaveFails(fails: boolean): void;
 }
 
 /** The mock API: the full contract plus {@link MockControls}. */
@@ -112,6 +119,21 @@ function makeIssue(
     file: extra.file ?? null,
   };
 }
+
+/** The issue Python returns when settings can't be written (same wording as converter/core/issues.py). */
+const SETTINGS_SAVE_FAILED = (): Issue =>
+  makeIssue(
+    "SETTINGS_SAVE_FAILED",
+    "warning",
+    "Your settings couldn't be saved",
+    "The change works for now, but it will be lost when PDF Manager closes.",
+    [
+      "Check the drive isn't full.",
+      "Make sure your user folder (AppData) isn't read-only or blocked by security software.",
+      "If it keeps happening, open the logs folder from Settings and keep the latest log file.",
+    ],
+    { details: "PermissionError: [Errno 13] Permission denied: 'settings.json.tmp'" },
+  );
 
 const OCR_MISSING = (): Issue =>
   makeIssue(
@@ -170,6 +192,7 @@ export function createMockApi(options: MockOptions = {}): MockApi {
   const knownFiles = new Map<string, InputFile>();
   const jobs = new Map<string, MockJob>();
   let runningJob: MockJob | null = null;
+  let settingsSaveFails = options.settingsSaveFails ?? false;
   let jobCounter = 0;
   const pickCounts = { all: 0, documents: 0, images: 0 };
 
@@ -409,6 +432,10 @@ export function createMockApi(options: MockOptions = {}): MockApi {
       Object.assign(tools, next);
     },
 
+    setSettingsSaveFails(fails: boolean) {
+      settingsSaveFails = fails;
+    },
+
     async getAppInfo(): Promise<AppInfo> {
       await latency();
       return { version: "1.0.0 (preview)", logsDir: "C:\\Users\\Public\\PDF Manager\\logs", platform: "windows" };
@@ -419,10 +446,11 @@ export function createMockApi(options: MockOptions = {}): MockApi {
       return { ...settings };
     },
 
-    async saveSettings(patch: Partial<Settings>) {
+    async saveSettings(patch: Partial<Settings>): Promise<SaveSettingsResult> {
       await latency();
+      // Like Python: the change applies in memory even when writing to disk fails.
       settings = { ...settings, ...patch };
-      return { ...settings };
+      return { settings: { ...settings }, issue: settingsSaveFails ? SETTINGS_SAVE_FAILED() : null };
     },
 
     async pickFiles(kind: "all" | "documents" | "images") {

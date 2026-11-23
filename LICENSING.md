@@ -8,6 +8,8 @@ PDF Manager is free, open-source software. This page explains which licence appl
 | The distributed application (the Windows installer, and the Linux packages from v0.75), which combines that code with PyMuPDF and other components | [GNU Affero General Public License v3.0](LICENSE-AGPL-3.0.txt) (AGPL-3.0) |
 | Each bundled third-party component | Its own licence: see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and the [`licenses/`](licenses) folder |
 
+For a component-by-component list of dependency uses, upstream license websites, verified source packages, and unresolved redistribution questions, see the [dependency license review](docs/DEPENDENCY_LICENSE_REVIEW_2026-11-23.md). The original license texts remain in the installed `licenses/` folder.
+
 ## Why the app is AGPL-3.0
 
 PDF Manager uses [PyMuPDF](https://pymupdf.readthedocs.io/) for all PDF work. PyMuPDF is available under the AGPL-3.0 or a commercial licence from Artifex; PDF Manager uses the **AGPL-3.0 open-source route**. A program that includes PyMuPDF and is distributed to others must be distributed under the AGPL-3.0's terms, so **the distributed application as a whole is licensed under the AGPL-3.0**. It is not MIT-only.

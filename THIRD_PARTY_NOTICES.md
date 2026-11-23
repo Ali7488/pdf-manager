@@ -24,7 +24,7 @@ bundled; regenerate it whenever dependencies change. It is not legal advice.
 | packaging | 26.3 | Apache-2.0 OR BSD-2-Clause | Linux |  | [`LICENSE`](licenses/python/packaging-26.3/LICENSE), [`LICENSE.APACHE`](licenses/python/packaging-26.3/LICENSE.APACHE), [`LICENSE.BSD`](licenses/python/packaging-26.3/LICENSE.BSD) |
 | proxy-tools | 0.1.0 | MIT | Linux, Windows |  | [`MIT.txt`](licenses/python/proxy-tools-0.1.0/MIT.txt) |
 | pycparser | 3.12 | BSD-3-Clause | Windows |  | [`LICENSE`](licenses/python/pycparser-3.12/LICENSE) |
-| pymupdf | 1.28.2 | AGPL-3.0-only | Linux, Windows | All PDF work (rendering, OCR placement, merging, splitting, compressing) | [`COPYING`](licenses/python/pymupdf-1.28.2/COPYING) |
+| pymupdf | 1.28.2 | AGPL-3.0-only | Linux, Windows | All PDF work (rendering, OCR placement, merging, splitting, compressing) | [`COPYING`](licenses/python/pymupdf-1.28.2/COPYING), [`AGPL-3.0-only.txt`](licenses/python/pymupdf-1.28.2/AGPL-3.0-only.txt) |
 | pyside6 | 6.12.0 | LGPL-3.0-only | Linux | Qt window on Linux (via pywebview) | [`LGPL-3.0-only.txt`](licenses/python/pyside6-6.12.0/LGPL-3.0-only.txt), [`GPL-3.0-only.txt`](licenses/python/pyside6-6.12.0/GPL-3.0-only.txt) |
 | pyside6-addons | 6.12.0 | LGPL-3.0-only | Linux |  | [`LGPL-3.0-only.txt`](licenses/python/pyside6-addons-6.12.0/LGPL-3.0-only.txt), [`GPL-3.0-only.txt`](licenses/python/pyside6-addons-6.12.0/GPL-3.0-only.txt) |
 | pyside6-essentials | 6.12.0 | LGPL-3.0-only | Linux |  | [`LGPL-3.0-only.txt`](licenses/python/pyside6-essentials-6.12.0/LGPL-3.0-only.txt), [`GPL-3.0-only.txt`](licenses/python/pyside6-essentials-6.12.0/GPL-3.0-only.txt) |
@@ -53,10 +53,18 @@ bundled; regenerate it whenever dependencies change. It is not legal advice.
 
 ## Also included in the built app
 
-| Component | Licence | Notes |
-| --- | --- | --- |
-| Python runtime | PSF-2.0 | Bundled by PyInstaller. |
-| PyInstaller bootloader | GPL-2.0 with exception | The exception allows any licence for the app. |
+| Component | Version | Licence | Bundled on | Used for | Licence text |
+| --- | --- | --- | --- | --- | --- |
+| Python runtime | 3.13 | PSF-2.0 | Linux, Windows | Runs the app (bundled by PyInstaller) | [`LICENSE.txt`](licenses/other/python-runtime/LICENSE.txt) |
+| PyInstaller bootloader | 6.22.3 | GPL-2.0-or-later WITH Bootloader-exception | Linux, Windows | Starts the app; the exception allows any licence for the app | [`COPYING.txt`](licenses/other/pyinstaller-6.22.3/COPYING.txt) |
+| Feather Icons (design of some icons) | 4.x | MIT | Linux, Windows | Some interface icon shapes | [`LICENSE`](licenses/other/feather-icons/LICENSE) |
+| Microsoft WebView2 SDK binaries (Microsoft.Web.WebView2.Core.dll, Microsoft.Web.WebView2.WinForms.dll, WebView2Loader.dll) | bundled with pywebview | Microsoft (see note) | Windows | Edge WebView2 window on Windows | — |
+
+**Note on the Microsoft WebView2 SDK binaries:** these closed-source Microsoft
+files come inside pywebview's Windows wheel and talk to the WebView2 Runtime that
+is part of Windows 11. They are redistributed under Microsoft's WebView2 SDK
+licence; check that licence, and how it fits with the AGPL-3.0 (for example under
+the AGPL's "System Libraries" provision), before relying on this notice.
 
 ## Not included (installed separately, by the user or the installer wizard)
 

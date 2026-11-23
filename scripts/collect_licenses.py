@@ -36,6 +36,11 @@ LICENSES = ROOT / "licenses"
 NOTICES = ROOT / "THIRD_PARTY_NOTICES.md"
 FRONTEND = ROOT / "frontend"
 SPDX_TEXT = "https://raw.githubusercontent.com/spdx/license-list-data/main/text/{}.txt"
+# Must match packaging/build.ps1 (its bootloader is part of the built app).
+PYINSTALLER_VERSION = "6.22.3"
+# Copyleft licences: always ship the full official text, even when a package
+# ships its own (short or partial) licence file. PyMuPDF's COPYING is one line.
+COPYLEFT = {"AGPL-3.0-only", "GPL-3.0-only", "LGPL-3.0-only", "GPL-2.0-only"}
 LICENSE_NAME = re.compile(r"(^|/)(LICEN[CS]E|COPYING|NOTICE|AUTHORS)[^/]*$", re.IGNORECASE)
 
 # Declared licences that need a normalized SPDX id (metadata is free text).
@@ -199,8 +204,9 @@ def python_components() -> list[Component]:
             found = _from_wheel(name, version, sorted(platforms)[0], target)
         spdx, files = found
         spdx = KNOWN_LICENSE.get(name, spdx)
-        if not files:
-            files = _standard_text(spdx, target)
+        ids = set(re.split(r"\s+(?:OR|AND)\s+", spdx))
+        if not files or ids & COPYLEFT:
+            files += [f for f in _standard_text(spdx, target) if f not in files]
         components.append(
             Component(
                 name,
@@ -266,7 +272,81 @@ USED_FOR = {
 }
 
 
-def write_notices(python: list[Component], frontend: list[Component]) -> None:
+def other_components() -> list[Component]:
+    """Parts of the built app that aren't Python or npm packages."""
+    out = []
+    # The Python runtime (PyInstaller bundles it). Its LICENSE.txt also covers the
+    # third-party software CPython itself incorporates.
+    runtime = (
+        Path(sys.base_prefix) / "lib" / f"python{sys.version_info.major}.{sys.version_info.minor}"
+    )
+    for candidate in (runtime / "LICENSE.txt", Path(sys.base_prefix) / "LICENSE.txt"):
+        if candidate.is_file():
+            target = LICENSES / "other" / "python-runtime"
+            target.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(candidate, target / "LICENSE.txt")
+            version = f"{sys.version_info.major}.{sys.version_info.minor}"
+            out.append(
+                Component(
+                    "Python runtime",
+                    version,
+                    "PSF-2.0",
+                    {"windows", "linux"},
+                    "Runs the app (bundled by PyInstaller)",
+                    ["other/python-runtime/LICENSE.txt"],
+                )
+            )
+            break
+    # PyInstaller's bootloader is linked into the app's executable.
+    target = LICENSES / "other" / f"pyinstaller-{PYINSTALLER_VERSION}"
+    _, files = _from_wheel("pyinstaller", PYINSTALLER_VERSION, "windows", target)
+    out.append(
+        Component(
+            "PyInstaller bootloader",
+            PYINSTALLER_VERSION,
+            "GPL-2.0-or-later WITH Bootloader-exception",
+            {"windows", "linux"},
+            "Starts the app; the exception allows any licence for the app",
+            [f"other/{target.name}/{f}" for f in files],
+        )
+    )
+    # Icons: drawn inline in frontend/src/components/Icon/Icon.tsx. The settings
+    # gear closely follows Feather Icons' design, so Feather is credited.
+    target = LICENSES / "other" / "feather-icons"
+    target.mkdir(parents=True, exist_ok=True)
+    mit = urllib.request.urlopen(SPDX_TEXT.format("MIT"), timeout=60).read().decode()
+    (target / "LICENSE").write_text(
+        mit.replace("<year>", "2013-2017").replace("<copyright holders>", "Cole Bemis"),
+        encoding="utf-8",
+    )
+    out.append(
+        Component(
+            "Feather Icons (design of some icons)",
+            "4.x",
+            "MIT",
+            {"windows", "linux"},
+            "Some interface icon shapes",
+            ["other/feather-icons/LICENSE"],
+        )
+    )
+    # Microsoft WebView2 SDK binaries, shipped inside pywebview's Windows wheel.
+    out.append(
+        Component(
+            "Microsoft WebView2 SDK binaries (Microsoft.Web.WebView2.Core.dll, "
+            "Microsoft.Web.WebView2.WinForms.dll, WebView2Loader.dll)",
+            "bundled with pywebview",
+            "Microsoft (see note)",
+            {"windows"},
+            "Edge WebView2 window on Windows",
+            [],
+        )
+    )
+    return out
+
+
+def write_notices(
+    python: list[Component], frontend: list[Component], other: list[Component]
+) -> None:
     """Write THIRD_PARTY_NOTICES.md."""
 
     def rows(components: list[Component]) -> list[str]:
@@ -274,7 +354,7 @@ def write_notices(python: list[Component], frontend: list[Component]) -> None:
         for c in components:
             where = ", ".join(sorted(p.capitalize() for p in c.platforms))
             files = ", ".join(f"[`{Path(f).name}`](licenses/{f})" for f in c.files) or "—"
-            used = USED_FOR.get(c.name, "")
+            used = c.used_for or USED_FOR.get(c.name, "")
             out.append(f"| {c.name} | {c.version} | {c.license} | {where} | {used} | {files} |")
         return out
 
@@ -310,10 +390,14 @@ bundled; regenerate it whenever dependencies change. It is not legal advice.
 
 ## Also included in the built app
 
-| Component | Licence | Notes |
-| --- | --- | --- |
-| Python runtime | PSF-2.0 | Bundled by PyInstaller. |
-| PyInstaller bootloader | GPL-2.0 with exception | The exception allows any licence for the app. |
+{header}
+{chr(10).join(rows(other))}
+
+**Note on the Microsoft WebView2 SDK binaries:** these closed-source Microsoft
+files come inside pywebview's Windows wheel and talk to the WebView2 Runtime that
+is part of Windows 11. They are redistributed under Microsoft's WebView2 SDK
+licence; check that licence, and how it fits with the AGPL-3.0 (for example under
+the AGPL's "System Libraries" provision), before relying on this notice.
 
 ## Not included (installed separately, by the user or the installer wizard)
 
@@ -333,9 +417,10 @@ def main() -> int:
         shutil.rmtree(LICENSES)
     python = python_components()
     frontend = frontend_components()
-    write_notices(python, frontend)
+    other = other_components()
+    write_notices(python, frontend, other)
     print(f"{len(python)} Python and {len(frontend)} interface components; see {NOTICES.name}")
-    unknown = [c.name for c in python + frontend if c.license == "UNKNOWN"]
+    unknown = [c.name for c in python + frontend + other if c.license == "UNKNOWN"]
     if unknown:
         print("WARNING: unknown licence for:", ", ".join(unknown))
         return 1

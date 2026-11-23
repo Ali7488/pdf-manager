@@ -7,13 +7,23 @@ into the list of ranges to write, and :func:`split_pdf` writes one PDF per range
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 import re
+import time
 from pathlib import Path
 
-from .common import OutputFile, SplitMethod, SplitSettings
+import fitz
+
+from .common import OutputFile, SplitMethod, SplitSettings, Stage
 from .context import JobContext
-from .issues import ConversionError, invalid_page_ranges
+from .issues import (
+    ConversionError,
+    empty_pdf,
+    invalid_page_ranges,
+    password_protected,
+    unreadable_file,
+)
 
 log = logging.getLogger(__name__)
 
@@ -164,6 +174,105 @@ def plan_split(settings: SplitSettings, page_count: int) -> list[tuple[int, int]
     raise ValueError(f"Unknown split method: {method}")  # Unreachable unless the enum grows.
 
 
+def _part_name(base_name: str, start: int, end: int) -> str:
+    """Return the suggested file name for one split part.
+
+    Args:
+        base_name: Name of the source document, without extension.
+        start: First page of the part (1-based).
+        end: Last page of the part (1-based, inclusive).
+
+    Returns:
+        ``"<base_name> - pages <a>-<b>.pdf"``, or ``"<base_name> - page <a>.pdf"``
+        for a single page.
+    """
+    if start == end:
+        return f"{base_name} - page {start}.pdf"
+    return f"{base_name} - pages {start}-{end}.pdf"
+
+
+def _fix_toc_levels(toc: list[list]) -> list[list]:
+    """Renumber bookmark levels so the outline is valid after some entries were dropped.
+
+    PyMuPDF's ``set_toc`` requires the first entry to be level 1 and each entry
+    to be at most one level deeper than the one before it. Dropping bookmarks
+    outside a range can break that (for example when a chapter heading is
+    dropped but its sub-headings are kept). Each entry's new level is the
+    number of kept ancestors plus one, so siblings stay siblings and children
+    stay children.
+
+    Args:
+        toc: Bookmark entries ``[level, title, page, ...]`` in document order.
+            Modified in place.
+
+    Returns:
+        The same list, with valid levels.
+    """
+    ancestors: list[int] = []  # Original levels of the kept entries enclosing this one.
+    for entry in toc:
+        level = entry[0]
+        # Leave the branch of every kept entry that isn't an ancestor of this one.
+        while ancestors and ancestors[-1] >= level:
+            ancestors.pop()
+        entry[0] = len(ancestors) + 1
+        ancestors.append(level)
+    return toc
+
+
+def _toc_for_range(toc: list[list], start: int, end: int) -> list[list]:
+    """Pick the bookmarks that point inside a range and shift them to the part's numbering.
+
+    Args:
+        toc: The source document's detailed outline (``get_toc(simple=False)``).
+        start: First page of the range (1-based).
+        end: Last page of the range (1-based, inclusive).
+
+    Returns:
+        A valid outline for the part: entries outside the range (and ones with
+        no page target, such as web links) are dropped, page numbers are
+        shifted so ``start`` becomes page 1, and levels are repaired.
+    """
+    kept: list[list] = []
+    for level, title, page, *rest in toc:
+        if not start <= page <= end:
+            continue  # Outside this part, or not a page target (page is -1 then).
+        new_page = page - start + 1
+        entry = [level, title, new_page]
+        if rest and isinstance(rest[0], dict):
+            dest = dict(rest[0])
+            if dest.get("kind") == fitz.LINK_GOTO:
+                # Keep the position on the page (and style); point it at the new page.
+                dest["page"] = new_page - 1  # Detailed destinations use 0-based pages.
+                entry.append(dest)
+        kept.append(entry)
+    return _fix_toc_levels(kept)
+
+
+def _open_source(source: Path) -> fitz.Document:
+    """Open the PDF to split, turning low-level failures into user-facing errors.
+
+    Args:
+        source: PDF to open; only read.
+
+    Returns:
+        The open document. The caller closes it.
+
+    Raises:
+        ConversionError: The file can't be read, needs a password, or has no pages.
+    """
+    try:
+        doc = fitz.open(str(source))
+    except Exception as exc:  # MuPDF raises several types for damaged or missing files.
+        raise ConversionError(unreadable_file(source.name, str(exc))) from exc
+    if doc.needs_pass:
+        doc.close()
+        raise ConversionError(password_protected(source.name))
+    if doc.page_count < 1:
+        doc.close()
+        raise ConversionError(empty_pdf(source.name))
+    return doc
+
+
 def split_pdf(
     source: Path, out_dir: Path, base_name: str, settings: SplitSettings, ctx: JobContext
 ) -> list[OutputFile]:
@@ -174,5 +283,80 @@ def split_pdf(
     are kept, and bookmarks that fall inside a range are kept with page numbers
     shifted. Reports progress (``Stage.SPLITTING``) and checks for cancel
     between parts.
+
+    Files are written in ``out_dir`` as ``part_001.pdf``, ``part_002.pdf`` and
+    so on, so repeated ranges never overwrite each other; the suggested name is
+    in :attr:`OutputFile.name`.
+
+    Args:
+        source: PDF to split; only read.
+        out_dir: Scratch folder for the parts; created if needed.
+        base_name: Name used to build the suggested output names.
+        settings: How to split.
+        ctx: Job context for progress, cancel and warnings.
+
+    Returns:
+        One :class:`OutputFile` per range, in output order.
+
+    Raises:
+        ConversionError: Invalid ranges (with the file name filled in), or the
+            source can't be read, needs a password, or has no pages.
+        Cancelled: The user pressed Cancel.
     """
-    raise NotImplementedError
+    started = time.perf_counter()
+    out_dir.mkdir(parents=True, exist_ok=True)
+    with _open_source(source) as doc:
+        page_count = doc.page_count
+        try:
+            ranges = plan_split(settings, page_count)
+        except ConversionError as exc:
+            # The parser doesn't know the file; add it so the message names it.
+            raise ConversionError(dataclasses.replace(exc.issue, file=source.name)) from exc
+        log.debug(
+            "Splitting %s (%d pages, method=%s) into %d part(s): %s",
+            source.name,
+            page_count,
+            settings.method,
+            len(ranges),
+            ranges,
+        )
+        toc = doc.get_toc(simple=False)
+        # Keep the document's descriptive metadata (title, author...) on every part.
+        metadata = {
+            k: v for k, v in (doc.metadata or {}).items() if k not in ("format", "encryption")
+        }
+        outputs: list[OutputFile] = []
+        for index, (start, end) in enumerate(ranges, 1):
+            ctx.check_cancel()
+            ctx.report(
+                Stage.SPLITTING,
+                f"Splitting: part {index} of {len(ranges)}",
+                within_file=(index - 1) / len(ranges),
+            )
+            target = out_dir / f"part_{index:03d}.pdf"
+            with fitz.open() as part:
+                # insert_pdf takes 0-based, inclusive page numbers. Links between
+                # pages inside the range are re-pointed; ones to other pages are dropped.
+                part.insert_pdf(doc, from_page=start - 1, to_page=end - 1, links=True, annots=True)
+                part.set_metadata(metadata)
+                part_toc = _toc_for_range(toc, start, end)
+                if part_toc:
+                    part.set_toc(part_toc)
+                # garbage=4 removes unused and duplicate objects; deflate compresses streams.
+                part.save(str(target), garbage=4, deflate=True)
+            size = target.stat().st_size
+            log.debug(
+                "Wrote part %d: pages %d-%d, %d bookmark(s), %d bytes",
+                index,
+                start,
+                end,
+                len(part_toc),
+                size,
+            )
+            outputs.append(
+                OutputFile(_part_name(base_name, start, end), target, end - start + 1, size)
+            )
+    done = "1 file" if len(outputs) == 1 else f"{len(outputs)} files"
+    ctx.report(Stage.SPLITTING, f"Split into {done}", within_file=1.0)
+    log.debug("Split %s in %.2f s", source.name, time.perf_counter() - started)
+    return outputs

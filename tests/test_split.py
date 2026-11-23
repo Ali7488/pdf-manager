@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
+import fitz
 import pytest
 
-from converter.common import SplitMethod, SplitSettings
-from converter.issues import ConversionError, IssueCode
-from converter.split import parse_page_ranges, plan_split
+from converter.common import SplitMethod, SplitSettings, Stage
+from converter.context import JobContext
+from converter.issues import Cancelled, ConversionError, IssueCode
+from converter.split import _fix_toc_levels, parse_page_ranges, plan_split, split_pdf
 
 
 def _reason(text: str, page_count: int = 10) -> str:
@@ -177,3 +181,260 @@ def test_plan_per_page():
 def test_plan_per_page_ignores_other_fields():
     settings = SplitSettings(method=SplitMethod.PER_PAGE, ranges="nonsense", every_n=0)
     assert plan_split(settings, 2) == [(1, 1), (2, 2)]
+
+
+# --- split_pdf ------------------------------------------------------------------------
+
+PAGES = 10
+
+# Nested outline used by the fixture: (level, title, page).
+SOURCE_TOC = [
+    [1, "Chapter A", 1],
+    [2, "Section A1", 2],
+    [1, "Chapter B", 5],
+    [2, "Section B1", 6],
+    [3, "Detail B1a", 7],
+    [1, "Chapter C", 9],
+]
+
+
+@pytest.fixture
+def sample_pdf(tmp_path: Path) -> Path:
+    """Build a 10-page PDF with text, bookmarks, links and an annotation.
+
+    Page 1 has a link to page 3 and a web link; page 2 has a text note.
+
+    Args:
+        tmp_path: pytest's temporary folder.
+
+    Returns:
+        Path to the saved PDF.
+    """
+    path = tmp_path / "Sample.pdf"
+    with fitz.open() as doc:
+        for number in range(1, PAGES + 1):
+            page = doc.new_page()
+            page.insert_text((72, 72), f"Sample page {number}")
+        goto = {"kind": fitz.LINK_GOTO, "from": fitz.Rect(72, 100, 200, 120), "page": 2}
+        web = {"kind": fitz.LINK_URI, "from": fitz.Rect(72, 130, 200, 150)}
+        web["uri"] = "https://example.com/"
+        doc[0].insert_link(goto)
+        doc[0].insert_link(web)
+        doc[1].add_text_annot((72, 200), "A sample note")
+        doc.set_toc(SOURCE_TOC)
+        doc.set_metadata({"title": "Sample title"})
+        doc.save(str(path))
+    return path
+
+
+def _split(source: Path, out_dir: Path, settings: SplitSettings, ctx: JobContext | None = None):
+    """Run split_pdf with the base name "Sample" and a default context.
+
+    Args:
+        source: PDF to split.
+        out_dir: Output folder.
+        settings: Split settings.
+        ctx: Optional job context.
+
+    Returns:
+        The list of OutputFile entries.
+    """
+    return split_pdf(source, out_dir, "Sample", settings, ctx or JobContext())
+
+
+def _page_text(path: Path, page: int = 0) -> str:
+    """Return the text of one page of a PDF, stripped.
+
+    Args:
+        path: PDF to read.
+        page: 0-based page index.
+
+    Returns:
+        The page text.
+    """
+    with fitz.open(str(path)) as doc:
+        return doc[page].get_text().strip()
+
+
+def _toc(path: Path) -> list[list]:
+    """Return a PDF's simple outline.
+
+    Args:
+        path: PDF to read.
+
+    Returns:
+        ``[level, title, page]`` entries.
+    """
+    with fitz.open(str(path)) as doc:
+        return doc.get_toc()
+
+
+def test_split_ranges_names_counts_and_content(sample_pdf, tmp_path):
+    settings = SplitSettings(method=SplitMethod.RANGES, ranges="1-3, 5, 8–10")
+    outputs = _split(sample_pdf, tmp_path / "out", settings)
+    assert [o.name for o in outputs] == [
+        "Sample - pages 1-3.pdf",
+        "Sample - page 5.pdf",
+        "Sample - pages 8-10.pdf",
+    ]
+    assert [o.page_count for o in outputs] == [3, 1, 3]
+    for output in outputs:
+        assert output.path.is_file()
+        assert output.path.parent == tmp_path / "out"
+        assert output.size_bytes == output.path.stat().st_size
+        with fitz.open(str(output.path)) as doc:
+            assert doc.page_count == output.page_count
+            assert doc.metadata["title"] == "Sample title"
+    assert _page_text(outputs[1].path) == "Sample page 5"
+    assert _page_text(outputs[2].path, 2) == "Sample page 10"
+
+
+def test_split_repeated_range_gets_separate_files(sample_pdf, tmp_path):
+    outputs = _split(sample_pdf, tmp_path / "out", SplitSettings(ranges="2, 2"))
+    assert [o.name for o in outputs] == ["Sample - page 2.pdf", "Sample - page 2.pdf"]
+    assert outputs[0].path != outputs[1].path
+    assert all(o.path.is_file() for o in outputs)
+
+
+def test_split_every_n(sample_pdf, tmp_path):
+    settings = SplitSettings(method=SplitMethod.EVERY_N, every_n=4)
+    outputs = _split(sample_pdf, tmp_path / "out", settings)
+    assert [o.name for o in outputs] == [
+        "Sample - pages 1-4.pdf",
+        "Sample - pages 5-8.pdf",
+        "Sample - pages 9-10.pdf",
+    ]
+    assert [o.page_count for o in outputs] == [4, 4, 2]
+    assert _page_text(outputs[2].path) == "Sample page 9"
+
+
+def test_split_per_page(sample_pdf, tmp_path):
+    outputs = _split(sample_pdf, tmp_path / "out", SplitSettings(method=SplitMethod.PER_PAGE))
+    assert len(outputs) == PAGES
+    assert outputs[6].name == "Sample - page 7.pdf"
+    assert all(o.page_count == 1 for o in outputs)
+    assert _page_text(outputs[6].path) == "Sample page 7"
+
+
+def test_split_bookmarks_shifted_and_levels_fixed(sample_pdf, tmp_path):
+    outputs = _split(sample_pdf, tmp_path / "out", SplitSettings(ranges="6-10, 1-3, 5, 3-4"))
+    # Chapter B (level 1) is outside 6-10, so its children move up one level.
+    assert _toc(outputs[0].path) == [
+        [1, "Section B1", 1],
+        [2, "Detail B1a", 2],
+        [1, "Chapter C", 4],
+    ]
+    assert _toc(outputs[1].path) == [[1, "Chapter A", 1], [2, "Section A1", 2]]
+    assert _toc(outputs[2].path) == [[1, "Chapter B", 1]]
+    assert _toc(outputs[3].path) == []  # No bookmarks on pages 3-4.
+
+
+def test_split_bookmark_keeps_position_on_page(tmp_path):
+    source = tmp_path / "Positioned.pdf"
+    with fitz.open() as doc:
+        for _ in range(3):
+            doc.new_page()
+        dest = {"kind": fitz.LINK_GOTO, "page": 2, "to": fitz.Point(0, 300), "zoom": 0}
+        doc.set_toc([[1, "Lower on page 3", 3, dest]])
+        doc.save(str(source))
+    (output,) = _split(source, tmp_path / "out", SplitSettings(ranges="2-3"))
+    with fitz.open(str(output.path)) as doc:
+        ((level, title, page, detail),) = doc.get_toc(simple=False)
+    assert (level, title, page) == (1, "Lower on page 3", 2)
+    assert detail["page"] == 1
+    assert detail["to"].y == pytest.approx(300, abs=1)
+
+
+def test_fix_toc_levels_keeps_structure():
+    toc = [[3, "a", 1], [4, "b", 1], [3, "c", 2], [2, "d", 3], [5, "e", 3], [3, "f", 4]]
+    # a and c are siblings; d is a shallower heading; e and f both sit under d.
+    assert [entry[0] for entry in _fix_toc_levels(toc)] == [1, 2, 1, 1, 2, 2]
+
+
+def test_split_keeps_links_and_annotations(sample_pdf, tmp_path):
+    outputs = _split(sample_pdf, tmp_path / "out", SplitSettings(ranges="1-3, 2"))
+    with fitz.open(str(outputs[0].path)) as doc:
+        links = doc[0].get_links()
+        internal = [link for link in links if link["kind"] == fitz.LINK_GOTO]
+        external = [link for link in links if link["kind"] == fitz.LINK_URI]
+        assert [link["page"] for link in internal] == [2]  # Still points at "Sample page 3".
+        assert [link["uri"] for link in external] == ["https://example.com/"]
+        assert [annot.info["content"] for annot in doc[1].annots()] == ["A sample note"]
+    with fitz.open(str(outputs[1].path)) as doc:
+        assert [annot.info["content"] for annot in doc[0].annots()] == ["A sample note"]
+
+
+def test_split_drops_links_to_pages_outside_the_part(sample_pdf, tmp_path):
+    (output,) = _split(sample_pdf, tmp_path / "out", SplitSettings(ranges="1-2"))
+    with fitz.open(str(output.path)) as doc:
+        kinds = [link["kind"] for link in doc[0].get_links()]
+    assert fitz.LINK_URI in kinds
+    assert fitz.LINK_GOTO not in kinds  # Page 3 isn't in this part.
+
+
+def test_split_reports_progress(sample_pdf, tmp_path):
+    events = []
+    ctx = JobContext(progress=events.append)
+    _split(sample_pdf, tmp_path / "out", SplitSettings(ranges="1, 2, 3, 4"), ctx)
+    assert {event.stage for event in events} == {Stage.SPLITTING}
+    fractions = [event.fraction for event in events]
+    assert fractions == sorted(fractions)
+    assert fractions[0] == 0.0 and fractions[-1] == 1.0
+    assert events[0].message == "Splitting: part 1 of 4"
+
+
+def test_split_cancel_stops_between_parts(sample_pdf, tmp_path):
+    ctx = JobContext()
+
+    def cancel_on_first_report(event):
+        """Press Cancel as soon as the first part starts."""
+        ctx.cancel.cancel()
+
+    ctx.progress = cancel_on_first_report
+    out_dir = tmp_path / "out"
+    with pytest.raises(Cancelled):
+        _split(sample_pdf, out_dir, SplitSettings(method=SplitMethod.PER_PAGE), ctx)
+    # The part in progress finishes; nothing after it is started.
+    assert sorted(p.name for p in out_dir.iterdir()) == ["part_001.pdf"]
+
+
+def test_split_cancel_before_start_writes_nothing(sample_pdf, tmp_path):
+    ctx = JobContext()
+    ctx.cancel.cancel()
+    out_dir = tmp_path / "out"
+    with pytest.raises(Cancelled):
+        _split(sample_pdf, out_dir, SplitSettings(method=SplitMethod.PER_PAGE), ctx)
+    assert list(out_dir.iterdir()) == []
+
+
+def test_split_invalid_ranges_names_the_file(sample_pdf, tmp_path):
+    with pytest.raises(ConversionError) as info:
+        _split(sample_pdf, tmp_path / "out", SplitSettings(ranges="11"))
+    assert info.value.issue.code == IssueCode.INVALID_PAGE_RANGES
+    assert info.value.issue.file == "Sample.pdf"
+    assert info.value.issue.message == "Page 11 doesn't exist; this document has 10 pages."
+
+
+def test_split_leaves_source_unchanged(sample_pdf, tmp_path):
+    before = sample_pdf.read_bytes()
+    _split(sample_pdf, tmp_path / "out", SplitSettings(method=SplitMethod.EVERY_N, every_n=3))
+    assert sample_pdf.read_bytes() == before
+
+
+def test_split_unreadable_file(tmp_path):
+    broken = tmp_path / "Broken.pdf"
+    broken.write_bytes(b"this is not a pdf")
+    with pytest.raises(ConversionError) as info:
+        _split(broken, tmp_path / "out", SplitSettings(ranges="1"))
+    assert info.value.issue.code == IssueCode.UNREADABLE_FILE
+    assert info.value.issue.file == "Broken.pdf"
+
+
+def test_split_password_protected(tmp_path):
+    locked = tmp_path / "Locked.pdf"
+    with fitz.open() as doc:
+        doc.new_page()
+        doc.save(str(locked), encryption=fitz.PDF_ENCRYPT_AES_256, user_pw="pw", owner_pw="pw")
+    with pytest.raises(ConversionError) as info:
+        _split(locked, tmp_path / "out", SplitSettings(ranges="1"))
+    assert info.value.issue.code == IssueCode.PASSWORD_PROTECTED

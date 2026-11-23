@@ -22,7 +22,7 @@ from api.settings_store import SettingsStore
 CONTRACT = {
     "get_app_info": [],
     "get_settings": [],
-    "save_settings": ["patch"],
+    "save_settings": ["patch"],  # Returns SaveSettingsResult: { settings, issue }.
     "pick_files": ["kind"],
     "pick_folder": [],
     "check_tools": ["action", "settings", "data"],
@@ -141,7 +141,8 @@ def test_methods_never_raise_on_garbage(api_obj, window):
     """Malformed arguments return contract-shaped results instead of raising."""
     window.dialog_results = [None] * 10
     garbage = {"x": object()}
-    assert api_obj.save_settings("not an object")["theme"] == "system"
+    saved = api_obj.save_settings("not an object")
+    assert saved == {"settings": api_obj.get_settings(), "issue": None}
     assert api_obj.pick_files(42) == []
     result = api_obj.check_tools("nope", None, 5)
     assert result["ok"] is False
@@ -228,12 +229,45 @@ def test_get_app_info(api_obj, logs):
 
 
 def test_settings_round_trip(api_obj, store):
-    """save_settings merges, persists and returns the full settings."""
+    """save_settings merges, persists and returns { settings, issue: null }."""
     assert api_obj.get_settings()["dpi"] == 200
-    saved = api_obj.save_settings({"dpi": 300, "theme": "neon"})
+    result = api_obj.save_settings({"dpi": 300, "theme": "neon"})
+    assert set(result) == {"settings", "issue"}
+    assert result["issue"] is None
+    saved = result["settings"]
     assert saved["dpi"] == 300 and saved["theme"] == "system"
     assert json.loads(store.path.read_text(encoding="utf-8"))["dpi"] == 300
     assert api_obj.get_settings() == saved
+
+
+def test_save_settings_failure_returns_issue(api_obj, store, monkeypatch, logs):
+    """A failed write returns the in-memory settings plus a logged SETTINGS_SAVE_FAILED."""
+
+    def full_disk(values):
+        raise OSError(28, "No space left on device")
+
+    monkeypatch.setattr(store, "_write", full_disk)
+    result = api_obj.save_settings({"theme": "dark"})
+    assert result["settings"]["theme"] == "dark"
+    assert api_obj.get_settings()["theme"] == "dark"  # Applies for this session.
+    issue = result["issue"]
+    assert_issue(issue, "SETTINGS_SAVE_FAILED")
+    assert issue["severity"] == "warning"
+    assert "No space left" in issue["details"]
+    assert issue["logFile"] == str(logs)
+    assert "SETTINGS_SAVE_FAILED" in logs.read_text(encoding="utf-8")
+
+
+def test_save_settings_bug_returns_issue_and_current_settings(api_obj, store, monkeypatch):
+    """An unexpected error still answers with the settings in effect and an issue."""
+
+    def broken(patch):
+        raise ZeroDivisionError("bug")
+
+    monkeypatch.setattr(store, "update", broken)
+    result = api_obj.save_settings({"theme": "dark"})
+    assert result["settings"] == store.get()
+    assert_issue(result["issue"], "UNEXPECTED_ERROR")
 
 
 # ----- Pickers -----

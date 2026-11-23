@@ -4,7 +4,10 @@ Settings are kept as the contract's camelCase ``Settings`` object (see
 ``frontend/src/api/types.ts``) in a small JSON file at
 :func:`api.paths.settings_path`. A missing or damaged file never stops the
 app: defaults are used and the problem is logged. Each field is validated on
-its own, so one bad value only resets that field.
+its own, so one bad value only resets that field. A file that can't be
+written never stops the app either: the new values apply until it closes,
+and :meth:`SettingsStore.update` reports a ``SETTINGS_SAVE_FAILED`` issue so
+the UI can say so (audit R6).
 """
 
 from __future__ import annotations
@@ -17,10 +20,12 @@ import re
 import tempfile
 import threading
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .service import DPI, OCR_LANGUAGE, OCR_PAGE_TIMEOUT_SEC
+from .logging_setup import log_issue
+from .service import DPI, OCR_LANGUAGE, OCR_PAGE_TIMEOUT_SEC, Issue, settings_save_failed
 
 log = logging.getLogger(__name__)
 
@@ -133,8 +138,28 @@ def validate_patch(patch: Any) -> tuple[dict[str, Any], list[str]]:
     return valid, problems
 
 
+@dataclass(frozen=True)
+class SettingsUpdate:
+    """The outcome of :meth:`SettingsStore.update`.
+
+    Attributes:
+        settings: The full settings now in effect (a copy), including the patch.
+        issue: ``SETTINGS_SAVE_FAILED`` (already logged) if the file couldn't be
+            written, so the settings only apply until the app closes; ``None``
+            when they were saved.
+    """
+
+    settings: dict[str, Any]
+    issue: Issue | None = None
+
+
 class SettingsStore:
     """The user's settings, in memory and on disk. Thread-safe.
+
+    Updates are applied one at a time, in the order :meth:`update` was called
+    (first come, first served), and each one is merged and written as a unit.
+    So the file always ends up holding the latest values, and a slow write
+    can't let a later change be overtaken by an earlier one.
 
     Args:
         path: The settings file. Its folder is created on the first save.
@@ -142,8 +167,12 @@ class SettingsStore:
 
     def __init__(self, path: Path):
         self._path = Path(path)
-        self._lock = threading.Lock()
+        self._lock = threading.Lock()  # Guards _values and the file.
         self._values: dict[str, Any] = copy.deepcopy(DEFAULTS)
+        # A ticket queue: plain locks don't wake waiters in arrival order.
+        self._turn = threading.Condition()
+        self._next_ticket = 0  # Handed to the next caller of update().
+        self._serving = 0  # The ticket whose update may run now.
 
     @property
     def path(self) -> Path:
@@ -183,30 +212,42 @@ class SettingsStore:
         with self._lock:
             return copy.deepcopy(self._values)
 
-    def update(self, patch: Any) -> dict[str, Any]:
+    def update(self, patch: Any) -> SettingsUpdate:
         """Merge a partial settings object, persist it and return the full settings.
 
         Invalid or unknown fields are skipped and logged; the rest is applied.
         If the file can't be written, the new values still apply for this
-        session and the failure is logged.
+        session and the result carries a logged ``SETTINGS_SAVE_FAILED`` issue.
+        Concurrent calls run one at a time, in the order they were made.
 
         Args:
             patch: Partial ``Settings`` from the UI (camelCase keys).
 
         Returns:
-            A copy of the full settings after the update.
+            The full settings after the update and the save issue, if any.
         """
         valid, problems = validate_patch(patch)
         for problem in problems:
             log.warning("Ignoring setting from the UI: %s", problem)
-        with self._lock:
-            self._values.update(valid)
-            snapshot = copy.deepcopy(self._values)
-            try:
-                self._write(snapshot)
-            except OSError:
-                log.exception("Couldn't save settings to %s", self._path)
-        return snapshot
+        with self._turn:
+            ticket = self._next_ticket
+            self._next_ticket += 1
+            self._turn.notify_all()  # Lets tests see that a caller is queued.
+            self._turn.wait_for(lambda: self._serving == ticket)
+        try:
+            with self._lock:
+                self._values.update(valid)
+                snapshot = copy.deepcopy(self._values)
+                try:
+                    self._write(snapshot)
+                except OSError as exc:
+                    details = f"Couldn't write {self._path}: {type(exc).__name__}: {exc}"
+                    return SettingsUpdate(snapshot, log_issue(settings_save_failed(details), exc))
+            return SettingsUpdate(snapshot)
+        finally:
+            with self._turn:
+                self._serving += 1
+                self._turn.notify_all()
 
     def _write(self, values: dict[str, Any]) -> None:
         """Write the settings atomically: a temp file in the same folder, then replace.
@@ -230,7 +271,7 @@ class SettingsStore:
                 stream.flush()
                 os.fsync(stream.fileno())
             # Known issue: on Windows, replace can briefly fail if antivirus or
-            # a backup tool has the file open; the error is logged by the caller.
+            # a backup tool has the file open; the caller reports it as an issue.
             os.replace(temp_name, self._path)
         except BaseException:
             Path(temp_name).unlink(missing_ok=True)

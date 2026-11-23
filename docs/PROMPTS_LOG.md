@@ -67,8 +67,8 @@ A short, summarized record of each request made to the coding agent, and what ca
     - [ ] API layer: after merging its branch, move Windows-specific parts (opening folders, OCR install, settings paths) behind the same kind of interface.
 21. **Documentation for a post-build review.** Keep accurate, proportional documentation of architecture decisions, dependencies, execution flows, non-obvious choices, significant bugs, tests and CI, so the owner can understand, debug, modify and defend the app; never claim unreviewed code was reviewed. Checklist:
     - [x] Record decision P16 and add the rule to `AGENTS.md`.
-    - [ ] Write `docs/ARCHITECTURE.md` once `run_action` is implemented.
-    - [ ] Update `docs/ENGINEERING_REVIEW.md` with the bugs found and their status, plus a review-status section.
+    - [x] Write `docs/ARCHITECTURE.md` once `run_action` is implemented. (API layer and frontend sections pending their merge.)
+    - [x] Update `docs/ENGINEERING_REVIEW.md` with the bugs found and their status, plus a review-status section.
 22. **Split the converter into folders by responsibility.** Checklist:
     - [x] Record decision F36.
     - [x] Restructure `converter/` into subpackages (the API-layer branch's imports still need updating when it's merged).

@@ -112,4 +112,5 @@ A short, summarized record of each request made to the coding agent, and what ca
 30. **Retro, simple UI.** Make the frontend feel like 2016-era Microsoft Office software (own colour schemes), with few colours per scheme, fewer visual layers, heavier text, and Office's font or the closest free match. → Decisions F40–F42; restyled and shown to the owner on the local dev server.
 31. **UI refinements.** Soft rounded buttons, thicker borders, and at most three high-contrast, complementary tones per scheme (dark: black and gold; burgundy: burgundy and pink with white text). → Decision F43; screenshots checked for light and dark.
 32. **Less contrast, more muted.** Background, foreground, text and at most one accent per scheme; neighbouring colours easy to tell apart. → Decision F44; light and dark screenshots checked.
+33. **Drop the eyebrow texts.** Quick, easy instructions instead of subtitles everywhere. → Decision F45; action explanations moved into (?) tooltips; unused summaries and hint styles removed.
 

@@ -115,4 +115,5 @@ A short, summarized record of each request made to the coding agent, and what ca
 33. **Drop the eyebrow texts.** Quick, easy instructions instead of subtitles everywhere. → Decision F45; action explanations moved into (?) tooltips; unused summaries and hint styles removed.
 34. **Too empty: add explanation, not eyebrows.** → Each action page opens with a plain sentence on what it does; every option has a short explanation beside it (F45 updated).
 35. **Too spacious; make content bigger.** → Decision F46: smaller default window, left-aligned content with less dead space, larger text and controls.
+36. **Use the horizontal space; is a copyright line valid; add the needed licences.** → Two-column layout on wide windows (F47). A copyright line is valid; PyMuPDF's AGPL-3.0 applies to the distributed app, so `THIRD_PARTY_NOTICES.md` and every bundled licence text ship with it, and the app shows its copyright, licences and source location (P30). The owner will research licensing further.
 

@@ -129,4 +129,4 @@ All document processing runs locally. Never commit real user documents, copyrigh
 
 This project is developed with Claude Code and AI subagents under human-directed requirements and architectural decisions. Generated changes require human code review and runtime validation before the v1.0 release.
 
-**License:** [MIT](LICENSE).
+**License:** PDF Manager's own code is [MIT](LICENSE). The distributed app also bundles open-source components, notably **PyMuPDF (GNU AGPL-3.0)**, so the app as a whole is distributed under the AGPL-3.0's terms; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and the [`licenses/`](licenses) folder (regenerate with `uv run --with pip scripts/collect_licenses.py`).

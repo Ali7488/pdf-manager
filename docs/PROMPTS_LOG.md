@@ -53,4 +53,8 @@ A short, summarized record of each request made to the coding agent, and what ca
     - [x] Record decisions P13 and F35.
     - [ ] Define the service-layer interface (`run_action`, types, issues, cancellation).
     - [ ] Hand the API layer, the new actions and packaging to parallel agents; merge their branches.
+18. **Verbose logging in development.** Error logging should be verbose in development mode; production can be more concise but still keep some verbose logs. Checklist:
+    - [x] Record decision C13.
+    - [ ] Service layer logs verbosely at DEBUG level (commands, timings, tool output, tracebacks).
+    - [ ] API layer: DEBUG level in development mode, INFO in production, with errors always logged in full.
 

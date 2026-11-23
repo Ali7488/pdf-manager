@@ -36,6 +36,7 @@ Decisions made by the project owner, in their own direction (summarized, not quo
 | C11 | 2026-11-22 | The installer checks for Microsoft PowerPoint first and offers LibreOffice as an optional backup. |
 | C12 | 2026-11-22 | Investigate PowerPoint conversion falling back to **LibreOffice** too often. |
 | P13 | 2026-11-22 | Push small commits as you go, and use as many parallel subagents as needed. |
+| C13 | 2026-11-22 | **Logging levels:** verbose logs in **development mode** (running from source, for the owner's testing). **Production** (the installed app) logs more concisely, but still keeps verbose records for errors. |
 
 ## Frontend and packaging
 

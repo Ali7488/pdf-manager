@@ -163,3 +163,22 @@ A short, summarized record of each request made to the coding agent, and what ca
     - [x] CI 45243745067 and Windows build 45243767264 green; draft pull request #2 for the owner's review (real Windows 11 testing still open).
     - [x] Docs and decisions (P33, docs/BROWSER_MODE.md).
 
+42. **Update draft PR #2: LibreOffice-only presentations, per-upload UUIDs, unsaved-result protection, save recovery, exact source link.** The owner's decisions:
+    - Use LibreOffice Impress as the only automatic converter for `.ppt`/`.pptx` on every supported OS, with the same path for drag and drop and Add files. Explain what to install when a presentation is added and Impress is missing; keep PDF-only workflows independent of LibreOffice; document the manual PowerPoint-to-PDF route for a closer visual match. Test representative decks (missing or clipped text, numerical labels, charts, fonts, slide count) and record fidelity follow-ups.
+    - One server-generated UUID per upload (storage path and lookup), original name for display and output, fresh UUID for every new upload, reused for later conversions. Private write and validation, ID published only after staging succeeds, failed attempts cleaned up, retry = fresh upload; renderer choice independent of provenance metadata. Test identical name/size/time, simultaneous same-name uploads, failure then retry, and that each ID resolves to the right bytes.
+    - Keep quick reopen and the one-hour idle timeout, but never idle-shut-down with active work or an unsaved result; confirm before Quit discards unsaved results; test that a finished unsaved job survives the idle deadline.
+    - After a reload, a job saved to a folder shows its saved outcome or stays out of recovery, never a failing Save; Download again stays until Done; test folder saves and downloads across reloads.
+    - About links to the exact Git revision of the build; verify the preview ZIP links to its own commit and the release source bundle matches the shipped build.
+    - Run the regression tests and CI, rebuild the Windows preview ZIP from the updated commit, report its link, SHA and results, list the pending interactive Windows 11 checks, and keep PR #2 a draft.
+
+    The owner also asked for small commits along the way, full reasoned summaries, and a list of what is needed from them.
+
+    Found while reading: commit `b018810` had deleted decisions F1–F47 and O1–O3 from `docs/DECISIONS.md`; restored (`24c6330`). Decisions C17, P34–P38 recorded; O4 (installer LibreOffice default) and O5 (do downloads count as saved) opened with interim choices. Checklist:
+    - [x] Restore the deleted decisions; record the new ones.
+    - [ ] Per-upload UUIDs, with tests.
+    - [ ] Unsaved-result protection (idle shutdown, Quit confirmation), with tests.
+    - [ ] Save recovery after a reload, with tests.
+    - [ ] LibreOffice-only presentation conversion, add-time notice, installer and docs, with tests.
+    - [ ] About links to the build's exact commit; workflow checks the ZIP and the source bundle.
+    - [ ] Fidelity test of representative decks; follow-ups recorded.
+    - [ ] Checks, CI, Windows preview ZIP; PR #2 updated, still a draft.

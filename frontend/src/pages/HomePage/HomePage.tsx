@@ -26,8 +26,7 @@ export function HomePage() {
         <p className={styles.dropTitle}>Drop PDFs, PowerPoints or images here</p>
         <p className={styles.dropHint}>You can drop files on any page of this window.</p>
         <div className={styles.dropButtons}>
-          <AddFilesButton kind="documents" variant="primary" />
-          <AddFilesButton kind="images" />
+          <AddFilesButton kind="all" variant="primary" />
         </div>
       </div>
 

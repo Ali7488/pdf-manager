@@ -1,17 +1,27 @@
 import { screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { Action } from "../../api/types";
 import { renderApp } from "../../test/renderApp";
 
 describe("HomePage", () => {
-  it("shows the drop zone and adds picked files", async () => {
-    const { user } = await renderApp();
+  it("shows the drop zone and adds every kind of file with one button", async () => {
+    const { user, mock } = await renderApp();
+    const pickFiles = vi.spyOn(mock, "pickFiles");
     expect(screen.getByText("Drop PDFs, PowerPoints or images here")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add images" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Add files" }));
+    expect(pickFiles).toHaveBeenCalledWith("all");
     expect(await screen.findByText("Sample report.pdf")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Add images" }));
-    expect(await screen.findByText("Photo 1.jpg")).toBeInTheDocument();
+    expect(screen.getByText("Photo 1.jpg")).toBeInTheDocument();
     expect(screen.getAllByTestId("file-row")).toHaveLength(5);
+  });
+
+  it("asks for images only on the Images to PDF tab", async () => {
+    const { user, mock } = await renderApp({ state: { page: Action.ImagesToPdf } });
+    const pickFiles = vi.spyOn(mock, "pickFiles");
+    await user.click(screen.getByRole("button", { name: "Add images" }));
+    expect(pickFiles).toHaveBeenCalledWith("images");
   });
 
   it("opens a mode tab from its button", async () => {

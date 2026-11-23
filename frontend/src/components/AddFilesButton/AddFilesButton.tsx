@@ -7,9 +7,9 @@ import { Button, type ButtonProps } from "../Button/Button";
 
 /** Props for {@link AddFilesButton}. */
 export interface AddFilesButtonProps extends Pick<ButtonProps, "variant" | "size"> {
-  /** "documents" for PDF and PowerPoint, "images" for PNG and JPG. */
-  kind: "documents" | "images";
-  /** Button text. Defaults to "Add files" or "Add images". */
+  /** "all" for every supported type, "documents" for PDF and PowerPoint, "images" for PNG and JPG. */
+  kind: "all" | "documents" | "images";
+  /** Button text. Defaults to "Add images" for images, otherwise "Add files". */
   label?: string;
 }
 

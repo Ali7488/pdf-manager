@@ -694,3 +694,25 @@ def test_save_after_shutdown_reports_results_gone(make_manager, recorder, tmp_pa
     assert "No results found" in info.value.issue.details
     assert list(out.iterdir()) == []
     assert not scratch_folders(tmp_path)
+
+
+def test_save_with_keep_leaves_results_for_another_save(make_manager, recorder, tmp_path):
+    """keep=True (browser download copies): the results stay until saved or discarded."""
+    first, second = tmp_path / "copy", tmp_path / "out"
+    first.mkdir()
+    second.mkdir()
+    manager, job_id = finished_job(make_manager, recorder, "a.pdf")
+    kept = manager.save(job_id, first, as_zip=False, keep=True)
+    assert [p.name for p in kept] == ["a.pdf"] and scratch_folders(tmp_path)
+    saved = manager.save(job_id, second, as_zip=False)
+    assert [p.name for p in saved] == ["a.pdf"] and not scratch_folders(tmp_path)
+
+
+def test_no_new_job_after_shutdown(make_manager, recorder, tmp_path):
+    """Once shut down, the manager refuses new jobs and leaves no scratch folder."""
+    manager = make_manager(succeeding("a.pdf"))
+    manager.shutdown()
+    with pytest.raises(ConversionError) as info:
+        manager.start(Action.FLATTEN, ActionSettings(), DATA)
+    assert "closing" in info.value.issue.details
+    assert not scratch_folders(tmp_path)

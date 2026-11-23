@@ -227,6 +227,7 @@ class JobManager:
         # Signalled on every change of a job's state, under _lock.
         self._changed = threading.Condition(self._lock)
         self._jobs: dict[str, _Job] = {}
+        self._closed = False  # Set by shutdown: no new jobs after it.
 
     def running_job(self) -> str | None:
         """Return the id of the running job, or ``None`` if none is running."""
@@ -249,6 +250,8 @@ class JobManager:
                 or the scratch folder couldn't be created.
         """
         with self._lock:
+            if self._closed:
+                raise ConversionError(unexpected_error("The app is closing."))
             if any(j.status == RUNNING for j in self._jobs.values()):
                 raise ConversionError(job_already_running())
             try:
@@ -263,6 +266,10 @@ class JobManager:
                 daemon=True,  # Never keep the app alive after the window closes.
             )
             self._jobs[job.id] = job
+            # Started under the lock, so a shutdown can't slip in between the
+            # job being registered and its worker running (it would delete the
+            # scratch folder of a job that then starts anyway).
+            job.thread.start()
         log.info("Job %s started: %s, %d file(s)", job.id, action, len(data.files))
         log.debug(
             "Job %s settings: %s; saved: dpi=%s lang=%s timeout=%s tesseract=%s; files: %s",
@@ -274,7 +281,6 @@ class JobManager:
             settings.tesseract_path,
             [str(f) for f in data.files],
         )
-        job.thread.start()
         return job.id
 
     def cancel(self, job_id: str) -> bool:
@@ -405,15 +411,17 @@ class JobManager:
             self._changed.notify_all()
             return job
 
-    def _end_save(self, job: _Job, saved: bool) -> None:
+    def _end_save(self, job: _Job, saved: bool, keep: bool = False) -> None:
         """Leave the ``saving`` state; delete the results if saved or no longer wanted.
 
         Args:
             job: The job :meth:`_begin_save` returned.
             saved: Whether every file was written.
+            keep: Keep the results even though they were saved (a copy for a
+                browser download, which the user may still need to repeat).
         """
         with self._changed:
-            drop = saved or job.drop_requested
+            drop = (saved and not keep) or job.drop_requested
             job.state = GONE if drop else READY
             if drop and self._jobs.get(job.id) is job:
                 del self._jobs[job.id]
@@ -423,7 +431,7 @@ class JobManager:
                 log.info("Job %s results dropped after its save ended", job.id)
             _remove_tree(job.scratch)
 
-    def save(self, job_id: str, folder: Path, as_zip: bool) -> list[Path]:
+    def save(self, job_id: str, folder: Path, as_zip: bool, keep: bool = False) -> list[Path]:
         """Copy a finished job's results into a folder, never overwriting anything.
 
         Names that already exist get `` (2)``, `` (3)`` and so on
@@ -441,6 +449,8 @@ class JobManager:
             job_id: The finished job.
             folder: Destination folder; must exist.
             as_zip: Save everything as one zip file.
+            keep: Keep the results after a successful save (browser mode's
+                download copies); they stay until saved, discarded or shut down.
 
         Returns:
             Full paths written.
@@ -474,7 +484,7 @@ class JobManager:
                 raise
             saved = True
         finally:
-            self._end_save(job, saved)
+            self._end_save(job, saved, keep)
         log.info("Job %s saved: %s", job_id, [str(p) for p in written])
         return written
 
@@ -554,6 +564,7 @@ class JobManager:
                 to finish (and again for an aborted save to roll back).
         """
         with self._changed:
+            self._closed = True
             jobs = list(self._jobs.values())
             self._jobs.clear()
             saving = [job for job in jobs if job.state == SAVING]

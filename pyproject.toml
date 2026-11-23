@@ -12,6 +12,7 @@ dependencies = [
 [dependency-groups]
 # Test-only: python-pptx builds a sample PPTX fixture in tests/smoke_test.py.
 dev = [
+    "pytest>=8",
     "python-pptx>=1.0,<2",
 ]
 

@@ -18,22 +18,21 @@ Input files are never modified. Outputs are built in a temporary folder and save
 
 ## Windows
 
-Run `INSTALL.bat` once (it creates a virtual environment and installs Tesseract and LibreOffice through `winget` if they are missing), then start the app with `OPEN.bat`. Review the installer before distributing it publicly.
+Run `INSTALL.bat` once (it installs [uv](https://docs.astral.sh/uv/) if needed, uses it to set up Python and the dependencies in `.venv`, and installs Tesseract and LibreOffice through `winget` if they are missing), then start the app with `OPEN.bat`. Review the installer before distributing it publicly.
 
-## Development (Linux)
+## Development
 
 ```bash
-python -m venv .venv
-.venv/bin/python -m pip install -r requirements-dev.txt
+uv sync    # creates .venv with the pinned Python and all dependencies
 # Tesseract (English) and LibreOffice must be installed for the integration tests.
-.venv/bin/python tests/smoke_test.py
-.venv/bin/python tests/test_temp_lock.py
-.venv/bin/python app.py
+uv run tests/smoke_test.py
+uv run tests/test_temp_lock.py
+uv run app.py
 ```
 
 ## Dependencies
 
-Python packages (`requirements.txt`):
+Python packages (`pyproject.toml`, locked in `uv.lock`):
 
 | Package | Used in | Why |
 | --- | --- | --- |
@@ -51,7 +50,7 @@ External programs:
 
 The GUI uses only the standard library (Tkinter).
 
-Development only (`requirements-dev.txt`): python-pptx, which the tests use to build a sample PPTX file.
+Development only (the `dev` dependency group): python-pptx, which the tests use to build a sample PPTX file.
 
 ## Layout
 

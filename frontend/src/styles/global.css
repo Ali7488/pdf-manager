@@ -22,9 +22,6 @@ body {
   font-weight: var(--font-weight-regular);
   line-height: var(--line-height-normal);
   -webkit-font-smoothing: antialiased;
-  transition:
-    background-color var(--duration-slow) var(--ease-standard),
-    color var(--duration-slow) var(--ease-standard);
 }
 
 /* No scattered italics or bold: headings and strong text use medium (500). */

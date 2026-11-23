@@ -74,7 +74,9 @@ export function ActionPage({ action }: ActionPageProps) {
           {usedFiles.length === 0
             ? `Add ${kindsText} to start.`
             : problem
-              ? "Fix the options above to start."
+              ? settings.split.method === "ranges" && settings.split.ranges.trim() === ""
+                ? "Type the pages to split above."
+                : "Fix the options above to start."
               : usedFiles.length === 1
                 ? "Ready: 1 file."
                 : `Ready: ${usedFiles.length} files.`}

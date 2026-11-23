@@ -1,0 +1,993 @@
+{
+  "generated_by": "scripts/collect_licenses.py",
+  "python_windows": "3.13.17",
+  "pyinstaller": "6.22.3",
+  "mupdf": "1.28.2",
+  "webview2_sdk": {
+    "version": "1.0.3856.49",
+    "sha256": {
+      "webview/lib/Microsoft.Web.WebView2.Core.dll": "8219a3135436c147f8eb02fb831e99596103eebc18b6d7b794ca93f4c67018a2",
+      "webview/lib/Microsoft.Web.WebView2.WinForms.dll": "c48f8d729dc531288d2c53a6241effe7922ed1b947850b2442008a945c098c48",
+      "webview/lib/runtimes/win-x64/native/WebView2Loader.dll": "eb5335edeaa6f2122c044e82aab2351dc8c9b4e0fe5e578c71922fb61be285e7",
+      "webview/lib/runtimes/win-x86/native/WebView2Loader.dll": "04814b2c59314c6452d61b821a4a3a5c5f8e8577b55b985f6a7a4b59f8907ec5",
+      "webview/lib/runtimes/win-arm64/native/WebView2Loader.dll": "0937030efc718f3da77c5e0978fb5046e381d0bb7b01acaad31a535a1b588a33"
+    }
+  },
+  "sources": {
+    "python": [
+      {
+        "component": "bottle",
+        "version": "0.13.4",
+        "url": "https://files.pythonhosted.org/packages/7a/71/cca6167c06d00c81375fd668719df245864076d284f7cb46a694cbeb5454/bottle-0.13.4.tar.gz",
+        "sha256": "787e78327e12b227938de02248333d788cfe45987edca735f8f88e03472c3f47",
+        "platforms": [
+          "linux",
+          "windows"
+        ]
+      },
+      {
+        "component": "cffi",
+        "version": "2.1.1",
+        "url": "https://files.pythonhosted.org/packages/9e/ef/008a1939e372c06329a3fce4279c02f328488f3526744906eeec3da7ad5f/cffi-2.1.1.tar.gz",
+        "sha256": "dd31f52ea1086513bb9df30f8fcee9b8918323ae067a3d5b78bc826a000712be",
+        "platforms": [
+          "windows"
+        ]
+      },
+      {
+        "component": "clr-loader",
+        "version": "0.3.1",
+        "url": "https://files.pythonhosted.org/packages/e4/46/7eea92b6aa2d68af78e049cbecec5f757f1aad44ecdecdc16bbad7eead51/clr_loader-0.3.1.tar.gz",
+        "sha256": "2e073e9aaf49d1ae2f56ecba27987ad5fb68be4bcd9dd34a5bed8f0e4e128366",
+        "platforms": [
+          "windows"
+        ]
+      },
+      {
+        "component": "packaging",
+        "version": "26.3",
+        "url": "https://files.pythonhosted.org/packages/7d/fa/3944b40b07da9ce895c0e6303a5ab7d53da063554f534556b134a54d6093/packaging-26.3.tar.gz",
+        "sha256": "94edc256424af38762eb31306eed28beb9f0efc50a8837492c9d6fd6004aed79",
+        "platforms": [
+          "linux"
+        ]
+      },
+      {
+        "component": "proxy-tools",
+        "version": "0.1.0",
+        "url": "https://files.pythonhosted.org/packages/f2/cf/77d3e19b7fabd03895caca7857ef51e4c409e0ca6b37ee6e9f7daa50b642/proxy_tools-0.1.0.tar.gz",
+        "sha256": "ccb3751f529c047e2d8a58440d86b205303cf0fe8146f784d1cbcd94f0a28010",
+        "platforms": [
+          "linux",
+          "windows"
+        ]
+      },
+      {
+        "component": "pycparser",
+        "version": "3.12",
+        "url": "https://files.pythonhosted.org/packages/cb/27/eeb9f307bf07060f3d9f9aa0fb8c15b01bdfded0a941e4b2719c7f94cacd/pycparser-3.12.tar.gz",
+        "sha256": "f03387877eab82ce01bbdfd0ba7252ee55a90b1c708d5129e2ce915475cf1db6",
+        "platforms": [
+          "windows"
+        ]
+      },
+      {
+        "component": "pymupdf",
+        "version": "1.28.2",
+        "url": "https://files.pythonhosted.org/packages/a3/fb/b6761fa2d5266f2cdb24c3b91f4023070ab7848381417678e7a289a1d52a/pymupdf-1.28.2.tar.gz",
+        "sha256": "5e0be7908a715aa20333caddd73f1d6f01e4cd0c26e869fa2dd0b7f344da2249",
+        "platforms": [
+          "linux",
+          "windows"
+        ]
+      },
+      {
+        "component": "pyside6",
+        "version": "6.12.0",
+        "url": "https://download.qt.io/official_releases/QtForPython/pyside6/PySide6-6.12.0-src/pyside-setup-everywhere-src-6.12.0.tar.xz",
+        "sha256": "",
+        "platforms": [
+          "linux"
+        ]
+      },
+      {
+        "component": "pyside6-addons",
+        "version": "6.12.0",
+        "url": "https://download.qt.io/official_releases/QtForPython/pyside6/PySide6-6.12.0-src/pyside-setup-everywhere-src-6.12.0.tar.xz and https://download.qt.io/official_releases/qt/6.12/6.12.0/single/qt-everywhere-src-6.12.0.tar.xz",
+        "sha256": "",
+        "platforms": [
+          "linux"
+        ]
+      },
+      {
+        "component": "pyside6-essentials",
+        "version": "6.12.0",
+        "url": "https://download.qt.io/official_releases/QtForPython/pyside6/PySide6-6.12.0-src/pyside-setup-everywhere-src-6.12.0.tar.xz and https://download.qt.io/official_releases/qt/6.12/6.12.0/single/qt-everywhere-src-6.12.0.tar.xz",
+        "sha256": "",
+        "platforms": [
+          "linux"
+        ]
+      },
+      {
+        "component": "pyside6-pdf",
+        "version": "6.12.0.140",
+        "url": "https://download.qt.io/official_releases/QtForPython/pyside6/PySide6-6.12.0-src/pyside-setup-everywhere-src-6.12.0.tar.xz and https://download.qt.io/official_releases/qt/6.12/6.12.0/single/qt-everywhere-src-6.12.0.tar.xz",
+        "sha256": "",
+        "platforms": [
+          "linux"
+        ]
+      },
+      {
+        "component": "pyside6-webengine",
+        "version": "6.12.0.140",
+        "url": "https://download.qt.io/official_releases/QtForPython/pyside6/PySide6-6.12.0-src/pyside-setup-everywhere-src-6.12.0.tar.xz and https://download.qt.io/official_releases/qt/6.12/6.12.0/single/qt-everywhere-src-6.12.0.tar.xz",
+        "sha256": "",
+        "platforms": [
+          "linux"
+        ]
+      },
+      {
+        "component": "pythonnet",
+        "version": "3.2.1",
+        "url": "https://files.pythonhosted.org/packages/ef/34/98f38d7ca1e9eb684d297d1d6a9420f3f3a32f411eae82a7f25a2b783539/pythonnet-3.2.1.tar.gz",
+        "sha256": "c86e8dd31268f6e0c48fcc4d6030041316d49ed2764a1cb6ea8c37876e07c572",
+        "platforms": [
+          "windows"
+        ]
+      },
+      {
+        "component": "pywebview",
+        "version": "6.2.1",
+        "url": "https://files.pythonhosted.org/packages/59/4a/05307135dafba67778669d194bd1a3822a7685ec9ee8a6d7e70856c1a551/pywebview-6.2.1.tar.gz",
+        "sha256": "71b7136752e40824655304d938efb62014218d1a90bd8e87e1cbdb1ce9c466af",
+        "platforms": [
+          "linux",
+          "windows"
+        ]
+      },
+      {
+        "component": "pywin32",
+        "version": "312",
+        "url": "https://github.com/mhammond/pywin32/archive/refs/tags/b312.tar.gz",
+        "sha256": "",
+        "platforms": [
+          "windows"
+        ]
+      },
+      {
+        "component": "qtpy",
+        "version": "2.4.3",
+        "url": "https://files.pythonhosted.org/packages/70/01/392eba83c8e47b946b929d7c46e0f04b35e9671f8bb6fc36b6f7945b4de8/qtpy-2.4.3.tar.gz",
+        "sha256": "db744f7832e6d3da90568ba6ccbca3ee2b3b4a890c3d6fbbc63142f6e4cdf5bb",
+        "platforms": [
+          "linux"
+        ]
+      },
+      {
+        "component": "shiboken6",
+        "version": "6.12.0",
+        "url": "https://download.qt.io/official_releases/QtForPython/pyside6/PySide6-6.12.0-src/pyside-setup-everywhere-src-6.12.0.tar.xz",
+        "sha256": "",
+        "platforms": [
+          "linux"
+        ]
+      },
+      {
+        "component": "typing-extensions",
+        "version": "4.16.0",
+        "url": "https://files.pythonhosted.org/packages/f6/cc/6253133b5bb138fc3306cebfbda2c520f545d36b5be2c7255cc528bb45d6/typing_extensions-4.16.0.tar.gz",
+        "sha256": "dc983d19a509c94dba722ee6abd33940f7c05a89e243c47e907eb4db6f1a43e5",
+        "platforms": [
+          "linux",
+          "windows"
+        ]
+      }
+    ],
+    "frontend": [
+      {
+        "component": "@dnd-kit/accessibility",
+        "version": "3.1.1",
+        "url": "https://registry.npmjs.org/@dnd-kit/accessibility/-/accessibility-3.1.1.tgz",
+        "integrity": "sha512-2P+YgaXF+gRsIihwwY1gCsQSYnu9Zyj2py8kY5fFvUM1qm2WA2u639R6YNVfU4GWr+ZM5mqEsfHZZLoRONbemw==",
+        "platforms": [
+          "linux",
+          "windows"
+        ]
+      },
+      {
+        "component": "@dnd-kit/core",
+        "version": "6.3.1",
+        "url": "https://registry.npmjs.org/@dnd-kit/core/-/core-6.3.1.tgz",
+        "integrity": "sha512-xkGBRQQab4RLwgXxoqETICr6S5JlogafbhNsidmrkVv2YRs5MLwpjoF2qpiGjQt8S9AoxtIV603s0GIUpY5eYQ==",
+        "platforms": [
+          "linux",
+          "windows"
+        ]
+      },
+      {
+        "component": "@dnd-kit/sortable",
+        "version": "10.0.0",
+        "url": "https://registry.npmjs.org/@dnd-kit/sortable/-/sortable-10.0.0.tgz",
+        "integrity": "sha512-+xqhmIIzvAYMGfBYYnbKuNicfSsk4RksY2XdmJhT+HAC01nix6fHCztU68jooFiMUB01Ky3F0FyOvhG/BZrWkg==",
+        "platforms": [
+          "linux",
+          "windows"
+        ]
+      },
+      {
+        "component": "@dnd-kit/utilities",
+        "version": "3.2.2",
+        "url": "https://registry.npmjs.org/@dnd-kit/utilities/-/utilities-3.2.2.tgz",
+        "integrity": "sha512-+MKAJEOfaBe5SmV6t34p80MMKhjvUz0vRrvVJbPT0WElzaOJ/1xs+D+KDv+tD/NE5ujfrChEcshd4fLn0wpiqg==",
+        "platforms": [
+          "linux",
+          "windows"
+        ]
+      },
+      {
+        "component": "@fontsource-variable/open-sans",
+        "version": "5.3.0",
+        "url": "https://registry.npmjs.org/@fontsource-variable/open-sans/-/open-sans-5.3.0.tgz",
+        "integrity": "sha512-VOfhZfLIOBVa6K/dTEu7scqQXYdGa4jBX8quFpQ0S6574B+W2EOBJf9PkqyVtMEI7WWIWNEbpvPc3vY1mN2mmQ==",
+        "platforms": [
+          "linux",
+          "windows"
+        ]
+      },
+      {
+        "component": "react",
+        "version": "19.3.1",
+        "url": "https://registry.npmjs.org/react/-/react-19.3.1.tgz",
+        "integrity": "sha512-QNhWdt7nrgVWWQG58QuGsAR3jv3Hbe4mb4vz7w2csnHavciZJgda1CPNaldF6eVxv90ud3jUXpKlHL69gO38yw==",
+        "platforms": [
+          "linux",
+          "windows"
+        ]
+      },
+      {
+        "component": "react-dom",
+        "version": "19.3.1",
+        "url": "https://registry.npmjs.org/react-dom/-/react-dom-19.3.1.tgz",
+        "integrity": "sha512-Y0bARz53lhEC1NMCASs0/j+faB/zqt3R8hpvg1e8+61ZVJ4UL0UdC4cBbXfZMcIuhrfgeILTLe+ZeBCavQPtKQ==",
+        "platforms": [
+          "linux",
+          "windows"
+        ]
+      },
+      {
+        "component": "scheduler",
+        "version": "0.28.0",
+        "url": "https://registry.npmjs.org/scheduler/-/scheduler-0.28.0.tgz",
+        "integrity": "sha512-juorfCmIkIw8tT+p5BXSm6PJjQF/ycEYmKyzURCIt/RaZIhL+PulbQ9Yu2z1HdOJDdqDTlxA1+xKBmHXJsczAw==",
+        "platforms": [
+          "linux",
+          "windows"
+        ]
+      },
+      {
+        "component": "tslib",
+        "version": "2.9.1",
+        "url": "https://registry.npmjs.org/tslib/-/tslib-2.9.1.tgz",
+        "integrity": "sha512-a4Ux9VKuIMHsOS7ENbEq6hK2ZGYIT27Rtl0E4eD9KqwxhKiQeMZE/9xb3IdYwWaSOyIBQLExhQgXDTYoiCxnWA==",
+        "platforms": [
+          "linux",
+          "windows"
+        ]
+      }
+    ],
+    "mupdf": {
+      "url": "https://mupdf.com/downloads/archive/mupdf-1.28.2-source.tar.gz",
+      "sha256": "44075a84e329db55b9bef5f342a70fd26d69e48ad1d33cb89d9664581c641156"
+    },
+    "python_runtime": {
+      "url": "https://www.python.org/ftp/python/3.13.17/Python-3.13.17.tar.xz"
+    },
+    "pyinstaller": {
+      "url": "https://files.pythonhosted.org/packages/63/41/f90302845945abd4ed647933ff5ee7c6ac93983187be67f897b6cb613331/pyinstaller-6.22.3.tar.gz",
+      "sha256": "05eb2f5615503e72939a7224d68b4aff572c6b0438ee4a17d0a4b481f399362d"
+    }
+  },
+  "components": [
+    {
+      "name": "bottle",
+      "version": "0.13.4",
+      "license": "MIT",
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "group": "python",
+      "files": [
+        "python/bottle-0.13.4/LICENSE"
+      ]
+    },
+    {
+      "name": "cffi",
+      "version": "2.1.1",
+      "license": "MIT-0",
+      "platforms": [
+        "windows"
+      ],
+      "group": "python",
+      "files": [
+        "python/cffi-2.1.1/LICENSE"
+      ]
+    },
+    {
+      "name": "clr-loader",
+      "version": "0.3.1",
+      "license": "MIT",
+      "platforms": [
+        "windows"
+      ],
+      "group": "python",
+      "files": [
+        "python/clr-loader-0.3.1/LICENSE"
+      ]
+    },
+    {
+      "name": "packaging",
+      "version": "26.3",
+      "license": "Apache-2.0 OR BSD-2-Clause",
+      "platforms": [
+        "linux"
+      ],
+      "group": "python",
+      "files": [
+        "python/packaging-26.3/LICENSE",
+        "python/packaging-26.3/LICENSE.APACHE",
+        "python/packaging-26.3/LICENSE.BSD"
+      ]
+    },
+    {
+      "name": "proxy-tools",
+      "version": "0.1.0",
+      "license": "MIT",
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "group": "python",
+      "files": [
+        "python/proxy-tools-0.1.0/MIT.txt"
+      ]
+    },
+    {
+      "name": "pycparser",
+      "version": "3.12",
+      "license": "BSD-3-Clause",
+      "platforms": [
+        "windows"
+      ],
+      "group": "python",
+      "files": [
+        "python/pycparser-3.12/LICENSE"
+      ]
+    },
+    {
+      "name": "pymupdf",
+      "version": "1.28.2",
+      "license": "AGPL-3.0-only",
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "group": "python",
+      "files": [
+        "python/pymupdf-1.28.2/COPYING",
+        "python/pymupdf-1.28.2/AGPL-3.0-only.txt"
+      ]
+    },
+    {
+      "name": "pyside6",
+      "version": "6.12.0",
+      "license": "LGPL-3.0-only",
+      "platforms": [
+        "linux"
+      ],
+      "group": "python",
+      "files": [
+        "python/pyside6-6.12.0/LGPL-3.0-only.txt",
+        "python/pyside6-6.12.0/GPL-3.0-only.txt"
+      ]
+    },
+    {
+      "name": "pyside6-addons",
+      "version": "6.12.0",
+      "license": "LGPL-3.0-only",
+      "platforms": [
+        "linux"
+      ],
+      "group": "python",
+      "files": [
+        "python/pyside6-addons-6.12.0/LGPL-3.0-only.txt",
+        "python/pyside6-addons-6.12.0/GPL-3.0-only.txt"
+      ]
+    },
+    {
+      "name": "pyside6-essentials",
+      "version": "6.12.0",
+      "license": "LGPL-3.0-only",
+      "platforms": [
+        "linux"
+      ],
+      "group": "python",
+      "files": [
+        "python/pyside6-essentials-6.12.0/LGPL-3.0-only.txt",
+        "python/pyside6-essentials-6.12.0/GPL-3.0-only.txt"
+      ]
+    },
+    {
+      "name": "pyside6-pdf",
+      "version": "6.12.0.140",
+      "license": "LGPL-3.0-only",
+      "platforms": [
+        "linux"
+      ],
+      "group": "python",
+      "files": [
+        "python/pyside6-pdf-6.12.0.140/LGPL-3.0-only.txt",
+        "python/pyside6-pdf-6.12.0.140/GPL-3.0-only.txt"
+      ]
+    },
+    {
+      "name": "pyside6-webengine",
+      "version": "6.12.0.140",
+      "license": "LGPL-3.0-only",
+      "platforms": [
+        "linux"
+      ],
+      "group": "python",
+      "files": [
+        "python/pyside6-webengine-6.12.0.140/LGPL-3.0-only.txt",
+        "python/pyside6-webengine-6.12.0.140/GPL-3.0-only.txt"
+      ]
+    },
+    {
+      "name": "pythonnet",
+      "version": "3.2.1",
+      "license": "MIT",
+      "platforms": [
+        "windows"
+      ],
+      "group": "python",
+      "files": [
+        "python/pythonnet-3.2.1/AUTHORS.md",
+        "python/pythonnet-3.2.1/LICENSE"
+      ]
+    },
+    {
+      "name": "pywebview",
+      "version": "6.2.1",
+      "license": "BSD-3-Clause",
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "group": "python",
+      "files": [
+        "python/pywebview-6.2.1/LICENSE"
+      ]
+    },
+    {
+      "name": "pywin32",
+      "version": "312",
+      "license": "PSF",
+      "platforms": [
+        "windows"
+      ],
+      "group": "python",
+      "files": [
+        "python/pywin32-312/adodbapi/license.txt",
+        "python/pywin32-312/pythonwin/License.txt",
+        "python/pywin32-312/pythonwin/pywin/idle/LICENSE.txt",
+        "python/pywin32-312/adodbapi/license.txt",
+        "python/pywin32-312/com/License.txt",
+        "python/pywin32-312/com/win32comext/mapi/src/MAPIStubLibrary/LICENSE",
+        "python/pywin32-312/pythonwin/License.txt",
+        "python/pywin32-312/pythonwin/Scintilla/License.txt",
+        "python/pywin32-312/pythonwin/pywin/idle/LICENSE.txt",
+        "python/pywin32-312/win32/License.txt",
+        "python/pywin32-312/win32/License.txt",
+        "python/pywin32-312/win32com/License.txt",
+        "python/pywin32-312/win32comext/License.txt",
+        "python/pywin32-312/win32comext/mapi/NOTICE.md"
+      ]
+    },
+    {
+      "name": "qtpy",
+      "version": "2.4.3",
+      "license": "MIT",
+      "platforms": [
+        "linux"
+      ],
+      "group": "python",
+      "files": [
+        "python/qtpy-2.4.3/AUTHORS.md",
+        "python/qtpy-2.4.3/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "shiboken6",
+      "version": "6.12.0",
+      "license": "LGPL-3.0-only",
+      "platforms": [
+        "linux"
+      ],
+      "group": "python",
+      "files": [
+        "python/shiboken6-6.12.0/LGPL-3.0-only.txt",
+        "python/shiboken6-6.12.0/GPL-3.0-only.txt"
+      ]
+    },
+    {
+      "name": "typing-extensions",
+      "version": "4.16.0",
+      "license": "PSF-2.0",
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "group": "python",
+      "files": [
+        "python/typing-extensions-4.16.0/LICENSE"
+      ]
+    },
+    {
+      "name": "MuPDF (inside PyMuPDF)",
+      "version": "1.28.2",
+      "license": "AGPL-3.0",
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "group": "mupdf",
+      "files": [
+        "mupdf/COPYING"
+      ]
+    },
+    {
+      "name": "Brotli",
+      "version": "from MuPDF 1.28.2",
+      "license": "MIT",
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "group": "mupdf",
+      "files": [
+        "mupdf/brotli/LICENSE"
+      ]
+    },
+    {
+      "name": "cmark-gfm",
+      "version": "from MuPDF 1.28.2",
+      "license": "BSD-2-Clause and others (see COPYING)",
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "group": "mupdf",
+      "files": [
+        "mupdf/cmark-gfm/COPYING"
+      ]
+    },
+    {
+      "name": "extract (Artifex)",
+      "version": "from MuPDF 1.28.2",
+      "license": "AGPL-3.0",
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "group": "mupdf",
+      "files": [
+        "mupdf/extract/COPYING"
+      ]
+    },
+    {
+      "name": "FreeType",
+      "version": "from MuPDF 1.28.2",
+      "license": "FTL OR GPL-2.0-or-later",
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "group": "mupdf",
+      "files": [
+        "mupdf/freetype/LICENSE.TXT",
+        "mupdf/freetype/docs/FTL.TXT"
+      ]
+    },
+    {
+      "name": "Gumbo HTML parser",
+      "version": "from MuPDF 1.28.2",
+      "license": "Apache-2.0",
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "group": "mupdf",
+      "files": [
+        "mupdf/gumbo-parser/COPYING"
+      ]
+    },
+    {
+      "name": "HarfBuzz",
+      "version": "from MuPDF 1.28.2",
+      "license": "MIT (\"Old MIT\")",
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "group": "mupdf",
+      "files": [
+        "mupdf/harfbuzz/COPYING"
+      ]
+    },
+    {
+      "name": "jbig2dec (Artifex)",
+      "version": "from MuPDF 1.28.2",
+      "license": "AGPL-3.0-or-later",
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "group": "mupdf",
+      "files": [
+        "mupdf/jbig2dec/LICENSE",
+        "mupdf/jbig2dec/COPYING"
+      ]
+    },
+    {
+      "name": "Little CMS (lcms2mt)",
+      "version": "from MuPDF 1.28.2",
+      "license": "MIT",
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "group": "mupdf",
+      "files": [
+        "mupdf/lcms2/LICENSE"
+      ]
+    },
+    {
+      "name": "Leptonica",
+      "version": "from MuPDF 1.28.2",
+      "license": "BSD-2-Clause",
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "group": "mupdf",
+      "files": [
+        "mupdf/leptonica/leptonica-license.txt"
+      ]
+    },
+    {
+      "name": "IJG libjpeg",
+      "version": "from MuPDF 1.28.2",
+      "license": "IJG (see LEGAL ISSUES in README)",
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "group": "mupdf",
+      "files": [
+        "mupdf/libjpeg/README"
+      ]
+    },
+    {
+      "name": "MuJS (Artifex)",
+      "version": "from MuPDF 1.28.2",
+      "license": "ISC",
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "group": "mupdf",
+      "files": [
+        "mupdf/mujs/COPYING"
+      ]
+    },
+    {
+      "name": "OpenJPEG",
+      "version": "from MuPDF 1.28.2",
+      "license": "BSD-2-Clause",
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "group": "mupdf",
+      "files": [
+        "mupdf/openjpeg/LICENSE"
+      ]
+    },
+    {
+      "name": "Tesseract OCR engine (library)",
+      "version": "from MuPDF 1.28.2",
+      "license": "Apache-2.0",
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "group": "mupdf",
+      "files": [
+        "mupdf/tesseract/LICENSE"
+      ]
+    },
+    {
+      "name": "Zint barcode library (backend)",
+      "version": "from MuPDF 1.28.2",
+      "license": "BSD-3-Clause",
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "group": "mupdf",
+      "files": [
+        "mupdf/zint/LICENSE"
+      ]
+    },
+    {
+      "name": "zlib",
+      "version": "from MuPDF 1.28.2",
+      "license": "Zlib",
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "group": "mupdf",
+      "files": [
+        "mupdf/zlib/LICENSE"
+      ]
+    },
+    {
+      "name": "ZXing-C++",
+      "version": "from MuPDF 1.28.2",
+      "license": "Apache-2.0",
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "group": "mupdf",
+      "files": [
+        "mupdf/zxing-cpp/LICENSE"
+      ]
+    },
+    {
+      "name": "Droid fonts",
+      "version": "from MuPDF 1.28.2",
+      "license": "Apache-2.0",
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "group": "mupdf",
+      "files": [
+        "mupdf/droid/NOTICE"
+      ]
+    },
+    {
+      "name": "Source Han fonts",
+      "version": "from MuPDF 1.28.2",
+      "license": "OFL-1.1",
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "group": "mupdf",
+      "files": [
+        "mupdf/han/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "Noto fonts",
+      "version": "from MuPDF 1.28.2",
+      "license": "OFL-1.1",
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "group": "mupdf",
+      "files": [
+        "mupdf/noto/COPYING"
+      ]
+    },
+    {
+      "name": "Charis SIL font",
+      "version": "from MuPDF 1.28.2",
+      "license": "OFL-1.1",
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "group": "mupdf",
+      "files": [
+        "mupdf/sil/OFL.txt"
+      ]
+    },
+    {
+      "name": "@dnd-kit/accessibility",
+      "version": "3.1.1",
+      "license": "MIT",
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "group": "frontend",
+      "files": [
+        "frontend/@dnd-kit__accessibility-3.1.1/LICENSE"
+      ]
+    },
+    {
+      "name": "@dnd-kit/core",
+      "version": "6.3.1",
+      "license": "MIT",
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "group": "frontend",
+      "files": [
+        "frontend/@dnd-kit__core-6.3.1/LICENSE"
+      ]
+    },
+    {
+      "name": "@dnd-kit/sortable",
+      "version": "10.0.0",
+      "license": "MIT",
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "group": "frontend",
+      "files": [
+        "frontend/@dnd-kit__sortable-10.0.0/LICENSE"
+      ]
+    },
+    {
+      "name": "@dnd-kit/utilities",
+      "version": "3.2.2",
+      "license": "MIT",
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "group": "frontend",
+      "files": [
+        "frontend/@dnd-kit__utilities-3.2.2/LICENSE"
+      ]
+    },
+    {
+      "name": "@fontsource-variable/open-sans",
+      "version": "5.3.0",
+      "license": "OFL-1.1",
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "group": "frontend",
+      "files": [
+        "frontend/@fontsource-variable__open-sans-5.3.0/LICENSE"
+      ]
+    },
+    {
+      "name": "react",
+      "version": "19.3.1",
+      "license": "MIT",
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "group": "frontend",
+      "files": [
+        "frontend/react-19.3.1/LICENSE"
+      ]
+    },
+    {
+      "name": "react-dom",
+      "version": "19.3.1",
+      "license": "MIT",
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "group": "frontend",
+      "files": [
+        "frontend/react-dom-19.3.1/LICENSE"
+      ]
+    },
+    {
+      "name": "scheduler",
+      "version": "0.28.0",
+      "license": "MIT",
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "group": "frontend",
+      "files": [
+        "frontend/scheduler-0.28.0/LICENSE"
+      ]
+    },
+    {
+      "name": "tslib",
+      "version": "2.9.1",
+      "license": "0BSD",
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "group": "frontend",
+      "files": [
+        "frontend/tslib-2.9.1/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "Python runtime (python.org Windows build)",
+      "version": "3.13.17",
+      "license": "PSF-2.0 (and the bundled libraries' licences inside)",
+      "platforms": [
+        "windows"
+      ],
+      "group": "other",
+      "files": [
+        "other/python-runtime-windows-3.13.17/LICENSE.txt",
+        "other/python-runtime-windows-3.13.17/license.rst"
+      ]
+    },
+    {
+      "name": "Python runtime (Linux packages; confirm with the v0.75 build)",
+      "version": "3.13.18",
+      "license": "PSF-2.0",
+      "platforms": [
+        "linux"
+      ],
+      "group": "other",
+      "files": [
+        "other/python-runtime-linux/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "PyInstaller bootloader",
+      "version": "6.22.3",
+      "license": "GPL-2.0-or-later WITH Bootloader-exception",
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "group": "other",
+      "files": [
+        "other/pyinstaller-6.22.3/COPYING.txt"
+      ]
+    },
+    {
+      "name": "Feather Icons (design of some icons)",
+      "version": "4.x",
+      "license": "MIT",
+      "platforms": [
+        "linux",
+        "windows"
+      ],
+      "group": "other",
+      "files": [
+        "other/feather-icons/LICENSE"
+      ]
+    },
+    {
+      "name": "Microsoft WebView2 SDK files (Microsoft.Web.WebView2.Core.dll, Microsoft.Web.WebView2.WinForms.dll, WebView2Loader.dll), inside pywebview",
+      "version": "1.0.3856.49",
+      "license": "BSD-3-Clause-style Microsoft licence (no source published; see note)",
+      "platforms": [
+        "windows"
+      ],
+      "group": "other",
+      "files": [
+        "other/microsoft-webview2-sdk-1.0.3856.49/LICENSE.txt",
+        "other/microsoft-webview2-sdk-1.0.3856.49/NOTICE.txt"
+      ]
+    }
+  ]
+}

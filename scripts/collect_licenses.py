@@ -12,6 +12,17 @@ Writes (both committed, and shipped next to the installed app):
   licence list.
 * ``THIRD_PARTY_NOTICES.md``: one table of every bundled component, its version,
   its licence and the platforms it is bundled on.
+* ``licenses/manifest.json``: the same inventory in machine-readable form, plus the
+  exact versions and checksums ``scripts/check_licenses.py`` uses to detect a stale
+  inventory (in CI) and to check a built or installed app against it.
+
+Besides the Python and npm packages it covers the parts that aren't packages: the
+Windows Python runtime (python.org build, the exact version the Windows build
+uses), the PyInstaller bootloader, the Microsoft WebView2 SDK files inside
+pywebview (licence and notice from Microsoft's matching NuGet package, checked
+byte-for-byte against pywebview's copies), and MuPDF with the third-party
+libraries and fonts it compiles into PyMuPDF (licence files from the exact MuPDF
+source release). Downloads are cached in ``build/license-cache``.
 
 Only *runtime* dependencies that are bundled on Windows or Linux are included
 (macOS-only packages, development tools and test libraries are not shipped).
@@ -19,13 +30,16 @@ Only *runtime* dependencies that are bundled on Windows or Linux are included
 
 from __future__ import annotations
 
+import hashlib
 import importlib.metadata as md
 import json
 import re
 import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
+import tomllib
 import urllib.request
 import zipfile
 from dataclasses import dataclass, field
@@ -36,8 +50,55 @@ LICENSES = ROOT / "licenses"
 NOTICES = ROOT / "THIRD_PARTY_NOTICES.md"
 FRONTEND = ROOT / "frontend"
 SPDX_TEXT = "https://raw.githubusercontent.com/spdx/license-list-data/main/text/{}.txt"
+MANIFEST = LICENSES / "manifest.json"
+CACHE = ROOT / "build" / "license-cache"
 # Must match packaging/build.ps1 (its bootloader is part of the built app).
 PYINSTALLER_VERSION = "6.22.3"
+# The python.org CPython the Windows build bundles. Must match
+# .github/workflows/build-windows.yml; scripts/check_licenses.py fails the build
+# when the bundled interpreter is a different version.
+PYTHON_WINDOWS_VERSION = "3.13.17"
+# The Microsoft.Web.WebView2 NuGet release whose DLLs pywebview ships.
+WEBVIEW2_SDK_VERSION = "1.0.3856.49"
+WEBVIEW2_DLLS = {
+    # path inside pywebview's wheel: path inside the NuGet package
+    "webview/lib/Microsoft.Web.WebView2.Core.dll": "lib/net462/Microsoft.Web.WebView2.Core.dll",
+    "webview/lib/Microsoft.Web.WebView2.WinForms.dll": (
+        "lib/net462/Microsoft.Web.WebView2.WinForms.dll"
+    ),
+    "webview/lib/runtimes/win-x64/native/WebView2Loader.dll": "build/native/x64/WebView2Loader.dll",
+    "webview/lib/runtimes/win-x86/native/WebView2Loader.dll": "build/native/x86/WebView2Loader.dll",
+    "webview/lib/runtimes/win-arm64/native/WebView2Loader.dll": (
+        "build/native/arm64/WebView2Loader.dll"
+    ),
+}
+# Third-party code MuPDF compiles into PyMuPDF, from MuPDF's thirdparty/ and
+# resources/fonts/ folders: folder -> (name, licence, licence files in that folder).
+# curl and freeglut are left out: MuPDF uses them only in its own viewer apps, and
+# PyMuPDF's Windows library shows no trace of either. Including a notice for a
+# library that turns out not to be compiled in is harmless; missing one is not.
+MUPDF_PARTS = {
+    "thirdparty/brotli": ("Brotli", "MIT", ["LICENSE"]),
+    "thirdparty/cmark-gfm": ("cmark-gfm", "BSD-2-Clause and others (see COPYING)", ["COPYING"]),
+    "thirdparty/extract": ("extract (Artifex)", "AGPL-3.0", ["COPYING"]),
+    "thirdparty/freetype": ("FreeType", "FTL OR GPL-2.0-or-later", ["LICENSE.TXT", "docs/FTL.TXT"]),
+    "thirdparty/gumbo-parser": ("Gumbo HTML parser", "Apache-2.0", ["COPYING"]),
+    "thirdparty/harfbuzz": ("HarfBuzz", 'MIT ("Old MIT")', ["COPYING"]),
+    "thirdparty/jbig2dec": ("jbig2dec (Artifex)", "AGPL-3.0-or-later", ["LICENSE", "COPYING"]),
+    "thirdparty/lcms2": ("Little CMS (lcms2mt)", "MIT", ["LICENSE"]),
+    "thirdparty/leptonica": ("Leptonica", "BSD-2-Clause", ["leptonica-license.txt"]),
+    "thirdparty/libjpeg": ("IJG libjpeg", "IJG (see LEGAL ISSUES in README)", ["README"]),
+    "thirdparty/mujs": ("MuJS (Artifex)", "ISC", ["COPYING"]),
+    "thirdparty/openjpeg": ("OpenJPEG", "BSD-2-Clause", ["LICENSE"]),
+    "thirdparty/tesseract": ("Tesseract OCR engine (library)", "Apache-2.0", ["LICENSE"]),
+    "thirdparty/zint": ("Zint barcode library (backend)", "BSD-3-Clause", ["LICENSE"]),
+    "thirdparty/zlib": ("zlib", "Zlib", ["LICENSE"]),
+    "thirdparty/zxing-cpp": ("ZXing-C++", "Apache-2.0", ["LICENSE"]),
+    "resources/fonts/droid": ("Droid fonts", "Apache-2.0", ["NOTICE"]),
+    "resources/fonts/han": ("Source Han fonts", "OFL-1.1", ["LICENSE.txt"]),
+    "resources/fonts/noto": ("Noto fonts", "OFL-1.1", ["COPYING"]),
+    "resources/fonts/sil": ("Charis SIL font", "OFL-1.1", ["OFL.txt"]),
+}
 # Copyleft licences: always ship the full official text, even when a package
 # ships its own (short or partial) licence file. PyMuPDF's COPYING is one line.
 COPYLEFT = {"AGPL-3.0-only", "GPL-3.0-only", "LGPL-3.0-only", "GPL-2.0-only"}
@@ -66,6 +127,7 @@ class Component:
     platforms: set[str] = field(default_factory=set)
     used_for: str = ""
     files: list[str] = field(default_factory=list)
+    group: str = ""
 
 
 def runtime_python_packages() -> dict[str, tuple[str, set[str]]]:
@@ -130,11 +192,25 @@ def _from_installed(name: str, target: Path) -> tuple[str, list[str]] | None:
         if LICENSE_NAME.search(str(file)) and not str(file).endswith(".py"):
             source = Path(dist.locate_file(file))
             if source.is_file():
-                target.mkdir(parents=True, exist_ok=True)
-                dest = target / Path(str(file)).name
-                shutil.copyfile(source, dest)
-                copied.append(dest.name)
+                copied.append(_keep(target, str(file), source.read_bytes()))
     return _license_from_metadata(dist.metadata), copied
+
+
+def _keep(target: Path, member: str, data: bytes) -> str:
+    """Save one licence file under ``target`` and return its relative name.
+
+    Files are kept under their path inside the package (minus a leading
+    ``*.dist-info/licenses/`` or ``*.dist-info/`` part), so a package with several
+    ``License.txt`` files in different folders (pywin32) keeps all of them.
+    """
+    parts = Path(member).parts
+    if parts and parts[0].endswith(".dist-info"):
+        parts = parts[2:] if len(parts) > 2 and parts[1] == "licenses" else parts[1:]
+    relative = Path(*parts)
+    dest = target / relative
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(data)
+    return relative.as_posix()
 
 
 def _from_wheel(name: str, version: str, platform: str, target: Path) -> tuple[str, list[str]]:
@@ -168,11 +244,8 @@ def _from_wheel(name: str, version: str, platform: str, target: Path) -> tuple[s
             for member in archive.namelist():
                 if member.endswith(".dist-info/METADATA"):
                     meta_text = archive.read(member).decode("utf-8", "replace")
-                elif ".dist-info/" in member and LICENSE_NAME.search(member):
-                    target.mkdir(parents=True, exist_ok=True)
-                    dest = target / Path(member).name
-                    dest.write_bytes(archive.read(member))
-                    copied.append(dest.name)
+                elif LICENSE_NAME.search(member) and not member.endswith(".py"):
+                    copied.append(_keep(target, member, archive.read(member)))
     from email.parser import Parser
 
     return _license_from_metadata(Parser().parsestr(meta_text)), copied
@@ -272,34 +345,212 @@ USED_FOR = {
 }
 
 
-def other_components() -> list[Component]:
-    """Parts of the built app that aren't Python or npm packages."""
-    out = []
-    # The Python runtime (PyInstaller bundles it). Its LICENSE.txt also covers the
-    # third-party software CPython itself incorporates.
-    runtime = (
-        Path(sys.base_prefix) / "lib" / f"python{sys.version_info.major}.{sys.version_info.minor}"
+def _download(url: str, name: str, sha256: str | None = None) -> Path:
+    """Download ``url`` into the cache (once) and check its SHA-256 if given."""
+    CACHE.mkdir(parents=True, exist_ok=True)
+    path = CACHE / name
+    if not path.is_file():
+        with urllib.request.urlopen(url, timeout=300) as response:
+            data = response.read()
+        path.write_bytes(data)
+    if sha256 and _sha256(path.read_bytes()) != sha256:
+        path.unlink()
+        raise SystemExit(f"Checksum mismatch for {url}")
+    return path
+
+
+def _sha256(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def _wheel(name: str, version: str, platform: str) -> Path:
+    """The package's official wheel for ``platform``, downloaded into the cache."""
+    found = sorted(CACHE.glob(f"{name.replace('-', '_')}-{version}-*.whl"))
+    if found:
+        return found[0]
+    tag = {"windows": "win_amd64", "linux": "manylinux2014_x86_64"}[platform]
+    CACHE.mkdir(parents=True, exist_ok=True)
+    subprocess.run(
+        [sys.executable, "-m", "pip", "download", f"{name}=={version}", "--no-deps"]
+        + ["--only-binary=:all:", "--platform", tag, "--python-version", "3.13"]
+        + ["--implementation", "cp", "--dest", str(CACHE), "--quiet"],
+        check=True,
     )
+    return sorted(CACHE.glob(f"{name.replace('-', '_')}-{version}-*.whl"))[0]
+
+
+def python_runtime_components() -> list[Component]:
+    """The Python runtime PyInstaller bundles, per platform.
+
+    Windows: the python.org build of ``PYTHON_WINDOWS_VERSION`` (what the Windows
+    build workflow installs). Its ``LICENSE.txt`` holds the PSF licence, the terms
+    for the Microsoft C++ runtime it is built with, and the licences of the
+    libraries shipped beside it (bzip2, libffi, OpenSSL's Apache-2.0, Tcl/Tk).
+    CPython's ``Doc/license.rst`` adds the notices for code compiled into the
+    interpreter itself (expat, libmpdec, mimalloc, HACL*, zlib and others).
+
+    Linux (packages from v0.75): the interpreter running this script, for now.
+    """
+    out = []
+    version = PYTHON_WINDOWS_VERSION
+    target = LICENSES / "other" / f"python-runtime-windows-{version}"
+    target.mkdir(parents=True, exist_ok=True)
+    embed = _download(
+        f"https://www.python.org/ftp/python/{version}/python-{version}-embed-amd64.zip",
+        f"python-{version}-embed-amd64.zip",
+    )
+    with zipfile.ZipFile(embed) as archive:
+        (target / "LICENSE.txt").write_bytes(archive.read("LICENSE.txt"))
+    rst = _download(
+        f"https://raw.githubusercontent.com/python/cpython/v{version}/Doc/license.rst",
+        f"cpython-{version}-license.rst",
+    )
+    shutil.copyfile(rst, target / "license.rst")
+    out.append(
+        Component(
+            "Python runtime (python.org Windows build)",
+            version,
+            "PSF-2.0 (and the bundled libraries' licences inside)",
+            {"windows"},
+            "Runs the app (bundled by PyInstaller)",
+            [f"other/{target.name}/LICENSE.txt", f"other/{target.name}/license.rst"],
+            "other",
+        )
+    )
+    local = sys.version.split()[0]
+    runtime = Path(sys.base_prefix) / "lib" / f"python{sys.version_info[0]}.{sys.version_info[1]}"
     for candidate in (runtime / "LICENSE.txt", Path(sys.base_prefix) / "LICENSE.txt"):
         if candidate.is_file():
-            target = LICENSES / "other" / "python-runtime"
+            target = LICENSES / "other" / "python-runtime-linux"
             target.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(candidate, target / "LICENSE.txt")
-            version = f"{sys.version_info.major}.{sys.version_info.minor}"
             out.append(
                 Component(
-                    "Python runtime",
-                    version,
+                    "Python runtime (Linux packages; confirm with the v0.75 build)",
+                    local,
                     "PSF-2.0",
-                    {"windows", "linux"},
+                    {"linux"},
                     "Runs the app (bundled by PyInstaller)",
-                    ["other/python-runtime/LICENSE.txt"],
+                    [f"other/{target.name}/LICENSE.txt"],
+                    "other",
                 )
             )
             break
+    return out
+
+
+def webview2_component(pywebview_version: str) -> tuple[Component, dict[str, str]]:
+    """Microsoft's WebView2 SDK files inside pywebview's wheel.
+
+    Downloads Microsoft's NuGet package of ``WEBVIEW2_SDK_VERSION``, checks that
+    pywebview's copies are byte-identical to it (so the package's licence really is
+    the licence of the files we ship), and keeps its LICENSE.txt and NOTICE.txt.
+
+    Returns:
+        The component and the SHA-256 of each DLL, by its path inside the wheel.
+    """
+    nupkg = _download(
+        f"https://www.nuget.org/api/v2/package/Microsoft.Web.WebView2/{WEBVIEW2_SDK_VERSION}",
+        f"microsoft.web.webview2.{WEBVIEW2_SDK_VERSION}.nupkg",
+    )
+    wheel = _wheel("pywebview", pywebview_version, "windows")
+    hashes = {}
+    with zipfile.ZipFile(nupkg) as sdk, zipfile.ZipFile(wheel) as pkg:
+        for in_wheel, in_sdk in WEBVIEW2_DLLS.items():
+            ours = pkg.read(in_wheel)
+            if ours != sdk.read(in_sdk):
+                raise SystemExit(
+                    f"{in_wheel} in pywebview {pywebview_version} is not the file from "
+                    f"Microsoft.Web.WebView2 {WEBVIEW2_SDK_VERSION}; update WEBVIEW2_SDK_VERSION."
+                )
+            hashes[in_wheel] = _sha256(ours)
+        target = LICENSES / "other" / f"microsoft-webview2-sdk-{WEBVIEW2_SDK_VERSION}"
+        target.mkdir(parents=True, exist_ok=True)
+        for name in ("LICENSE.txt", "NOTICE.txt"):
+            (target / name).write_bytes(sdk.read(name))
+    component = Component(
+        "Microsoft WebView2 SDK files (Microsoft.Web.WebView2.Core.dll, "
+        "Microsoft.Web.WebView2.WinForms.dll, WebView2Loader.dll), inside pywebview",
+        WEBVIEW2_SDK_VERSION,
+        "BSD-3-Clause-style Microsoft licence (no source published; see note)",
+        {"windows"},
+        "Connects the window to the Edge WebView2 Runtime on Windows",
+        [f"other/{target.name}/LICENSE.txt", f"other/{target.name}/NOTICE.txt"],
+        "other",
+    )
+    return component, hashes
+
+
+def mupdf_components(mupdf_version: str) -> tuple[list[Component], dict]:
+    """MuPDF and the third-party code it compiles into PyMuPDF.
+
+    PyMuPDF's wheel carries only a one-line COPYING, and PyMuPDF's source
+    distribution doesn't contain MuPDF (it downloads MuPDF at build time), so the
+    licence files come from the exact MuPDF source release.
+
+    Returns:
+        The components and the source archive's URL and SHA-256.
+    """
+    url = f"https://mupdf.com/downloads/archive/mupdf-{mupdf_version}-source.tar.gz"
+    archive_path = _download(url, f"mupdf-{mupdf_version}-source.tar.gz")
+    wanted = {"COPYING": "mupdf/COPYING"}
+    for folder, (_, _, files) in MUPDF_PARTS.items():
+        for name in files:
+            wanted[f"{folder}/{name}"] = f"mupdf/{folder.split('/')[-1]}/{name}"
+    found = {}
+    with tarfile.open(archive_path) as archive:
+        prefix = f"mupdf-{mupdf_version}-source/"
+        for member in archive.getmembers():
+            relative = member.name.removeprefix(prefix)
+            if member.isfile() and relative in wanted:
+                dest = LICENSES / wanted[relative]
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                dest.write_bytes(archive.extractfile(member).read())
+                found[relative] = wanted[relative]
+    missing = sorted(set(wanted) - set(found))
+    if missing:
+        raise SystemExit(f"MuPDF {mupdf_version} source lacks: {', '.join(missing)}")
+    out = [
+        Component(
+            "MuPDF (inside PyMuPDF)",
+            mupdf_version,
+            "AGPL-3.0",
+            {"windows", "linux"},
+            "PDF engine compiled into PyMuPDF",
+            [found["COPYING"]],
+            "mupdf",
+        )
+    ]
+    for folder, (name, spdx, files) in MUPDF_PARTS.items():
+        out.append(
+            Component(
+                name,
+                f"from MuPDF {mupdf_version}",
+                spdx,
+                {"windows", "linux"},
+                "Compiled into PyMuPDF by MuPDF",
+                [found[f"{folder}/{f}"] for f in files],
+                "mupdf",
+            )
+        )
+    source = {"url": url, "sha256": _sha256(archive_path.read_bytes())}
+    return out, source
+
+
+def other_components() -> list[Component]:
+    """The PyInstaller bootloader and the icon design credit."""
+    out = []
     # PyInstaller's bootloader is linked into the app's executable.
     target = LICENSES / "other" / f"pyinstaller-{PYINSTALLER_VERSION}"
-    _, files = _from_wheel("pyinstaller", PYINSTALLER_VERSION, "windows", target)
+    with zipfile.ZipFile(_wheel("pyinstaller", PYINSTALLER_VERSION, "windows")) as archive:
+        files = [
+            _keep(target, member, archive.read(member))
+            for member in archive.namelist()
+            if member.endswith(".dist-info/licenses/COPYING.txt")
+            or member.endswith(".dist-info/COPYING.txt")
+        ]
+    if not files:
+        raise SystemExit(f"PyInstaller {PYINSTALLER_VERSION}'s wheel has no COPYING.txt")
     out.append(
         Component(
             "PyInstaller bootloader",
@@ -308,6 +559,7 @@ def other_components() -> list[Component]:
             {"windows", "linux"},
             "Starts the app; the exception allows any licence for the app",
             [f"other/{target.name}/{f}" for f in files],
+            "other",
         )
     )
     # Icons: drawn inline in frontend/src/components/Icon/Icon.tsx. The settings
@@ -327,36 +579,116 @@ def other_components() -> list[Component]:
             {"windows", "linux"},
             "Some interface icon shapes",
             ["other/feather-icons/LICENSE"],
-        )
-    )
-    # Microsoft WebView2 SDK binaries, shipped inside pywebview's Windows wheel.
-    out.append(
-        Component(
-            "Microsoft WebView2 SDK binaries (Microsoft.Web.WebView2.Core.dll, "
-            "Microsoft.Web.WebView2.WinForms.dll, WebView2Loader.dll)",
-            "bundled with pywebview",
-            "Microsoft (see note)",
-            {"windows"},
-            "Edge WebView2 window on Windows",
-            [],
+            "other",
         )
     )
     return out
 
 
-def write_notices(
-    python: list[Component], frontend: list[Component], other: list[Component]
-) -> None:
+QT_SOURCE = (
+    "https://download.qt.io/official_releases/qt/6.12/6.12.0/single/qt-everywhere-src-6.12.0.tar.xz"
+)
+PYSIDE_SOURCE = (
+    "https://download.qt.io/official_releases/QtForPython/pyside6/PySide6-6.12.0-src/"
+    "pyside-setup-everywhere-src-6.12.0.tar.xz"
+)
+# Packages that publish no source distribution on PyPI: where their source is.
+# The Qt entries are Linux-only (v0.75); they must be revisited with that build.
+NO_SDIST = {
+    "pywin32": "https://github.com/mhammond/pywin32/archive/refs/tags/b{version}.tar.gz",
+    "pyside6": PYSIDE_SOURCE,
+    "pyside6-addons": f"{PYSIDE_SOURCE} and {QT_SOURCE}",
+    "pyside6-essentials": f"{PYSIDE_SOURCE} and {QT_SOURCE}",
+    "pyside6-pdf": f"{PYSIDE_SOURCE} and {QT_SOURCE}",
+    "pyside6-webengine": f"{PYSIDE_SOURCE} and {QT_SOURCE}",
+    "shiboken6": PYSIDE_SOURCE,
+}
+
+
+def python_sources(packages: dict[str, tuple[str, set[str]]]) -> list[dict]:
+    """Where each bundled Python package's source is published, from uv.lock."""
+    lock = tomllib.loads((ROOT / "uv.lock").read_text(encoding="utf-8"))
+    by_name = {p["name"]: p for p in lock["package"]}
+    out = []
+    for name, (version, platforms) in sorted(packages.items()):
+        entry = by_name[name]
+        sdist = entry.get("sdist")
+        if sdist:
+            url, sha = sdist["url"], sdist["hash"].removeprefix("sha256:")
+        elif name in NO_SDIST:
+            url, sha = NO_SDIST[name].format(version=version), ""
+        else:
+            raise SystemExit(f"No published source for {name} {version} in uv.lock")
+        out.append(
+            {
+                "component": name,
+                "version": version,
+                "url": url,
+                "sha256": sha,
+                "platforms": sorted(platforms),
+            }
+        )
+    return out
+
+
+def frontend_sources() -> list[dict]:
+    """npm tarballs (with integrity hashes) of the packages inlined into the UI."""
+    lock = json.loads((FRONTEND / "package-lock.json").read_text(encoding="utf-8"))
+    out = []
+    for path, info in sorted(lock["packages"].items()):
+        if not path or info.get("dev") or info.get("devOptional"):
+            continue
+        out.append(
+            {
+                "component": path.removeprefix("node_modules/"),
+                "version": info["version"],
+                "url": info["resolved"],
+                "integrity": info.get("integrity", ""),
+                "platforms": ["linux", "windows"],
+            }
+        )
+    return out
+
+
+def _pypi_sdist(name: str, version: str) -> dict:
+    """URL and SHA-256 of a package's source distribution on PyPI."""
+    with urllib.request.urlopen(f"https://pypi.org/pypi/{name}/{version}/json", timeout=60) as r:
+        files = json.load(r)["urls"]
+    sdist = next(f for f in files if f["packagetype"] == "sdist")
+    return {"url": sdist["url"], "sha256": sdist["digests"]["sha256"]}
+
+
+def write_manifest(components: list[Component], extra: dict) -> None:
+    """Write licenses/manifest.json (read by scripts/check_licenses.py)."""
+    data = {
+        "generated_by": "scripts/collect_licenses.py",
+        **extra,
+        "components": [
+            {
+                "name": c.name,
+                "version": c.version,
+                "license": c.license,
+                "platforms": sorted(c.platforms),
+                "group": c.group,
+                "files": c.files,
+            }
+            for c in components
+        ],
+    }
+    MANIFEST.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
+def write_notices(groups: dict[str, list[Component]]) -> None:
     """Write THIRD_PARTY_NOTICES.md."""
 
-    def rows(components: list[Component]) -> list[str]:
+    def rows(components: list[Component]) -> str:
         out = []
         for c in components:
             where = ", ".join(sorted(p.capitalize() for p in c.platforms))
-            files = ", ".join(f"[`{Path(f).name}`](licenses/{f})" for f in c.files) or "—"
+            files = ", ".join(f"[`{f.split('/', 1)[-1]}`](licenses/{f})" for f in c.files) or "—"
             used = c.used_for or USED_FOR.get(c.name, "")
             out.append(f"| {c.name} | {c.version} | {c.license} | {where} | {used} | {files} |")
-        return out
+        return "\n".join(out)
 
     header = (
         "| Component | Version | Licence | Bundled on | Used for | Licence text |\n"
@@ -366,48 +698,66 @@ def write_notices(
 
 PDF Manager's own code is released under the [MIT License](LICENSE), © 2026 Mohannad Ali.
 
-The distributed app (the Windows installer and the Linux packages) also includes the
-open-source components below. Each keeps its own licence; the licence texts are in the
+The distributed app (the Windows installer, and the Linux packages from v0.75) also
+includes the components below. Each keeps its own licence; the licence texts are in the
 [`licenses/`](licenses) folder, which is installed next to the app.
 
-**PyMuPDF is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0)**, or
-a commercial licence from Artifex. Because the distributed app includes PyMuPDF, the
-app as a whole is distributed under the terms of the AGPL-3.0. Its complete source code
-is available at <https://github.com/Ali7488/pdf-manager>.
+**PyMuPDF and MuPDF are licensed under the GNU Affero General Public License v3.0
+(AGPL-3.0)**, or a commercial licence from Artifex. Because the distributed app includes
+them, the app as a whole is distributed under the terms of the AGPL-3.0 (see
+[LICENSING.md](LICENSING.md)). Its complete source code is available at
+<https://github.com/Ali7488/pdf-manager>.
 
 This file is generated by `scripts/collect_licenses.py` from the packages actually
-bundled; regenerate it whenever dependencies change. It is not legal advice.
+bundled, and `scripts/check_licenses.py` fails CI and the Windows build when it is out of
+date. It is not legal advice.
 
 ## Python packages (the app's engine and window)
 
 {header}
-{chr(10).join(rows(python))}
+{rows(groups["python"])}
+
+## Inside PyMuPDF: MuPDF and the libraries and fonts it compiles in
+
+PyMuPDF includes MuPDF, which compiles in the third-party code below. The licence
+files come from the MuPDF {groups["mupdf"][0].version} source release.
+
+{header}
+{rows(groups["mupdf"])}
 
 ## Interface packages (inlined into the app's single HTML file)
 
 {header}
-{chr(10).join(rows(frontend))}
+{rows(groups["frontend"])}
 
 ## Also included in the built app
 
 {header}
-{chr(10).join(rows(other))}
+{rows(groups["other"])}
 
-**Note on the Microsoft WebView2 SDK binaries:** these closed-source Microsoft
-files come inside pywebview's Windows wheel and talk to the WebView2 Runtime that
-is part of Windows 11. They are redistributed under Microsoft's WebView2 SDK
-licence; check that licence, and how it fits with the AGPL-3.0 (for example under
-the AGPL's "System Libraries" provision), before relying on this notice.
+**Note on the Microsoft WebView2 SDK files:** pywebview ships these Microsoft files
+byte-for-byte as they are in Microsoft's `Microsoft.Web.WebView2` NuGet package
+{WEBVIEW2_SDK_VERSION}, which licenses them under the BSD-3-Clause-style terms in
+`LICENSE.txt` (with third-party notices in `NOTICE.txt`). We found no published source
+code for them. Whether the AGPL-3.0 requires it is an open question; see
+[LICENSING.md](LICENSING.md).
+
+**Note on the Python runtime:** the python.org Windows build includes the Microsoft C++
+runtime (`vcruntime140.dll`, `vcruntime140_1.dll`); its terms are in the "Additional
+Conditions for this Windows binary build" section of its `LICENSE.txt`.
 
 ## Not included (installed separately, by the user or the installer wizard)
 
 | Program | Licence | Notes |
 | --- | --- | --- |
-| Tesseract OCR | Apache-2.0 | Optional; installed with winget or the system package manager. |
+| Tesseract OCR program | Apache-2.0 | Optional; installed with winget or a package manager. |
 | LibreOffice | MPL-2.0 | Optional; installed separately. |
 | Microsoft PowerPoint | Proprietary | Optional; used only if already installed. |
-| Microsoft Edge WebView2 Runtime | Microsoft software licence | Part of Windows 11. |
+| Microsoft Edge WebView2 Runtime | Microsoft software licence | Part of Windows 11; not shipped. |
 | Segoe UI font | Proprietary | Used only if Windows provides it; never bundled. |
+
+The app runs the separately installed Tesseract program for OCR. MuPDF also compiles a
+copy of the Tesseract library into PyMuPDF (listed above), which PDF Manager doesn't use.
 """
     NOTICES.write_text(text, encoding="utf-8")
 
@@ -415,11 +765,43 @@ the AGPL's "System Libraries" provision), before relying on this notice.
 def main() -> int:
     if LICENSES.exists():
         shutil.rmtree(LICENSES)
+    packages = runtime_python_packages()
     python = python_components()
+    for c in python:
+        c.group = "python"
     frontend = frontend_components()
-    other = other_components()
-    write_notices(python, frontend, other)
-    print(f"{len(python)} Python and {len(frontend)} interface components; see {NOTICES.name}")
+    for c in frontend:
+        c.group = "frontend"
+    import pymupdf
+
+    if pymupdf.VersionBind != packages["pymupdf"][0]:
+        raise SystemExit("Run `uv sync` first: the installed PyMuPDF isn't the locked one.")
+    mupdf, mupdf_source = mupdf_components(pymupdf.mupdf_version)
+    webview2, webview2_hashes = webview2_component(packages["pywebview"][0])
+    other = python_runtime_components() + other_components() + [webview2]
+    groups = {"python": python, "mupdf": mupdf, "frontend": frontend, "other": other}
+    write_notices(groups)
+    write_manifest(
+        python + mupdf + frontend + other,
+        {
+            "python_windows": PYTHON_WINDOWS_VERSION,
+            "pyinstaller": PYINSTALLER_VERSION,
+            "mupdf": pymupdf.mupdf_version,
+            "webview2_sdk": {"version": WEBVIEW2_SDK_VERSION, "sha256": webview2_hashes},
+            "sources": {
+                "python": python_sources(packages),
+                "frontend": frontend_sources(),
+                "mupdf": mupdf_source,
+                "python_runtime": {
+                    "url": f"https://www.python.org/ftp/python/{PYTHON_WINDOWS_VERSION}/"
+                    f"Python-{PYTHON_WINDOWS_VERSION}.tar.xz"
+                },
+                "pyinstaller": _pypi_sdist("pyinstaller", PYINSTALLER_VERSION),
+            },
+        },
+    )
+    total = len(python) + len(mupdf) + len(frontend) + len(other)
+    print(f"{total} components; see {NOTICES.name} and {MANIFEST.relative_to(ROOT)}")
     unknown = [c.name for c in python + frontend + other if c.license == "UNKNOWN"]
     if unknown:
         print("WARNING: unknown licence for:", ", ".join(unknown))

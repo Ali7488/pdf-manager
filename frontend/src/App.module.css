@@ -1,3 +1,7 @@
+/*
+ * Window layout with just two layers, after 2016-era office software's File
+ * menu: a band-coloured side pane (with the app name) and one plain page.
+ */
 .shell {
   display: flex;
   height: 100%;
@@ -7,25 +11,18 @@
   flex: 1;
   min-width: 0;
   overflow-y: auto;
+  background: var(--color-background);
 }
 
 .page {
   max-width: var(--content-max-width);
   margin: 0 auto;
-  padding: var(--space-8) var(--space-8) 0;
-  animation: page-in var(--duration-slow) var(--ease-standard);
+  padding: var(--space-6) var(--space-8) 0;
 }
 
 /* Bottom breathing room, so pages without a sticky bar don't end flush. */
 .page::after {
   content: "";
   display: block;
-  height: var(--space-8);
-}
-
-@keyframes page-in {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
+  height: var(--space-6);
 }

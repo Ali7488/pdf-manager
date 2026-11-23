@@ -45,7 +45,6 @@ function Shell() {
     <div className={styles.shell}>
       <Sidebar />
       <main className={styles.main}>
-        {/* The key replays the fade-in whenever the tab changes. */}
         <div key={state.page} className={styles.page}>
           {page}
         </div>

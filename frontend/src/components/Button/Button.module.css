@@ -7,19 +7,14 @@
   padding: 0 var(--space-4);
   border: 1px solid transparent;
   border-radius: var(--radius-md);
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--font-weight-regular);
   font-size: var(--text-sm);
   line-height: 1;
   white-space: nowrap;
   transition:
-    background-color var(--duration-fast) var(--ease-standard),
-    border-color var(--duration-fast) var(--ease-standard),
-    color var(--duration-fast) var(--ease-standard),
-    transform var(--duration-fast) var(--ease-standard);
-}
-
-.button:active:not(:disabled) {
-  transform: translateY(1px);
+    background-color var(--duration-fast) linear,
+    border-color var(--duration-fast) linear,
+    color var(--duration-fast) linear;
 }
 
 .button:disabled {
@@ -27,34 +22,41 @@
 }
 
 .sm {
-  min-height: 2rem;
+  min-height: 1.75rem;
   padding: 0 var(--space-3);
   border-radius: var(--radius-sm);
 }
 
 .lg {
-  min-height: 3rem;
+  min-height: 2.25rem;
   padding: 0 var(--space-6);
   font-size: var(--text-md);
 }
 
+/* Main actions use the app band colour, like an office suite's default button. */
 .primary {
-  background: var(--color-primary);
-  color: var(--color-on-primary);
+  background: var(--color-band);
+  border-color: var(--color-band-active);
+  color: var(--color-on-band);
 }
 
 .primary:hover:not(:disabled) {
-  background: var(--color-primary-hover);
+  background: var(--color-band-hover);
+}
+
+.primary:active:not(:disabled) {
+  background: var(--color-band-active);
 }
 
 .secondary {
-  background: var(--color-surface);
+  background: var(--color-background);
   border-color: var(--color-border-strong);
   color: var(--color-text);
 }
 
 .secondary:hover:not(:disabled) {
-  background: var(--color-surface-muted);
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary);
 }
 
 .ghost {

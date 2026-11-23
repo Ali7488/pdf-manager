@@ -1,39 +1,38 @@
+/*
+ * Side pane in the style of an office suite's File menu: a solid band-coloured
+ * column with flat, full-width items. The current page is a darker block with
+ * a light edge marker.
+ */
 .sidebar {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-2);
   width: var(--sidebar-width);
   height: 100%;
-  padding: var(--space-5) var(--space-3);
-  border-right: 1px solid var(--color-border);
-  background: var(--color-surface);
+  padding: var(--space-3) 0;
+  background: var(--color-band);
+  color: var(--color-on-band);
   overflow-y: auto;
 }
 
+/* App name at the top of the pane, like an office suite's File menu. */
 .brand {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  padding: 0 var(--space-2);
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4) var(--space-4);
   font-size: var(--text-lg);
   font-weight: var(--font-weight-medium);
 }
 
 .logo {
   display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  border-radius: var(--radius-md);
-  background: var(--color-primary);
-  color: var(--color-on-primary);
+  color: var(--color-on-band);
 }
 
 .list {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -45,8 +44,8 @@
 
 .divider {
   height: 1px;
-  margin: var(--space-2) var(--space-2);
-  background: var(--color-border);
+  margin: var(--space-2) var(--space-4);
+  background: color-mix(in srgb, var(--color-on-band) 25%, transparent);
 }
 
 .item {
@@ -54,32 +53,38 @@
   align-items: center;
   gap: var(--space-3);
   width: 100%;
-  min-height: 2.5rem;
-  padding: 0 var(--space-3);
+  min-height: 2.25rem;
+  padding: 0 var(--space-4);
   border: 0;
-  border-radius: var(--radius-md);
+  border-left: 3px solid transparent;
+  border-radius: 0;
   background: transparent;
-  color: var(--color-text-muted);
+  color: var(--color-on-band);
+  font-size: var(--text-md);
   text-align: left;
-  transition:
-    background-color var(--duration-fast) var(--ease-standard),
-    color var(--duration-fast) var(--ease-standard);
+  opacity: 0.9;
+  transition: background-color var(--duration-fast) linear;
 }
 
 .item:hover {
-  background: var(--color-surface-muted);
-  color: var(--color-text);
+  background: var(--color-band-hover);
+  opacity: 1;
 }
 
 .current,
 .current:hover {
-  background: var(--color-primary-soft);
-  color: var(--color-text);
-  font-weight: var(--font-weight-medium);
+  border-left-color: var(--color-on-band);
+  background: var(--color-band-active);
+  opacity: 1;
 }
 
 .current svg {
-  color: var(--color-link);
+  color: inherit;
+}
+
+.item:focus-visible {
+  outline: 2px solid var(--color-on-band);
+  outline-offset: -2px;
 }
 
 .label {
@@ -89,10 +94,10 @@
 .badge {
   min-width: 1.5rem;
   padding: 0 var(--space-2);
-  border-radius: var(--radius-full);
-  background: var(--color-surface-muted);
-  color: var(--color-text);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-on-band) 20%, transparent);
+  color: var(--color-on-band);
   font-size: var(--text-xs);
-  line-height: 1.5rem;
+  line-height: 1.25rem;
   text-align: center;
 }

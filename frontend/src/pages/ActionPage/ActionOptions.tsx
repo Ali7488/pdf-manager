@@ -33,6 +33,7 @@ export function ActionOptions({ action, settings, onChange, usedFiles }: ActionO
       {info.merges && (
         <Checkbox
           label="Add a contents page"
+          detail="A first page listing each file, with links that jump to it."
           tip={CONTENTS_TIP}
           checked={settings.contentsPage}
           onChange={(contentsPage) => onChange({ contentsPage })}
@@ -60,6 +61,7 @@ export function ActionOptions({ action, settings, onChange, usedFiles }: ActionO
       {info.offersOcr && (
         <Checkbox
           label="Use OCR"
+          detail="Makes the text in your pages searchable and copyable. Takes longer."
           tip={OCR_TIP}
           checked={settings.useOcr}
           onChange={(useOcr) => onChange({ useOcr })}
@@ -70,32 +72,35 @@ export function ActionOptions({ action, settings, onChange, usedFiles }: ActionO
 }
 
 const IMAGE_OPTIONS: readonly RadioOption<"combine" | "separate">[] = [
-  { value: "combine", label: "One PDF with all images" },
-  { value: "separate", label: "One PDF per image" },
+  { value: "combine", label: "One PDF with all images", hint: "Each image becomes a page, in the order of the list." },
+  { value: "separate", label: "One PDF per image", hint: "Each image becomes its own PDF file." },
 ];
 
 const COMPRESS_OPTIONS: readonly RadioOption<CompressLevel>[] = [
   {
     value: "light",
     label: "Light",
+    hint: "Same quality, a little smaller.",
     tip: "Keeps the quality almost the same. The file gets a little smaller.",
   },
   {
     value: "balanced",
     label: "Balanced",
+    hint: "Much smaller, still sharp. Best for most files.",
     tip: "Noticeably smaller, and pictures still look sharp. A good choice for most files.",
   },
   {
     value: "strong",
     label: "Strong",
+    hint: "Smallest file; pictures may look soft up close.",
     tip: "Makes the file as small as possible. Pictures may look blurry or blocky up close.",
   },
 ];
 
 const SPLIT_OPTIONS: readonly RadioOption<SplitMethod>[] = [
-  { value: "ranges", label: "Pages I choose" },
-  { value: "every_n", label: "Every few pages" },
-  { value: "per_page", label: "One file per page" },
+  { value: "ranges", label: "Pages I choose", hint: "Type ranges like 1-3, 5. Each range becomes a file." },
+  { value: "every_n", label: "Every few pages", hint: "Cuts the file into parts of the same size." },
+  { value: "per_page", label: "One file per page", hint: "Every page becomes its own PDF." },
 ];
 
 const SPLIT_TIP =

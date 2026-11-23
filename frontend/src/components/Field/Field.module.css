@@ -71,6 +71,11 @@
 }
 
 /* Checkbox */
+/* Plain explanation beside a checkbox label. */
+.detail {
+  color: var(--color-text-muted);
+}
+
 .checkRow {
   display: flex;
   flex-wrap: wrap;

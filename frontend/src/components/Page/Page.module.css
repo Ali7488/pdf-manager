@@ -23,7 +23,7 @@
 
 .description {
   max-width: 44rem;
-  color: var(--color-text-muted);
+  color: var(--color-text);
 }
 
 /* Sections are not boxes: just a heading with a thin rule, then the content. */

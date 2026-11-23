@@ -9,7 +9,7 @@ import styles from "./Field.module.css";
 export interface RadioOption<T extends string> {
   value: T;
   label: string;
-  /** Optional one-line hint under the label. */
+  /** Optional short plain explanation under the label. */
   hint?: string;
   /** Optional (?) explanation. */
   tip?: string;

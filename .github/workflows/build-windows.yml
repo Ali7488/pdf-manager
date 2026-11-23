@@ -4,7 +4,9 @@
 # After building, it installs the app silently on the runner and starts it in
 # smoke-test mode (api/smoke.py): the installed app must open its window,
 # render the UI and answer through the bridge, then quit. The licence check
-# (scripts/check_licenses.py) runs on the bundle and on the installed app.
+# (scripts/check_licenses.py) runs on the bundle and on the installed app. The
+# Visual C++ Redistributable check is exercised with a simulated missing runtime
+# (the runner itself has the redistributable).
 # A second job gathers the third-party source code for the release (AGPL-3.0
 # section 6; see LICENSING.md). Neither job publishes anything.
 name: Build Windows installer
@@ -88,13 +90,56 @@ jobs:
             throw "The log has no SMOKE TEST PASSED line"
           }
 
+      # The app doesn't bundle the Visual C++ runtime (decision P32); it uses the
+      # system-wide Microsoft Visual C++ Redistributable, which GitHub's runner already
+      # has. So the smoke test above shows the app works with the system-wide copy. The
+      # missing-runtime path is only simulated here: /VCRUNTIMEDIR points the installer's
+      # detection at another folder. A clean Windows PC is still needed to see the real
+      # thing (docs/releases/v0.5.0.md).
+      - name: Visual C++ Redistributable detection (simulated missing runtime)
+        shell: pwsh
+        timeout-minutes: 6
+        run: |
+          $sys = Join-Path $env:WINDIR 'System32'
+          foreach ($name in 'vcruntime140.dll', 'vcruntime140_1.dll', 'msvcp140.dll', 'mfc140u.dll') {
+            $file = Get-Item (Join-Path $sys $name) -ErrorAction SilentlyContinue
+            Write-Host "Runner System32\$name : $(if ($file) { $file.VersionInfo.FileVersion } else { 'missing' })"
+          }
+          if (-not (Select-String -Path install.log -Pattern 'Visual C\+\+ runtime found' -Quiet)) {
+            Get-Content install.log | Select-String 'Visual C\+\+'
+            throw 'The real install did not detect the Visual C++ runtime on the runner'
+          }
+          $setup = Get-ChildItem dist/installer/*.exe | Select-Object -First 1
+          $empty = New-Item -ItemType Directory -Force (Join-Path $env:RUNNER_TEMP 'no-vc-runtime')
+          $partial = New-Item -ItemType Directory -Force (Join-Path $env:RUNNER_TEMP 'partial-vc-runtime')
+          Copy-Item (Join-Path $sys 'vcruntime140.dll') $partial
+          foreach ($case in @(@{ Name = 'empty'; Dir = $empty }, @{ Name = 'partial'; Dir = $partial })) {
+            $logFile = "install-$($case.Name)-vc-runtime.log"
+            $run = Start-Process $setup.FullName -Wait -PassThru -ArgumentList `
+              '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/NOOPTIONAL=1', "/LOG=$logFile", "/VCRUNTIMEDIR=$($case.Dir)"
+            Get-Content $logFile | Select-String 'Visual C\+\+'
+            # Setup still installs (like a missing WebView2 Runtime, it only warns) ...
+            if ($run.ExitCode -ne 0) { throw "Installer exit code $($run.ExitCode) ($($case.Name))" }
+            # ... and reports the runtime as missing.
+            if (-not (Select-String -Path $logFile -Pattern 'Visual C\+\+ runtime not found' -Quiet)) {
+              throw "The $($case.Name) runtime folder wasn't reported as missing"
+            }
+            if (Select-String -Path $logFile -Pattern 'Visual C\+\+ runtime found' -Quiet) {
+              throw "The $($case.Name) runtime folder was reported as present"
+            }
+          }
+          # The upgrade installs must not have put any runtime DLL back into the app.
+          $appDir = Join-Path $env:LOCALAPPDATA 'Programs\PDF Manager'
+          & uv run --frozen --no-sync python scripts/check_licenses.py bundle $appDir --installed
+          if ($LASTEXITCODE -ne 0) { throw 'Licence check after the simulated installs failed' }
+
       - name: Keep install and app logs if something failed
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: windows-install-logs
           path: |
-            install.log
+            install*.log
             app-logs/
           if-no-files-found: ignore
           retention-days: 7

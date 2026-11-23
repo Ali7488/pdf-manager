@@ -12,6 +12,9 @@
 * "Install OCR" never installs anything and never runs ``sudo`` (decision
   C16): it finishes at once with an issue holding the exact command for the
   user's distribution, which the UI shows with a Copy button.
+* Browser mode uses ``zenity`` or ``kdialog`` for native pickers when one is
+  installed (otherwise the browser's own file selection), and finds the
+  default browser with ``xdg-settings`` and its desktop file.
 
 Other POSIX systems without their own module (for example the BSDs) use this
 one as well; their desktops provide ``xdg-open`` too.
@@ -19,13 +22,25 @@ one as well; their desktops provide ``xdg-open`` too.
 
 from __future__ import annotations
 
+import logging
 import os
 import platform
+import shlex
+import shutil
 import subprocess
 from pathlib import Path
 
 from ..service import Issue, IssueCode, Severity
-from ._common import FILE_FILTERS, XDG_APP_FOLDER, xdg_dir
+from ._common import (
+    APP_MODE_BROWSERS,
+    FILE_FILTERS,
+    XDG_APP_FOLDER,
+    DefaultBrowser,
+    parse_filter,
+    xdg_dir,
+)
+
+log = logging.getLogger(__name__)
 
 LOGS_FOLDER = "logs"
 
@@ -229,3 +244,170 @@ def run_ocr_install() -> str:
         RuntimeError: Always. The app never runs package installs or ``sudo``.
     """
     raise RuntimeError("PDF Manager never installs programs on Linux (decision C16).")
+
+
+# ----- Browser mode: the default browser -----
+
+# Desktop file names of the app-mode browsers, by the word they contain
+# (microsoft-edge.desktop, google-chrome.desktop, brave-browser.desktop,
+# com.brave.Browser.desktop for the Flatpak, chromium(-browser).desktop).
+_DESKTOP_WORDS = (("microsoft-edge", "edge"), ("chrome", "chrome"), ("brave", "brave"))
+
+
+def classify_desktop_id(desktop_id: str) -> str | None:
+    """Which app-mode browser a desktop file name belongs to (a key of APP_MODE_BROWSERS)."""
+    name = desktop_id.lower()
+    if "chromium" in name:
+        return "chromium"
+    for word, key in _DESKTOP_WORDS:
+        if word in name:
+            return key
+    return None
+
+
+def desktop_exec_command(exec_line: str) -> tuple[str, ...] | None:
+    """The command of a desktop file's ``Exec`` value, without its field codes.
+
+    Field codes such as ``%U`` and the Flatpak markers ``@@u``/``@@`` are
+    dropped, so the URL can be added as ``--app=<url>``.
+    """
+    try:
+        words = shlex.split(exec_line)
+    except ValueError:
+        return None
+    words = [w for w in words if not (w.startswith("%") and len(w) == 2) and w not in ("@@u", "@@")]
+    return tuple(words) or None
+
+
+def _desktop_file(desktop_id: str) -> Path | None:
+    """Find a desktop file in the XDG data folders (including Flatpak's exports)."""
+    homes = [xdg_dir("XDG_DATA_HOME", (".local", "share"))]
+    dirs = os.environ.get("XDG_DATA_DIRS") or "/usr/local/share:/usr/share"
+    homes += [Path(d) for d in dirs.split(":") if d]
+    homes += [Path("/var/lib/flatpak/exports/share")]
+    for home in homes:
+        candidate = home / "applications" / desktop_id
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def _desktop_exec(path: Path) -> str | None:
+    """The ``Exec`` value of a desktop file's main ``[Desktop Entry]`` section."""
+    section = None
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        line = line.strip()
+        if line.startswith("["):
+            section = line
+        elif section == "[Desktop Entry]" and line.startswith("Exec="):
+            return line.removeprefix("Exec=")
+    return None
+
+
+def default_browser() -> DefaultBrowser:
+    """The desktop's default browser, and how to start it in app mode."""
+    try:
+        proc = subprocess.run(
+            ["xdg-settings", "get", "default-web-browser"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return DefaultBrowser("unknown (xdg-settings unavailable)")
+    desktop_id = proc.stdout.strip()
+    browser = classify_desktop_id(desktop_id)
+    if not desktop_id or browser is None:
+        return DefaultBrowser(desktop_id or "unknown")
+    path = _desktop_file(desktop_id)
+    exec_line = _desktop_exec(path) if path else None
+    command = desktop_exec_command(exec_line) if exec_line else None
+    if not command:
+        log.info("Default browser %s: no usable Exec line", desktop_id)
+        return DefaultBrowser(desktop_id)
+    return DefaultBrowser(APP_MODE_BROWSERS[browser], command)
+
+
+def open_url(url: str) -> None:
+    """Open a URL with ``xdg-open`` (the default browser, in a normal tab).
+
+    Raises:
+        OSError: ``xdg-open`` couldn't be started.
+    """
+    subprocess.Popen(
+        ["xdg-open", url],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+
+
+# ----- Browser mode: native pickers (zenity, kdialog) -----
+
+
+def _picker() -> tuple[str, str] | None:
+    """``("zenity" | "kdialog", path)`` for the first installed picker program."""
+    for name in ("zenity", "kdialog"):
+        found = shutil.which(name)
+        if found:
+            return name, found
+    return None
+
+
+def dialogs_available() -> bool:
+    """Whether a native picker program (zenity or kdialog) is installed."""
+    return _picker() is not None
+
+
+def files_command(program: str, path: str, filters: tuple[str, ...], multiple: bool) -> list[str]:
+    """The zenity or kdialog command line for an Open dialog."""
+    parsed = [parse_filter(f) for f in filters]
+    if program == "zenity":
+        cmd = [path, "--file-selection", "--title=Add files"]
+        if multiple:
+            cmd += ["--multiple", "--separator=\n"]
+        return cmd + [f"--file-filter={name} | {' '.join(pats)}" for name, pats in parsed]
+    spec = "\n".join(f"{' '.join(pats)}|{name}" for name, pats in parsed)
+    cmd = [path, "--title", "Add files", "--getopenfilename", str(Path.home()), spec]
+    return cmd + (["--multiple", "--separate-output"] if multiple else [])
+
+
+def folder_command(program: str, path: str, start: str) -> list[str]:
+    """The zenity or kdialog command line for a folder picker."""
+    start = start or str(Path.home())
+    if program == "zenity":
+        return [
+            path,
+            "--file-selection",
+            "--directory",
+            "--title=Choose a folder",
+            f"--filename={start.rstrip('/')}/",
+        ]
+    return [path, "--title", "Choose a folder", "--getexistingdirectory", start]
+
+
+def _run_picker(cmd: list[str]) -> list[str]:
+    """Run a picker and return the chosen paths (none if cancelled or it failed)."""
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    if proc.returncode != 0:  # 1: cancelled. Anything else: logged.
+        if proc.returncode != 1:
+            log.warning("%s exited with %d: %s", cmd[0], proc.returncode, proc.stderr.strip())
+        return []
+    return [line for line in proc.stdout.splitlines() if line.strip()]
+
+
+def ask_files(filters: tuple[str, ...], multiple: bool) -> list[Path]:
+    """Show zenity's or kdialog's Open dialog. Returns the chosen files (empty if cancelled)."""
+    picker = _picker()
+    if picker is None:
+        return []
+    return [Path(p) for p in _run_picker(files_command(*picker, filters, multiple))]
+
+
+def ask_folder(start: str) -> Path | None:
+    """Show zenity's or kdialog's folder picker. Returns the folder, or ``None``."""
+    picker = _picker()
+    if picker is None:
+        return None
+    chosen = _run_picker(folder_command(*picker, start))
+    return Path(chosen[0]) if chosen else None

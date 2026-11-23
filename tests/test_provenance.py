@@ -42,3 +42,23 @@ def test_windows_file_without_marker_is_trusted(tmp_path):
     local = tmp_path / "local.pptx"
     local.write_bytes(b"x")
     assert windows.is_untrusted(local) is False
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="NTFS alternate data streams")
+def test_mark_untrusted_treats_a_copy_as_downloaded(tmp_path):
+    """Browser-mode uploads get the Internet zone, so PowerPoint never opens them (C14)."""
+    upload = tmp_path / "Dropped.pptx"
+    upload.write_bytes(b"pptx")
+    assert windows.is_untrusted(upload) is False
+    windows.mark_untrusted(upload)
+    assert windows.is_untrusted(upload) is True
+
+
+def test_mark_untrusted_is_a_no_op_without_mark_of_the_web(tmp_path):
+    """Off Windows there is no provenance marker; the file is left as it is."""
+    from converter.platforms import posix
+
+    upload = tmp_path / "Dropped.pptx"
+    upload.write_bytes(b"pptx")
+    posix.mark_untrusted(upload)
+    assert upload.read_bytes() == b"pptx" and posix.is_untrusted(upload) is False

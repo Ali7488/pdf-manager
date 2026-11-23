@@ -207,6 +207,17 @@ def copy_with_provenance(source: Path, target: Path) -> None:
             stream.write(text)
 
 
+def mark_untrusted(path: Path) -> None:
+    """Give a file the Internet zone's Mark-of-the-Web.
+
+    Used for copies whose origin is unknown: a file dropped into the browser
+    window arrives as bytes, without its Zone.Identifier stream. Treating it as
+    downloaded keeps decision C14 safe (PowerPoint is never automated on it).
+    """
+    with open(f"{path}:Zone.Identifier", "w", encoding="utf-8") as stream:
+        stream.write(f"[ZoneTransfer]\nZoneId={UNTRUSTED_ZONE}\n")
+
+
 def os_family() -> str:
     """Which operating system family this is, for choosing user-facing wording."""
     return "windows"

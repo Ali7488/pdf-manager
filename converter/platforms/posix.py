@@ -68,6 +68,10 @@ def copy_with_provenance(source: Path, target: Path) -> None:
     shutil.copyfile(source, target)
 
 
+def mark_untrusted(path: Path) -> None:
+    """No Mark-of-the-Web here: nothing to write."""
+
+
 def os_family() -> str:
     """Which operating system family this is, for choosing user-facing wording."""
     return "mac" if sys.platform == "darwin" else "linux"

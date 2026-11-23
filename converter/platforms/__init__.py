@@ -25,6 +25,10 @@ Interface:
         (Windows Mark-of-the-Web). Always False where there's no such marker.
     copy_with_provenance(source, target) -> None
         Copy a file keeping its provenance marker (never strip it, audit R1).
+    mark_untrusted(path) -> None
+        Mark a file as coming from the Internet (Mark-of-the-Web), for copies
+        whose origin is unknown, such as files dropped into the browser
+        window. A no-op where there's no such marker.
     export_slides_with_powerpoint: Callable | None
         ``(source, output, timeout, cancel) -> None``: the optional PowerPoint
         slide renderer on Windows; ``None`` elsewhere. LibreOffice is always
@@ -41,6 +45,7 @@ if os.name == "nt":
         is_untrusted,
         kill_process_tree,
         libreoffice_candidates,
+        mark_untrusted,
         os_family,
         popen_options,
         powerpoint_installed,
@@ -54,6 +59,7 @@ else:
         is_untrusted,
         kill_process_tree,
         libreoffice_candidates,
+        mark_untrusted,
         os_family,
         popen_options,
         powerpoint_installed,
@@ -70,6 +76,7 @@ __all__ = [
     "os_family",
     "kill_process_tree",
     "libreoffice_candidates",
+    "mark_untrusted",
     "popen_options",
     "powerpoint_installed",
     "powerpoint_path",

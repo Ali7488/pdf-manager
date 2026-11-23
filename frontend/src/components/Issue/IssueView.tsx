@@ -1,6 +1,6 @@
 /**
  * How every error and warning is shown (F13): a plain title and message,
- * numbered troubleshooting steps, optional technical details, and a button
+ * a command to copy when the issue has one (C16), numbered troubleshooting steps, optional technical details, and a button
  * that opens the logs folder.
  */
 import { useId, useState, type ReactNode } from "react";
@@ -8,6 +8,7 @@ import type { Issue } from "../../api/types";
 import { useApp } from "../../state/AppContext";
 import { Button } from "../Button/Button";
 import { Icon } from "../Icon/Icon";
+import { CommandBlock } from "./CommandBlock";
 import styles from "./Issue.module.css";
 
 /** Props for {@link IssueView}. */
@@ -36,6 +37,7 @@ export function IssueView({ issue, actions, compact = false }: IssueViewProps) {
         {compact ? <h4 className={styles.title}>{issue.title}</h4> : <h3 className={styles.title}>{issue.title}</h3>}
       </div>
       <p className={styles.message}>{issue.message}</p>
+      {issue.command && <CommandBlock command={issue.command} />}
       {issue.troubleshooting.length > 0 && (
         <div>
           <p className={styles.stepsTitle}>Things to try:</p>

@@ -49,3 +49,7 @@ dist/
 *.zip
 *.7z
 *.log
+
+# Agent worktrees and local Claude Code settings
+.claude/worktrees/
+.claude/settings.local.json

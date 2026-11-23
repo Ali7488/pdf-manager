@@ -3,7 +3,8 @@
  * (`npm run dev` in a browser, and tests). It follows the contract in
  * docs/API.md closely enough to exercise every screen:
  *
- * - `pickFiles` returns sample files (a browser can't give real paths).
+ * - `pickFiles` returns sample files of the requested kind (a browser can't
+ *   give real paths); `"all"` returns documents and images.
  * - Files dropped in the browser become fake `InputFile`s via `simulateDrop`.
  * - Jobs emit realistic `jobProgress` events over a few seconds, honour
  *   `cancelJob`, warn about PowerPoint files (POWERPOINT_FALLBACK), and fail
@@ -24,6 +25,7 @@ import {
   type JobProgress,
   type JobStage,
   type OcrSearchResult,
+  type OcrStatus,
   type OutputFile,
   type PdfManagerApi,
   type SaveOptions,
@@ -169,7 +171,7 @@ export function createMockApi(options: MockOptions = {}): MockApi {
   const jobs = new Map<string, MockJob>();
   let runningJob: MockJob | null = null;
   let jobCounter = 0;
-  const pickCounts = { documents: 0, images: 0 };
+  const pickCounts = { all: 0, documents: 0, images: 0 };
 
   /** Short delay so calls feel like a real round trip. */
   const latency = () => wait(Math.max(1, Math.round(tickMs / 3)));
@@ -283,7 +285,7 @@ export function createMockApi(options: MockOptions = {}): MockApi {
           progress("splitting", i, `Splitting ${name}`);
           break;
         case Action.ImagesToPdf:
-          progress("preparing", i, `Placing ${name} on a page`);
+          progress("converting_images", i, `Placing ${name} on a page`);
           break;
         case Action.Compress:
           progress("compressing", i, `Making ${name} smaller`, null, null);
@@ -423,7 +425,7 @@ export function createMockApi(options: MockOptions = {}): MockApi {
       return { ...settings };
     },
 
-    async pickFiles(kind: "documents" | "images") {
+    async pickFiles(kind: "all" | "documents" | "images") {
       await latency();
       pickCounts[kind] += 1;
       const extra = pickCounts[kind] > 1 ? pickCounts[kind] : null;
@@ -436,7 +438,7 @@ export function createMockApi(options: MockOptions = {}): MockApi {
         { path: `${SAMPLE_FOLDER}\\Photo 1.jpg`, name: "Photo 1.jpg", kind: "image", sizeBytes: 2_100_000, pageCount: null },
         { path: `${SAMPLE_FOLDER}\\Diagram.png`, name: "Diagram.png", kind: "image", sizeBytes: 310_000, pageCount: null },
       ];
-      const list = kind === "images" ? images : docs;
+      const list = kind === "images" ? images : kind === "documents" ? docs : [...docs, ...images];
       // Later picks add one new file, so the list can grow while dedupe still shows.
       if (extra) {
         list.push(
@@ -496,6 +498,11 @@ export function createMockApi(options: MockOptions = {}): MockApi {
         },
         issues,
       };
+    },
+
+    async getOcrStatus(): Promise<OcrStatus> {
+      await latency();
+      return { present: tools.ocr, path: tools.ocr ? (settings.tesseractPath ?? TESSERACT_PATH) : null };
     },
 
     async getOcrLanguages() {

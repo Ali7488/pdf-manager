@@ -42,7 +42,44 @@ describe("bridge", () => {
   });
 });
 
+describe("bridge mapping", () => {
+  it("maps getOcrStatus to get_ocr_status and passes the pickFiles kind", async () => {
+    const getOcrStatus = vi.fn().mockResolvedValue({ present: true, path: "C:\\t.exe" });
+    const pickFiles = vi.fn().mockResolvedValue([]);
+    window.pywebview = { api: { get_settings: vi.fn(), get_ocr_status: getOcrStatus, pick_files: pickFiles } };
+    try {
+      const api = createBridgeApi();
+      expect(await api.getOcrStatus()).toEqual({ present: true, path: "C:\\t.exe" });
+      await api.pickFiles("all");
+      expect(pickFiles).toHaveBeenCalledWith("all");
+    } finally {
+      delete window.pywebview;
+    }
+  });
+});
+
 describe("mock API", () => {
+  it("picks every kind with 'all' and reports OCR status", async () => {
+    const api = createMockApi({ tickMs: 1 });
+    const kinds = new Set((await api.pickFiles("all")).map((file) => file.kind));
+    expect(kinds).toEqual(new Set(["pdf", "pptx", "image"]));
+    expect(await api.getOcrStatus()).toEqual({ present: false, path: null });
+    api.setTools({ ocr: true });
+    expect((await api.getOcrStatus()).present).toBe(true);
+  });
+
+  it("uses the converting_images stage for Images to PDF", async () => {
+    const api = createMockApi({ tickMs: 1 });
+    const images = await api.pickFiles("images");
+    const stages: string[] = [];
+    const off = onEvent("jobProgress", (payload) => stages.push(payload.stage));
+    const finished = nextFinished();
+    await api.startJob(Action.ImagesToPdf, defaultActionSettings(), { files: images.map((file) => file.path) });
+    await finished;
+    off();
+    expect(stages).toContain("converting_images");
+  });
+
   it("applies the tool-check rules", async () => {
     const api = createMockApi({ tickMs: 1, tools: { ocr: false, powerpoint: true, libreoffice: false } });
     const files = await api.pickFiles("documents");

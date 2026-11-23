@@ -11,6 +11,7 @@ import type {
   AppInfo,
   InputFile,
   OcrSearchResult,
+  OcrStatus,
   PdfManagerApi,
   PdfManagerEvents,
   SaveOptions,
@@ -78,21 +79,17 @@ let readyPromise: Promise<PythonApi> | null = null;
 /**
  * Resolves with the Python API once pywebview is ready: straight away if
  * `window.pywebview.api` already exists, otherwise on the `pywebviewready`
- * window event. The promise is created once and shared by every call.
+ * window event. Only the waiting promise is shared; once the API exists, the
+ * live object is always used.
  */
 function whenPythonReady(): Promise<PythonApi> {
+  const existing = window.pywebview?.api;
+  if (existing && typeof existing.get_settings === "function") {
+    return Promise.resolve(existing);
+  }
   if (!readyPromise) {
     readyPromise = new Promise((resolve) => {
-      const existing = window.pywebview?.api;
-      if (existing && typeof existing.get_settings === "function") {
-        resolve(existing);
-        return;
-      }
-      window.addEventListener(
-        "pywebviewready",
-        () => resolve(window.pywebview?.api ?? {}),
-        { once: true },
-      );
+      window.addEventListener("pywebviewready", () => resolve(window.pywebview?.api ?? {}), { once: true });
     });
   }
   return readyPromise;
@@ -124,11 +121,12 @@ export function createBridgeApi(): PdfManagerApi {
     getAppInfo: () => callPython<AppInfo>("get_app_info"),
     getSettings: () => callPython<Settings>("get_settings"),
     saveSettings: (patch: Partial<Settings>) => callPython<Settings>("save_settings", patch),
-    pickFiles: (kind: "documents" | "images") => callPython<InputFile[]>("pick_files", kind),
+    pickFiles: (kind: "all" | "documents" | "images") => callPython<InputFile[]>("pick_files", kind),
     pickFolder: () => callPython<string | null>("pick_folder"),
     // start_job and check_tools take three positional arguments on the Python side.
     checkTools: (action: Action, settings: ActionSettings, data: ActionData) =>
       callPython<ToolCheckResult>("check_tools", action, settings, data),
+    getOcrStatus: () => callPython<OcrStatus>("get_ocr_status"),
     getOcrLanguages: () => callPython<string[]>("get_ocr_languages"),
     searchOcr: () => callPython<OcrSearchResult>("search_ocr"),
     installOcr: () => callPython<void>("install_ocr"),

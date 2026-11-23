@@ -53,6 +53,7 @@ COPYLEFT_MARKERS = {
 # The Python runtime's own files are matched separately (see _runtime_rules).
 BINARY_RULES = [
     ("pdf manager.exe", "PyInstaller bootloader"),
+    ("unins*.exe", "INNO SETUP"),
     ("_internal/pymupdf/*", "pymupdf"),
     ("_internal/mupdfcpp64.dll", "pymupdf"),
     ("_internal/vcruntime140*.dll", "MSVC RUNTIME"),
@@ -207,6 +208,11 @@ def check_repo(report: Report) -> None:
         == manifest["python_windows"],
         "build-windows.yml installs a different Python than the notices",
     )
+    report.check(
+        _pin(".github/workflows/build-windows.yml", r"innosetup --version ([\d.]+)")
+        == manifest["inno_setup"],
+        "build-windows.yml installs a different Inno Setup than the notices",
+    )
     pymupdf = python.get("pymupdf", {}).get("version", "")
     report.check(
         manifest["mupdf"].split(".")[:2] == pymupdf.split(".")[:2],
@@ -325,6 +331,7 @@ def check_bundle(report: Report, app: Path, installed: bool) -> None:
         ("PYTHON RUNTIME", "python.org Windows"),
         ("MSVC RUNTIME", "Visual C++ runtime"),
         ("PyInstaller bootloader", "PyInstaller bootloader"),
+        ("INNO SETUP", "Inno Setup"),
     ):
         if counts.get(component):
             report.check(words in listed, f"The notices don't list the {component.lower()}")

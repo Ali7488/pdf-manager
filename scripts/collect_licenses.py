@@ -59,6 +59,9 @@ PYINSTALLER_VERSION = "6.22.3"
 # when the bundled interpreter is a different version.
 PYTHON_WINDOWS_VERSION = "3.13.17"
 FEATHER_VERSION = "v4.29.2"
+# The Inno Setup compiler the Windows build installs (build-windows.yml). Its
+# uninstaller (unins000.exe) is installed next to the app.
+INNO_SETUP_VERSION = "6.7.1"
 # The Microsoft.Web.WebView2 NuGet release whose DLLs pywebview ships.
 WEBVIEW2_SDK_VERSION = "1.0.3856.49"
 WEBVIEW2_DLLS = {
@@ -600,6 +603,22 @@ def other_components() -> list[Component]:
             "other",
         )
     )
+    # Inno Setup: the installer and the uninstaller it leaves next to the app.
+    target = LICENSES / "other" / "inno-setup"
+    target.mkdir(parents=True, exist_ok=True)
+    inno = _download("https://jrsoftware.org/files/is/license.txt", "inno-setup-license.txt")
+    shutil.copyfile(inno, target / "license.txt")
+    out.append(
+        Component(
+            "Inno Setup (the installer and unins000.exe)",
+            INNO_SETUP_VERSION,
+            "Inno Setup License (permissive)",
+            {"windows"},
+            "Installs and uninstalls the app",
+            ["other/inno-setup/license.txt"],
+            "other",
+        )
+    )
     # Icons: drawn inline in frontend/src/components/Icon/Icon.tsx. The settings
     # gear is Feather's "settings" path with its numbers rounded, so Feather's own
     # licence file (from the v4.29.2 tag) is shipped.
@@ -828,6 +847,7 @@ def main() -> int:
         {
             "python_windows": PYTHON_WINDOWS_VERSION,
             "pyinstaller": PYINSTALLER_VERSION,
+            "inno_setup": INNO_SETUP_VERSION,
             "mupdf": pymupdf.mupdf_version,
             "webview2_sdk": {"version": WEBVIEW2_SDK_VERSION, "sha256": webview2_hashes},
             "sources": {

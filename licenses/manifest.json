@@ -2,6 +2,7 @@
   "generated_by": "scripts/collect_licenses.py",
   "python_windows": "3.13.17",
   "pyinstaller": "6.22.3",
+  "inno_setup": "6.7.1",
   "mupdf": "1.28.2",
   "webview2_sdk": {
     "version": "1.0.3856.49",
@@ -973,6 +974,18 @@
       "group": "other",
       "files": [
         "other/microsoft-vc-runtime/README.txt"
+      ]
+    },
+    {
+      "name": "Inno Setup (the installer and unins000.exe)",
+      "version": "6.7.1",
+      "license": "Inno Setup License (permissive)",
+      "platforms": [
+        "windows"
+      ],
+      "group": "other",
+      "files": [
+        "other/inno-setup/license.txt"
       ]
     },
     {

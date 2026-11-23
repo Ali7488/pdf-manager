@@ -80,6 +80,7 @@ def test_frontend_inventory_reads_only_runtime_packages():
     ("relative", "component"),
     [
         ("PDF Manager.exe", "PyInstaller bootloader"),
+        ("unins000.exe", "INNO SETUP"),
         ("_internal/python313.dll", "PYTHON RUNTIME"),
         ("_internal/vcruntime140_1.dll", "MSVC RUNTIME"),
         ("_internal/MSVCP140.dll", "MSVC RUNTIME"),

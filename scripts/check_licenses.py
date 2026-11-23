@@ -54,6 +54,9 @@ COPYLEFT_MARKERS = {
 BINARY_RULES = [
     ("pdf manager.exe", "PyInstaller bootloader"),
     ("_internal/pymupdf/*", "pymupdf"),
+    ("_internal/mupdfcpp64.dll", "pymupdf"),
+    ("_internal/vcruntime140*.dll", "MSVC RUNTIME"),
+    ("_internal/msvcp140*.dll", "MSVC RUNTIME"),
     ("_internal/webview/lib/microsoft.web.webview2.*.dll", "WEBVIEW2"),
     ("_internal/webview/lib/runtimes/*/native/webview2loader.dll", "WEBVIEW2"),
     ("_internal/webview/lib/webbrowserinterop.*.dll", "pywebview"),
@@ -74,8 +77,6 @@ BINARY_RULES = [
 RUNTIME_FILES = [
     "python3.dll",
     "python3??.dll",
-    "vcruntime140.dll",
-    "vcruntime140_1.dll",
     "libcrypto-3*.dll",
     "libssl-3*.dll",
     "libffi-*.dll",
@@ -308,11 +309,31 @@ def check_bundle(report: Report, app: Path, installed: bool) -> None:
             unknown.append(relative)
             continue
         counts[component] = counts.get(component, 0) + 1
-        if component not in ("WEBVIEW2", "PYTHON RUNTIME", "PyInstaller bootloader"):
+        print(f"  {relative}: {component}")
+        if component not in (
+            "WEBVIEW2",
+            "PYTHON RUNTIME",
+            "MSVC RUNTIME",
+            "PyInstaller bootloader",
+        ):
             report.check(_norm(component) in names, f"{relative}: {component} isn't listed")
     for relative in unknown:
         report.fail(f"{relative} belongs to no listed component; add its notice")
+    listed = " ".join(c["name"] for c in manifest["components"])
+    for component, words in (
+        ("WEBVIEW2", "WebView2"),
+        ("PYTHON RUNTIME", "python.org Windows"),
+        ("MSVC RUNTIME", "Visual C++ runtime"),
+        ("PyInstaller bootloader", "PyInstaller bootloader"),
+    ):
+        if counts.get(component):
+            report.check(words in listed, f"The notices don't list the {component.lower()}")
     print("Native files by component:", json.dumps(counts, sort_keys=True))
+
+    # Microsoft files Windows provides itself must not be shipped (see pdf-manager.spec).
+    for path in app.rglob("*"):
+        if re.match(r"(ucrtbase|api-ms-win-.*|mfc140u)\.dll$", path.name, re.I):
+            report.fail(f"{path.relative_to(app).as_posix()} shouldn't be bundled")
 
     # Qt is Linux-only (decision P19).
     qt = [

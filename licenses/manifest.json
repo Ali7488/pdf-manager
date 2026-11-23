@@ -964,6 +964,18 @@
       ]
     },
     {
+      "name": "Microsoft Visual C++ runtime (vcruntime140.dll, vcruntime140_1.dll, msvcp140*.dll)",
+      "version": "14.x",
+      "license": "Microsoft Visual Studio \"Distributable Code\" terms (proprietary; see note)",
+      "platforms": [
+        "windows"
+      ],
+      "group": "other",
+      "files": [
+        "other/microsoft-vc-runtime/README.txt"
+      ]
+    },
+    {
       "name": "Feather Icons (design of some icons)",
       "version": "4.x",
       "license": "MIT",

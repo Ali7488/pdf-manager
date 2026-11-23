@@ -81,7 +81,9 @@ def test_frontend_inventory_reads_only_runtime_packages():
     [
         ("PDF Manager.exe", "PyInstaller bootloader"),
         ("_internal/python313.dll", "PYTHON RUNTIME"),
-        ("_internal/vcruntime140_1.dll", "PYTHON RUNTIME"),
+        ("_internal/vcruntime140_1.dll", "MSVC RUNTIME"),
+        ("_internal/MSVCP140.dll", "MSVC RUNTIME"),
+        ("_internal/mupdfcpp64.dll", "pymupdf"),
         ("_internal/libcrypto-3.dll", "PYTHON RUNTIME"),
         ("_internal/_ssl.pyd", "PYTHON RUNTIME"),
         ("_internal/pymupdf/mupdfcpp64.dll", "pymupdf"),
@@ -134,6 +136,14 @@ def test_changed_webview2_file_fails(tmp_path):
     assert any(
         "Microsoft.Web.WebView2.Core.dll isn't the Microsoft.Web.WebView2" in f for f in failures
     )
+
+
+@pytest.mark.parametrize("name", ["ucrtbase.dll", "api-ms-win-crt-heap-l1-1-0.dll", "mfc140u.dll"])
+def test_microsoft_files_windows_provides_must_not_be_bundled(tmp_path, name):
+    app = _fake_app(tmp_path)
+    (app / "_internal" / name).write_bytes(b"MZ")
+    failures = _failures(lambda r: check.check_bundle(r, app, installed=False))
+    assert any(f"_internal/{name} shouldn't be bundled" in f for f in failures)
 
 
 def test_qt_in_windows_bundle_fails(tmp_path):

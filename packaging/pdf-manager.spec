@@ -210,6 +210,17 @@ def _unneeded(dest: str) -> bool:
     # PyMuPDF 2.x wheels ship C headers for developers; the app never needs them.
     if "/mupdf-devel/" in f"/{path}":
         return True
+    name = path.rsplit("/", 1)[-1]
+    # The Universal C Runtime is part of Windows 10 and 11 (the installer's minimum),
+    # and Windows always uses its own copy even when an app ships one, so the copies
+    # PyInstaller picks up from the build machine are never used. Leaving them out also
+    # keeps Microsoft binaries the app doesn't need out of the AGPL-3.0 distribution.
+    if name == "ucrtbase.dll" or (name.startswith("api-ms-win-") and name.endswith(".dll")):
+        return True
+    # Microsoft's MFC runtime is only for pywin32's Pythonwin GUI (win32ui), which the
+    # app never imports; PowerPoint automation uses win32com and pythoncom.
+    if name == "mfc140u.dll":
+        return True
     return False
 
 

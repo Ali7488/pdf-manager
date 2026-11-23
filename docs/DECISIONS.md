@@ -27,6 +27,9 @@ Decisions made by the project owner, in their own direction (summarized, not quo
 | P20 | 2026-11-23 | **Licence: MIT.** |
 | P21 | 2026-11-23 | After the Linux work, continue overnight with small open items that need no new decisions (platform-aware troubleshooting text, cleaning up merged agent worktrees and branches). |
 | P22 | 2026-11-23 | **Don't run the manual Windows installer build workflow** (`build-windows.yml`); the owner will trigger it. Keep CI minute use low by pushing in small batches rather than after every commit. |
+| P23 | 2026-11-23 | **Public repository.** Make `Ali7488/pdf-manager` public now. Commit author emails stay as they are. The reference to the owner's private notes in `ENGINEERING_REVIEW.md` is removed. |
+| P24 | 2026-11-23 | **GitHub Actions runners may be used while free** (public repo, standard runners) to build and test, including the Windows installer build, re-running and fixing as needed. Supersedes P22 for the public repo. |
+| P25 | 2026-11-23 | **Release plan.** **v0.5**: Windows-only pre-release (installer built on GitHub runners), explicitly marked as a pre-release for testing, with a simple README of the features and install steps (Windows: double-click the installer). **v0.75** (also tonight): pre-release that fixes the Windows bugs found in v0.5 **and releases the Linux versions** (supersedes "no Linux packaging yet" in P15/P17). **v1.0**: full release only after the owner has manually verified the functionality, code and features. |
 
 ## Converter (Python backend)
 

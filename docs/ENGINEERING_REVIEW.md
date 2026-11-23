@@ -67,7 +67,6 @@ Implementation of the fixes above, by AI agents (not a human review). Evidence:
 2. **P2:** Repair R4–R6 and implement R7; verify behavior across UI and API rather than only testing a single function.
 3. **P3:** Resolve R8–R9 while updating documentation and recording verified outcomes.
 
-**Reference:** the full read-only audit is in private Development Vault at `30 Projects/Lecture PDF Maker/2026-11-22 - Post Merge Source Risk Audit Before Windows Release.md`. No application source code was modified by that audit.
 
 ## Open work
 

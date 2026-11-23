@@ -116,4 +116,10 @@ A short, summarized record of each request made to the coding agent, and what ca
 34. **Too empty: add explanation, not eyebrows.** → Each action page opens with a plain sentence on what it does; every option has a short explanation beside it (F45 updated).
 35. **Too spacious; make content bigger.** → Decision F46: smaller default window, left-aligned content with less dead space, larger text and controls.
 36. **Use the horizontal space; is a copyright line valid; add the needed licences.** → Two-column layout on wide windows (F47). A copyright line is valid; PyMuPDF's AGPL-3.0 applies to the distributed app, so `THIRD_PARTY_NOTICES.md` and every bundled licence text ship with it, and the app shows its copyright, licences and source location (P30). The owner will research licensing further.
+37. **Licensing plan and release readiness.** Use PyMuPDF's AGPL-3.0 route (P31); audit and implement the distribution requirements (licensing, corresponding source, build instructions, attribution, notices, installer inclusion); keep MIT for the original code without calling the app MIT-only; copyright footer and licensing info in Settings; run tests and verify the installed app; don't publish; give a compliance report and research items. Also: the file drop box fills the column's height, and headings are slightly more pronounced. Checklist:
+    - [x] UI: full-height empty file box; bolder, larger headings.
+    - [x] `LICENSING.md`, `LICENSE-AGPL-3.0.txt`, full copyleft texts, Python runtime, PyInstaller (pinned 6.22.3), Feather and WebView2 entries in the notices.
+    - [x] Settings → About with the AGPL's appropriate legal notices and "Open licences folder"; footer no longer says MIT.
+    - [x] Installer ships every licence file; the Windows build checks them and that no Qt is bundled.
+    - [ ] Verify on the Windows runner; compliance report in `docs.local/`.
 

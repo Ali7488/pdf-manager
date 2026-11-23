@@ -24,7 +24,7 @@ The Python `converter/` package is the engine. The Tkinter `app.py` is the curre
 - `app.py`: Tkinter dashboard (to be replaced).
 - `tests/`: integration tests (need Tesseract and LibreOffice installed).
 - `install_windows.ps1`, `INSTALL.bat`, `OPEN.bat`: Windows installer and launcher.
-- `docs/`: engineering backlog, source inventory and the prompts log.
+- `docs/`: decisions log, prompts log, API contract (`API.md`), portability rules (`PORTABILITY.md`), engineering backlog and source inventory.
 
 ## Commands
 
@@ -42,7 +42,7 @@ Use **uv** for everything (`uv add`, `uv run`, `uv sync`). Never use pip or requ
 ## Rules
 
 - **Generic only.** No personal names, no specific person's workflow, and no domain-specific wording (such as a particular course or subject) in code, UI text, tests, docs or commit messages. Test fixtures use neutral sample text.
-- **Windows first, portable always.** v1 targets Windows 11; prefer correct Windows behaviour. Linux packages (`.deb`, Arch `PKGBUILD`) and Qt/GNOME versions come later (decision P14), so keep the service and API layers portable: guard Windows-only code (COM, registry, `os.startfile`) with platform checks and working fallbacks, and never hard-code Windows paths.
+- **Windows first, portable always.** v1 targets Windows 11; prefer correct Windows behaviour. Linux packages (`.deb`, Arch `PKGBUILD`) and Qt/GNOME versions come later (decision P14), so keep the service and API layers portable: guard Windows-only code (COM, registry, `os.startfile`) with platform checks and working fallbacks, and never hard-code Windows paths. Platform-specific code lives only in `converter/platforms/` (and an equivalent API-layer module); see `docs/PORTABILITY.md`.
 - **Originals are never modified.** Inputs are only read. All work happens in a scratch folder, and results are copied out with collision-safe names (`converter.output.safe_destination`).
 - **No speaker notes.** The speaker-notes appendix was removed on purpose. Don't re-add it.
 - **Documentation.** Every function gets a Google-style docstring (summary, Args, Returns, Raises). Add inline comments for non-obvious lines, and flag known issues where they occur.

@@ -62,7 +62,7 @@ A short, summarized record of each request made to the coding agent, and what ca
     - [x] Add a "portable always" rule to `AGENTS.md`.
 20. **Cross-platform architecture.** Support Windows, Ubuntu/Debian and Arch from one frontend and one Python engine; isolate platform-specific code behind minimal interfaces; keep PowerPoint COM optional with LibreOffice as the cross-platform renderer; no Linux packaging yet; no Windows-only assumptions in shared logic; document portability constraints and future Linux release requirements without interrupting the running subagents. Checklist:
     - [x] Record decision P15.
-    - [ ] Write `docs/PORTABILITY.md`.
+    - [x] Write `docs/PORTABILITY.md`.
     - [ ] Service layer: move platform-specific code into `converter/platforms/` (Windows and POSIX modules behind one small interface).
     - [ ] API layer: after merging its branch, move Windows-specific parts (opening folders, OCR install, settings paths) behind the same kind of interface.
 

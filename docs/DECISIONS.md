@@ -26,8 +26,8 @@ Decisions made by the project owner, in their own direction (summarized, not quo
 | C1 | 2026-11-22 | The Python converter stays as the backend behind the new frontend. |
 | C2 | 2026-11-22 | PowerPoint must not close the user's own PowerPoint or presentations (fix 1). |
 | C3 | 2026-11-22 | A fatal PowerPoint error is shown in a popup. Non-fatal problems are returned as structured warnings. |
-| C4 | 2026-11-22 | Errors are saved to a **logs folder next to the installed app**, and a button opens that folder in File Explorer. |
-| C5 | 2026-11-22 | Add a manual **Cancel** button and an **automatic per-page OCR timeout**. The owner left the timeout value to engineering judgment ("5 minutes or whatever is reasonable"). |
+| C4 | 2026-11-22 | Errors are saved to a **logs folder next to the installed app**, and a button opens that folder in File Explorer. (Works because the app installs per user, see F17.) |
+| C5 | 2026-11-22 | Add a manual **Cancel** button and an **automatic per-page OCR timeout**. Default **2 minutes per page**, adjustable in Settings. |
 | C6 | 2026-11-22 | **Keep bookmarks** when merging. |
 | C7 | 2026-11-22 | Add a **contents (index) page** at the start of merged output, linking to each part. It must be possible to turn it off. |
 | C8 | 2026-11-22 | Renumber pages using **viewer page labels** (option a), not numbers printed on the pages. |
@@ -44,15 +44,39 @@ Decisions made by the project owner, in their own direction (summarized, not quo
 | F2 | 2026-11-22 | Delivered as an **installable Windows 11 executable** that opens as a native application window, for average users. Not a browser tab or a local web server. |
 | F3 | 2026-11-22 | Tooling: **Vite, React, TypeScript, npm**. |
 | F4 | 2026-11-22 | Styling: **CSS Modules** in a **feature-based folder layout**: each page keeps its components, tests and stylesheets in one directory. Top-level folders: `pages/`, shared `components/`, global `styles/`. |
-| F5 | 2026-11-22 | Themes: light and dark modes using the owner's usual template colours (black/white with gold accents, from `react-express-template` `client/src/styles/tokens.css`). Extra colourways were suggested (burgundy and pink; forest green, cream and coral; perhaps blue). **Open:** which of these ship. |
-| F6 | 2026-11-22 | Font: **IBM Plex Sans**, imported from Google Fonts. No scattered italics or bold. |
+| F5 | 2026-11-22 | Themes: light and dark modes using the owner's usual template colours (black/white with gold accents, from `react-express-template` `client/src/styles/tokens.css`). v1 ships **four schemes: dark, light, burgundy (burgundy and pink) and green (forest green, cream and coral)**. More, such as blue, only after Windows behaviour is proven. |
+| F6 | 2026-11-22 | Font: **IBM Plex Sans**, **bundled with the app** (not fetched from Google Fonts at runtime) so it works offline. No scattered italics or bold. |
 | F7 | 2026-11-22 | Look: basic and user-friendly, rounded corners, smooth but uncomplicated animations. |
 | F8 | 2026-11-22 | Files: drag and drop to add, drag to reorder, remove. Uploaded files persist across tabs. |
-| F9 | 2026-11-22 | Modes: Flatten, Flatten + Merge, Merge, **Split** (select page ranges). Converting PDFs to other file types was suggested ("perhaps"). **Open:** whether to include it and which formats. |
-| F10 | 2026-11-22 | A **"Use OCR" checkbox** with a short plain-language explanation. The first time, the Convert button is greyed out while the app checks that OCR is installed. Afterwards, assume it's present. Settings has a **"Search for OCR"** button. Installing OCR stays available in both places. |
+| F9 | 2026-11-22 | Modes: Flatten, Flatten + Merge, Merge, **Split** (select page ranges). v1 also adds **Images to PDF** (PNG/JPG) and **Compress PDF**. Word export is **after v1**, as an optional separate add-on install because of its extra dependency. |
+| F10 | 2026-11-22 | A **"Use OCR" checkbox** with a short plain-language explanation. **Unchecked by default.** Offered in Flatten, Flatten + Merge, Merge and Split (merged or split PDFs may be image-based). The first time it's checked, the Convert button is greyed out while the app checks that OCR is installed. Settings has a **"Search for OCR"** button. Installing OCR stays available in both places. |
 | F11 | 2026-11-22 | Settings panel approved: DPI, OCR language, OCR page timeout, contents page on/off, page numbering, optional default save folder, plus the OCR items in F10. |
 | F12 | 2026-11-22 | Results approved: save to the default folder or choose one, keep results until saved, list warnings. |
 | F13 | 2026-11-22 | Warnings and errors (OCR, conversion, merging and so on) appear in a **simple popup** with basic troubleshooting steps for the likely cause. |
-| F14 | 2026-11-22 | Tool check is a **modal shown when Convert is clicked**. It checks OCR, PowerPoint and LibreOffice. If PowerPoint is available, a missing LibreOffice only shows as "not present" and doesn't block conversion. |
-| F15 | 2026-11-22 | Navigation: a **sidebar with tabs** (Convert, Settings, possibly one tab per mode). **Open:** home page with upload plus buttons that lead to mode tabs, or upload directly in each tab. |
+| F14 | 2026-11-22 | Tool check is a **modal shown when Convert is clicked**. It appears on **every Convert** and checks **only what that job needs** (no OCR check when OCR is unchecked; PowerPoint/LibreOffice only matter for PowerPoint inputs). If PowerPoint is available, a missing LibreOffice only shows as "not present" and doesn't block conversion. If a required check fails, it shows an error with likely troubleshooting steps. |
+| F15 | 2026-11-22 | Navigation: a **sidebar** where **each mode is its own tab**, plus Settings. Option C: a **Home** page with the drop zone and file list and buttons leading to each mode tab, and every mode tab also accepts dropped files. The file list is shared across all tabs. |
 | F16 | 2026-11-22 | The frontend is built by a parallel agent while the converter work continues. |
+| F17 | 2026-11-22 | **Per-user install** (no admin rights needed). An **unsigned** installer is acceptable for v1. |
+| F18 | 2026-11-22 | Shell confirmed: a **pywebview** window talking to Python directly (no local server), packaged with **PyInstaller** and an **Inno Setup** installer. |
+| F19 | 2026-11-22 | The installer is a **simple install wizard**. |
+| F20 | 2026-11-22 | **Tooltips:** anything that may need explaining gets a small circular **(?)** next to it that shows a simple explanation on hover. |
+| F21 | 2026-11-22 | **Split** output: each page range becomes its **own file**. The user can save them as **one zip (optional)** or as individual files. |
+| F22 | 2026-11-22 | **Default save folder:** set in Settings. When enabled, results save there **without asking**. Each mode page has an option to save to the default folder or not, plus a **"Change default folder"** button that goes to Settings. |
+| F23 | 2026-11-22 | Drag to reorder uses **`@dnd-kit/sortable`**: smooth, intuitive animations are worth the ~15 KB. |
+| F24 | 2026-11-22 | Frontend tests: **Vitest + React Testing Library**, kept in each feature folder. |
+| F25 | 2026-11-22 | **Delete the Tkinter app** once the new app works. |
+
+## Open questions
+
+Not yet decided. Do not assume an answer.
+
+| # | Question |
+| --- | --- |
+| O1 | Contents page: on or off by default? Does it apply to both Merge and Flatten + Merge? |
+| O2 | Which colour scheme is used on first launch? Should light/dark follow the Windows setting by default? |
+| O3 | Split: besides custom page ranges, also offer "every N pages" and/or "one file per page"? Should Split accept PowerPoint files (rendered first)? |
+| O4 | Images to PDF: one PDF per image, all images combined into one PDF, or a user choice? Is OCR offered for it? |
+| O5 | Compress PDF: a single setting, or user-facing levels (for example Light / Balanced / Strong)? |
+| O6 | Install wizard: should it offer Tesseract OCR and LibreOffice as optional components during install, or leave OCR installation to the app? |
+| O7 | With the tool-check modal on every Convert, is the separate first-time OCR check (Convert button greyed out when "Use OCR" is first ticked) still wanted? |
+| O8 | When a default folder is set, is each mode page's "Save to default folder" option on or off by default? |

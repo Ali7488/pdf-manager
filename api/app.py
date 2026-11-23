@@ -5,6 +5,11 @@ logging, loads the settings, creates the pywebview window with
 :class:`api.bridge.Api` as its ``js_api`` and runs the GUI loop until the
 window closes. Afterwards a running job is cancelled and every scratch
 folder is deleted.
+
+The GUI backend comes from the platform module: pywebview's default (Edge
+WebView2) on Windows, Qt WebEngine through PySide6 on Linux (decisions P18,
+P19). With ``PDF_MANAGER_SMOKE_TEST=1`` the same start-up runs, the page is
+checked and the window closes again (:mod:`api.smoke`, used by CI).
 """
 
 from __future__ import annotations
@@ -16,7 +21,7 @@ from pathlib import Path
 
 import webview
 
-from . import paths
+from . import paths, platforms, smoke
 from .bridge import Api
 from .logging_setup import configure_logging, dev_mode
 from .settings_store import SettingsStore
@@ -91,6 +96,7 @@ def main() -> int:
 
     Returns:
         Process exit code: 0 after a normal close, 1 after a startup failure.
+        In smoke-test mode, 0 if the check passed and non-zero otherwise.
     """
     configure_logging()
     api: Api | None = None
@@ -112,8 +118,20 @@ def main() -> int:
             text_select=True,
         )
         api._bind_window(window)
+        gui = platforms.prepare_gui()
+        log.info("Starting the window (GUI: %s)", gui or "pywebview default")
+        if smoke.enabled():
+            check = smoke.SmokeCheck(window)
+            check.arm()
+            try:
+                # No devtools: they would open a second window.
+                webview.start(check.run, gui=gui, debug=False)
+            finally:
+                check.disarm()
+            log.info("Smoke test finished with exit code %d", check.exit_code)
+            return check.exit_code
         # debug=True enables the browser devtools (development mode only).
-        webview.start(debug=dev_mode())
+        webview.start(debug=dev_mode(), gui=gui)
         log.info("Window closed")
         return 0
     except Exception:

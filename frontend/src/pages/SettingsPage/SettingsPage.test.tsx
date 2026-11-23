@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { renderApp } from "../../test/renderApp";
@@ -111,5 +111,58 @@ describe("SettingsPage", () => {
     const { user } = await renderApp({ state: { page: "settings" } });
     await user.click(screen.getByRole("button", { name: "Open logs folder" }));
     expect(screen.getByText(/version 1\.0\.0/)).toBeInTheDocument();
+  });
+
+  describe("when settings can't be saved (audit R6)", () => {
+    const NOT_SAVED = "Not saved: your changes apply until you close PDF Manager.";
+
+    it("says the change isn't saved, keeps it, and clears the warning after a save that works", async () => {
+      const { user, mock } = await renderApp({ state: { page: "settings" }, mock: { settingsSaveFails: true } });
+      expect(screen.getByText("Changes are saved straight away.")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("radio", { name: /^Burgundy/ }));
+      const alert = (await screen.findByText("Your settings couldn't be saved")).closest("[role=alert]");
+      expect(alert).not.toBeNull();
+      const warning = within(alert as HTMLElement);
+      expect(warning.getByText(/lost when PDF Manager closes/)).toBeInTheDocument();
+      expect(warning.getByText("Check the drive isn't full.")).toBeInTheDocument();
+      expect(warning.getByRole("button", { name: "Open logs folder" })).toBeInTheDocument();
+      expect(screen.getByText(NOT_SAVED)).toBeInTheDocument();
+      expect(screen.queryByText("Changes are saved straight away.")).not.toBeInTheDocument();
+      // The change still applies for now.
+      expect(screen.getByRole("radio", { name: /^Burgundy/ })).toBeChecked();
+      expect(document.documentElement.dataset.theme).toBe("burgundy");
+
+      mock.setSettingsSaveFails(false);
+      await user.click(screen.getByRole("radio", { name: /^Green/ }));
+      expect(await screen.findByText("Changes are saved straight away.")).toBeInTheDocument();
+      expect(screen.queryByText(NOT_SAVED)).not.toBeInTheDocument();
+      expect(screen.queryByText("Your settings couldn't be saved")).not.toBeInTheDocument();
+      expect(document.documentElement.dataset.theme).toBe("green");
+    });
+
+    it("tries again with the button once the problem is fixed", async () => {
+      const { user, mock } = await renderApp({ state: { page: "settings" }, mock: { settingsSaveFails: true } });
+      const dpi = screen.getByRole("spinbutton", { name: "Resolution (DPI)" });
+      await user.clear(dpi);
+      await user.type(dpi, "300{Enter}");
+      expect(await screen.findByText(NOT_SAVED)).toBeInTheDocument();
+      expect(screen.getByRole("spinbutton", { name: "Resolution (DPI)" })).toHaveValue(300);
+
+      mock.setSettingsSaveFails(false);
+      const saveSettings = vi.spyOn(mock, "saveSettings");
+      await user.click(screen.getByRole("button", { name: "Try saving again" }));
+      expect(await screen.findByText("Changes are saved straight away.")).toBeInTheDocument();
+      expect(saveSettings).toHaveBeenCalledWith({});
+      expect((await mock.getSettings()).dpi).toBe(300);
+    });
+
+    it("also warns when the save call itself fails", async () => {
+      const { user, mock } = await renderApp({ state: { page: "settings" } });
+      vi.spyOn(mock, "saveSettings").mockRejectedValueOnce(new Error("The bridge stopped answering."));
+      await user.click(screen.getByRole("radio", { name: /^Dark/ }));
+      expect(await screen.findByText(NOT_SAVED)).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: /^Dark/ })).toBeChecked();
+    });
   });
 });

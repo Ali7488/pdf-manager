@@ -1,8 +1,12 @@
 /**
  * Settings: theme, default save folder, quality (DPI), OCR, and help.
- * Every change is saved straight away with `saveSettings`.
+ * Every change is saved straight away with `saveSettings`. If saving to disk
+ * fails, the page says so plainly (the change still applies until the app
+ * closes) and shows the issue's steps, instead of claiming it was saved.
  */
 import { Button } from "../../components/Button/Button";
+import { Icon } from "../../components/Icon/Icon";
+import { IssueView } from "../../components/Issue/IssueView";
 import { PageHeader, Section } from "../../components/Page/Page";
 import { useApp } from "../../state/AppContext";
 import { NumberSetting } from "./NumberSetting";
@@ -13,7 +17,7 @@ import { ThemePicker } from "./ThemePicker";
 /** The Settings page. */
 export function SettingsPage() {
   const { api, state, updateSettings } = useApp();
-  const { settings, appInfo } = state;
+  const { settings, appInfo, settingsSaveIssue } = state;
 
   const chooseFolder = async () => {
     const folder = await api.pickFolder();
@@ -22,7 +26,33 @@ export function SettingsPage() {
 
   return (
     <>
-      <PageHeader title="Settings" description="Changes are saved straight away." />
+      <PageHeader
+        title="Settings"
+        description={
+          settingsSaveIssue ? (
+            <span className={styles.unsaved}>
+              <Icon name="alert" className={styles.unsavedIcon} />
+              Not saved: your changes apply until you close PDF Manager.
+            </span>
+          ) : (
+            "Changes are saved straight away."
+          )
+        }
+      />
+
+      {settingsSaveIssue && (
+        <div role="alert" className={styles.unsavedIssue}>
+          <IssueView
+            issue={settingsSaveIssue}
+            actions={
+              // An empty change makes Python write all the current settings again.
+              <Button size="sm" onClick={() => void updateSettings({})}>
+                Try saving again
+              </Button>
+            }
+          />
+        </div>
+      )}
 
       <Section title="Appearance">
         <ThemePicker value={settings.theme} onChange={(theme) => void updateSettings({ theme })} />

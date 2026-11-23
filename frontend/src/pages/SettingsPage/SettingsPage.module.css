@@ -1,3 +1,21 @@
+/* Shown in the header when settings couldn't be written to disk. */
+.unsaved {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text);
+  font-weight: var(--font-weight-medium);
+}
+
+.unsavedIcon {
+  flex: none;
+  color: var(--color-warning);
+}
+
+.unsavedIssue {
+  margin-bottom: var(--space-4);
+}
+
 .label {
   font-weight: var(--font-weight-medium);
 }

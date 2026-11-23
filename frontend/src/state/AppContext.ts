@@ -21,7 +21,11 @@ export interface AppContextValue {
   dispatch: Dispatch<AppEvent>;
   api: PdfManagerApi;
   onEvent: typeof onEvent;
-  /** Applies a settings change straight away and saves it through Python. */
+  /**
+   * Applies a settings change straight away and saves it through Python.
+   * Saves run one at a time and the latest choice always wins; resolves once
+   * the save carrying this change has finished.
+   */
   updateSettings(patch: Partial<Settings>): Promise<void>;
   ocrInstall: OcrInstallState;
   /** Starts installing OCR; progress and result arrive in `ocrInstall`. */

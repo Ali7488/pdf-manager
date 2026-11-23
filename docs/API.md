@@ -29,7 +29,7 @@ A web page can't see real file paths, so dropped files are handled on the Python
 | --- | --- | --- |
 | `get_app_info()` | `getAppInfo()` | Version, logs folder path, platform. |
 | `get_settings()` | `getSettings()` | Saved settings. |
-| `save_settings(patch)` | `saveSettings(patch)` | Merge and persist a partial settings object; returns the full settings. |
+| `save_settings(patch)` | `saveSettings(patch)` | Merge and persist a partial settings object. Returns `{ settings, issue }`: the settings now in effect, and a `SETTINGS_SAVE_FAILED` issue if they couldn't be written to disk (they then apply only until the app closes). Calls are applied in the order received; the UI must not let an older response overwrite a newer choice. |
 | `pick_files(kind)` | `pickFiles(kind)` | Native file picker. `kind`: `"all"` (every supported type), `"documents"` (PDF/PPTX/PPT) or `"images"` (PNG/JPG). Returns `InputFile[]` (empty if cancelled). |
 | `pick_folder()` | `pickFolder()` | Native folder picker. Returns a path or `null`. |
 | `check_tools(action, settings, data)` | `checkTools(action, settings, data)` | Tool check for the Convert modal. Same arguments as `start_job`. Checks **only what this job needs** (see below). Returns `ToolCheckResult`. |

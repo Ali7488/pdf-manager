@@ -117,6 +117,7 @@ export type IssueCode =
   | "FLATTEN_CHECK_FAILED"
   | "MERGE_FAILED"
   | "SAVE_FAILED"
+  | "SETTINGS_SAVE_FAILED"
   | "JOB_ALREADY_RUNNING"
   | "UNEXPECTED_ERROR";
 
@@ -138,6 +139,13 @@ export interface ToolCheckResult {
   libreoffice: ToolStatus;
   /** Why ok is false (errors), or notes such as "LibreOffice not present" (warnings). */
   issues: Issue[];
+}
+
+export interface SaveSettingsResult {
+  /** Settings now in effect (in memory), including the patch. */
+  settings: Settings;
+  /** Set when the settings couldn't be saved to disk; null when saved. */
+  issue: Issue | null;
 }
 
 export interface OcrStatus {
@@ -225,7 +233,12 @@ export type StartJobResult = { jobId: string; issue?: undefined } | { jobId?: un
 export interface PdfManagerApi {
   getAppInfo(): Promise<AppInfo>;
   getSettings(): Promise<Settings>;
-  saveSettings(patch: Partial<Settings>): Promise<Settings>;
+  /**
+   * Merge and persist a partial settings object. Always returns the settings now in effect;
+   * `issue` is set (SETTINGS_SAVE_FAILED) if they couldn't be written to disk, so the UI can
+   * show that the change applies only until the app closes.
+   */
+  saveSettings(patch: Partial<Settings>): Promise<SaveSettingsResult>;
   /** Native file picker. "all" accepts every supported type (PDF, PPTX, PPT, PNG, JPG). */
   pickFiles(kind: "all" | "documents" | "images"): Promise<InputFile[]>;
   pickFolder(): Promise<string | null>;

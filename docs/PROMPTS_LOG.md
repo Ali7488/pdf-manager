@@ -109,4 +109,5 @@ A short, summarized record of each request made to the coding agent, and what ca
     - [ ] Build the Windows installer on GitHub runners and fix until it builds.
     - [ ] v0.5.0 pre-release (Windows) with user-facing README and notes.
     - [ ] v0.75.0 pre-release: Windows fixes + Linux packages (Ubuntu/Debian `.deb`, Arch `PKGBUILD`).
+30. **Retro, simple UI.** Make the frontend feel like 2016-era Microsoft Office software (own colour schemes), with few colours per scheme, fewer visual layers, heavier text, and Office's font or the closest free match. → Decisions F40–F42; restyled and shown to the owner on the local dev server.
 

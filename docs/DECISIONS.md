@@ -100,6 +100,9 @@ Decisions made by the project owner, in their own direction (summarized, not quo
 | F37 | 2026-11-23 | **Automatic CI (audit R7):** on every push and pull request, run Python lint and the full tests on Linux (with Tesseract and LibreOffice installed) and on Windows, plus the frontend typecheck, lint, tests and build. Windows packaging stays a separate manual job. |
 | F38 | 2026-11-23 | **Settings (was O11):** neither a contents-page default nor a page-numbering switch. The contents page stays a per-tab checkbox (off by default); page numbering stays automatic (viewer labels). |
 | F39 | 2026-11-23 | **OCR language (was O12):** one language at a time, chosen in Settings (English by default). |
+| F40 | 2026-11-23 | **Classic desktop look**, after 2016-era Microsoft Office software but with our own colour schemes: a band-coloured side pane with the app name (like Office's File menu), one plain page, sections marked by a heading and thin rule (no boxes), flat compact controls, almost square corners, no shadows, minimal animation. Supersedes the rounded, modern look in F7. |
+| F41 | 2026-11-23 | **Few colours per scheme:** each theme defines only base colours (band, accent, paper, canvas, ink, line, alert, and text on band/accent); every other shade is derived from them. |
+| F42 | 2026-11-23 | **Font:** Segoe UI (what Office used) where Windows already provides it, since it's proprietary and can't be bundled; otherwise bundled **Open Sans** (OFL), the closest freely licensed match (same designer). All text weights one step heavier (500 body, 600 emphasis). Supersedes IBM Plex Sans in F6. |
 
 ## Open questions
 

@@ -2,7 +2,7 @@
 
 The React user interface of PDF Manager. In the desktop app it runs inside a pywebview window and talks to the Python backend directly (no web server). The contract between the two is in [`../docs/API.md`](../docs/API.md) and [`src/api/types.ts`](src/api/types.ts).
 
-Stack: Vite, React, TypeScript, CSS Modules, dnd-kit (drag to reorder), IBM Plex Sans (bundled, works offline), Vitest and React Testing Library.
+Stack: Vite, React, TypeScript, CSS Modules, dnd-kit (drag to reorder), Segoe UI where Windows provides it, else bundled Open Sans (works offline), Vitest and React Testing Library.
 
 ## Commands
 
@@ -20,12 +20,12 @@ npm run build        # type-check, then build dist/index.html
 The desktop app opens `dist/index.html` straight from disk as a `file://` URL (no web server). Chromium and WebView2 block module scripts and font downloads from `file://`, so `npm run build` produces a **single `dist/index.html` with nothing else next to it**:
 
 - [`vite-plugin-singlefile`](https://github.com/richardtallent/vite-plugin-singlefile) inlines the JavaScript and CSS (no code-splitting).
-- The IBM Plex Sans font files are inlined as data URIs (see `src/styles/fonts.css`). To keep the file small, only weights 400 and 500, the woff2 format, and the Latin and Latin Extended subsets are bundled; other scripts fall back to Segoe UI.
+- Font: Segoe UI is used where Windows provides it (it's proprietary, so it isn't bundled). The fallback is Open Sans (OFL), a variable font inlined as data URIs (see `src/styles/fonts.css`): woff2, Latin and Latin Extended only.
 - The small inline script in `index.html` that picks light or dark before the first paint stays as it is.
 
 The result is about 450 kB (about 186 kB gzipped). Don't add anything the page has to fetch at runtime (fonts from a CDN, lazy-loaded chunks, images by URL); it would break in the desktop app.
 
-To check a build, open `dist/index.html` directly in a Chromium-based browser (double-click it, or use `file://` in the address bar). It should show the Home page in IBM Plex Sans with no console errors. Without Python, the page waits for pywebview, so settings don't load.
+To check a build, open `dist/index.html` directly in a Chromium-based browser (double-click it, or use `file://` in the address bar). It should show the Home page with no console errors. Without Python, the page waits for pywebview, so settings don't load.
 
 ## Running with the mock
 

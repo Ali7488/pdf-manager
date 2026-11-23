@@ -9,7 +9,7 @@ import { viteSingleFile } from "vite-plugin-singlefile";
  * The desktop app loads `dist/index.html` straight from disk as a file:// URL
  * (no web server). Chromium/WebView2 blocks module scripts and font fetches
  * from file://, so the build produces ONE self-contained `dist/index.html`:
- * vite-plugin-singlefile inlines the JS and CSS, and every asset (the IBM Plex
+ * vite-plugin-singlefile inlines the JS and CSS, and every asset (the Open Sans
  * font files) is inlined as a data URI. `base: "./"` keeps any leftover URL
  * relative.
  */

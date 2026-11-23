@@ -169,6 +169,8 @@ export interface OcrSearchResult {
 export interface AppInfo {
   version: string;
   logsDir: string;
+  /** Folder with the licence texts (LICENSING.md, THIRD_PARTY_NOTICES.md, licenses/). */
+  licensesDir: string;
   platform: "windows" | "linux" | "mac";
 }
 

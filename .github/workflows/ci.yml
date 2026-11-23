@@ -1,0 +1,85 @@
+# Automatic checks on every push and pull request (decision F37, audit R7).
+#
+# - python-linux:   lint, format check and the full pytest suite with Tesseract and
+#                   LibreOffice installed, so OCR and slide tests really run.
+# - python-windows: the pytest suite on Windows, to exercise Windows-only code paths
+#                   (process-tree killing, registry parsing, paths). Tesseract and
+#                   LibreOffice aren't installed there, so tests needing them skip.
+# - frontend:       typecheck, lint, tests and the single-file production build.
+#
+# Windows packaging (PyInstaller + Inno Setup) stays a separate, manual workflow:
+# build-windows.yml.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+# A newer push to the same branch cancels the older run, saving Actions minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python-linux:
+    name: Python (Linux)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Tesseract (English) and LibreOffice Impress
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            tesseract-ocr tesseract-ocr-eng libreoffice-impress
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Install Python dependencies
+        run: uv sync --frozen
+      - name: Lint
+        run: uvx ruff check --select F,E9,I,E501 --line-length 100 api converter tests main.py
+      - name: Format check
+        run: uvx ruff format --check --line-length 100 api converter tests main.py
+      - name: Tests
+        run: uv run pytest -q -p no:cacheprovider -rs
+
+  python-windows:
+    name: Python (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Install Python dependencies
+        run: uv sync --frozen
+      - name: Tests
+        run: uv run pytest -q -p no:cacheprovider -rs
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - name: Build (must be one self-contained index.html)
+        run: |
+          npm run build
+          test "$(ls dist)" = "index.html"

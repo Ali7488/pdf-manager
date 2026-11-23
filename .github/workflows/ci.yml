@@ -6,6 +6,9 @@
 #                   (process-tree killing, registry parsing, paths). Tesseract and
 #                   LibreOffice aren't installed there, so tests needing them skip.
 # - frontend:       typecheck, lint, tests and the single-file production build.
+# - linux-startup:  starts the real app (Qt WebEngine via PySide6) under Xvfb in
+#                   smoke-test mode: the React UI must render and window.pywebview.api
+#                   must answer, then the window closes (decision P17).
 #
 # Windows packaging (PyInstaller + Inno Setup) stays a separate, manual workflow:
 # build-windows.yml.
@@ -83,3 +86,59 @@ jobs:
         run: |
           npm run build
           test "$(ls dist)" = "index.html"
+
+  linux-startup:
+    name: Linux start-up (Qt window)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      # The PySide6 wheels bundle Qt itself; Qt's xcb platform plugin and Qt WebEngine
+      # (Chromium) still need these system libraries. xauth is needed by xvfb-run.
+      - name: Install Qt WebEngine's system libraries and Xvfb
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            xvfb xauth \
+            libegl1 libgl1 libopengl0 libgbm1 libdrm2 \
+            libxkbcommon0 libxkbcommon-x11-0 libxkbfile1 \
+            libxcb1 libx11-xcb1 libxcb-cursor0 libxcb-icccm4 libxcb-image0 \
+            libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-shape0 \
+            libxcb-xfixes0 libxcb-xinerama0 libxcb-xkb1 \
+            libxcomposite1 libxdamage1 libxrandr2 libxtst6 libxshmfence1 \
+            libnss3 libnspr4 libfontconfig1 libfreetype6 libdbus-1-3 \
+            libglib2.0-0t64 libasound2t64
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Install Python dependencies (PySide6 is Linux-only)
+        run: uv sync --frozen
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Build the interface
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+      # The app checks itself (api/smoke.py) and exits 0 only if the page rendered and
+      # the bridge answered. Its own watchdog stops it after about 105 s; `timeout` is a
+      # last resort.
+      - name: Start the app under Xvfb and check the window
+        shell: bash
+        env:
+          PDF_MANAGER_SMOKE_TEST: "1"
+        run: |
+          timeout 180 xvfb-run --auto-servernum --server-args="-screen 0 1280x1024x24" \
+            uv run --frozen main.py | tee smoke-test.txt
+          grep -q "^SMOKE TEST PASSED" smoke-test.txt
+      - name: Keep the app's log if the check failed
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-startup-logs
+          path: logs/
+          if-no-files-found: ignore
+          retention-days: 7

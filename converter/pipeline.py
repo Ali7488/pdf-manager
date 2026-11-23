@@ -134,3 +134,35 @@ def process_files(
     prefix = f"{stem} + {len(files) - 1} more" if len(files) > 1 else stem
     suffix = "Flattened Searchable Merged.pdf" if mode == FLATTEN_MERGE else "Merged.pdf"
     return [(f"{prefix} - {suffix}", final)]
+
+
+def run_action(
+    action,
+    settings,
+    data,
+    *,
+    scratch: Path,
+    progress=None,
+    cancel=None,
+):
+    """Run one conversion job: the single entry point for every action.
+
+    Interface stub, replaced by the full implementation. Contract:
+
+    Args:
+        action (Action): What to do.
+        settings (ActionSettings): How to do it; each action reads only its fields.
+        data (ActionData): The input files, in the user's order.
+        scratch (Path): Empty working folder; outputs are left here.
+        progress (Progress | None): Receives ProgressEvent updates.
+        cancel (CancelToken | None): Lets the caller stop the job.
+
+    Returns:
+        JobResult: Output files (in scratch) and non-fatal warnings.
+
+    Raises:
+        ConversionError: A fatal, user-explainable problem (``.issue``).
+        Cancelled: The job was cancelled.
+        Exception: Anything else is a bug; the caller reports it as unexpected.
+    """
+    raise NotImplementedError

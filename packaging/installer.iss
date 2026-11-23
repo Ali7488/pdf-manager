@@ -321,6 +321,13 @@ var
   WantOcr, WantLibreOffice, OcrFailed, LibreOfficeFailed, NoWinget: Boolean;
   Summary: String;
 begin
+  { /NOOPTIONAL=1 on the command line skips the optional programs entirely
+    (automated tests and administrators installing them separately). }
+  if ExpandConstant('{param:NOOPTIONAL|0}') = '1' then
+  begin
+    Log('Optional components skipped (/NOOPTIONAL=1).');
+    Exit;
+  end;
   WantOcr := OcrCheckBox.Checked and OcrCheckBox.Enabled;
   WantLibreOffice := LibreOfficeCheckBox.Checked and LibreOfficeCheckBox.Enabled;
   if not WantOcr and not WantLibreOffice then

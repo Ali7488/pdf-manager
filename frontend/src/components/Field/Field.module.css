@@ -1,0 +1,180 @@
+/* Text and number inputs, selects */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.labelRow {
+  display: flex;
+  align-items: center;
+}
+
+.label {
+  font-weight: var(--font-weight-medium);
+}
+
+.inputRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.input,
+.select {
+  min-height: var(--control-height);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-background);
+  color: var(--color-text);
+  transition: border-color var(--duration-fast) var(--ease-standard);
+}
+
+.input {
+  width: 100%;
+  max-width: 22rem;
+}
+
+.input[type="number"] {
+  max-width: 8rem;
+}
+
+.input:hover,
+.select:hover {
+  border-color: var(--color-link);
+}
+
+.input:focus-visible,
+.select:focus-visible {
+  border-color: var(--color-link);
+  outline-offset: 0;
+}
+
+.inputInvalid,
+.inputInvalid:hover {
+  border-color: var(--color-danger);
+}
+
+.suffix {
+  color: var(--color-text-muted);
+}
+
+.help {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.error {
+  color: var(--color-danger);
+  font-size: var(--text-sm);
+}
+
+/* Checkbox */
+.checkRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 2rem;
+  cursor: pointer;
+}
+
+.check input,
+.card input {
+  width: 1.125rem;
+  height: 1.125rem;
+  margin: 0;
+  flex: none;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
+/* Radio cards */
+.fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.legend {
+  display: flex;
+  align-items: center;
+  padding: 0;
+  margin-bottom: var(--space-2);
+  font-weight: var(--font-weight-medium);
+}
+
+.cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.cardWrap {
+  position: relative;
+  flex: 1 1 12rem;
+}
+
+.card {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  height: 100%;
+  padding: var(--space-3) var(--space-4);
+  padding-right: var(--space-8);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  cursor: pointer;
+  transition:
+    border-color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard);
+}
+
+.card input {
+  margin-top: 0.15rem;
+}
+
+.card:hover {
+  border-color: var(--color-border-strong);
+}
+
+.cardSelected,
+.cardSelected:hover {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.card:has(input:focus-visible) {
+  outline: var(--focus-ring-width) solid var(--color-link);
+  outline-offset: 2px;
+}
+
+.cardText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.cardLabel {
+  font-weight: var(--font-weight-medium);
+}
+
+.cardHint {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.cardTip {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-2);
+}

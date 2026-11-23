@@ -1,0 +1,51 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8);
+  background: var(--color-overlay);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity var(--duration-normal) var(--ease-standard),
+    visibility var(--duration-normal);
+}
+
+.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  height: 100%;
+  border: 3px dashed var(--color-primary);
+  border-radius: var(--radius-xl);
+  background: color-mix(in srgb, var(--color-surface) 92%, transparent);
+  color: var(--color-link);
+  transform: scale(0.98);
+  transition: transform var(--duration-slow) var(--ease-standard);
+}
+
+.active .card {
+  transform: scale(1);
+}
+
+.title {
+  color: var(--color-text);
+  font-size: var(--text-2xl);
+  font-weight: var(--font-weight-medium);
+}
+
+.hint {
+  color: var(--color-text-muted);
+}

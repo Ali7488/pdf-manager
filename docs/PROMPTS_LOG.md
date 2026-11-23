@@ -131,8 +131,9 @@ A short, summarized record of each request made to the coding agent, and what ca
     - [x] `docs/LICENSING_AUDIT_2026-11-23.md`, DECISIONS (O1–O3), ENGINEERING_REVIEW, LICENSING, README, release notes.
     - [x] Vault audit note (`75 Home Lab and System/BOTH DEVICES/Audits/2026-11-23 - PDF Manager v0.5 Licensing Verification and Fixes.md`).
 40. **Remove the bundled Visual C++ runtime (branch `fix/windows-vc-runtime`).** Inspect the real PyInstaller output and separate the Microsoft Visual C++ runtime DLLs from CPython, Windows and application DLLs; check Microsoft's redistributable deployment guidance and the GPL/AGPL System Libraries exception; stop bundling the runtime and require the separately installed Microsoft Visual C++ Redistributable (x64), with reliable detection and clear messages when it is missing; update the build exclusions, licence inventory, bundle checks, installer documentation and tests; run the Windows build, licence checks, install smoke test and CI, separating runner results from clean-machine testing; open a pull request. Keep WebView2, PyMuPDF and the licensing strategy; don't weaken checks; don't edit the dependency licensing research documents handled separately; don't merge or publish. Log the result in the vault's Audits folder. Checklist:
-    - [ ] Inspect the built app's DLLs and their imports.
-    - [ ] Exclude the runtime; installer prerequisite check; bundle check fails if it reappears.
-    - [ ] Inventory, notices, docs and tests.
-    - [ ] Windows build, checks and smoke tests; CI.
-    - [ ] Pull request; vault audit note.
+    - [x] Inspect the built app's DLLs and their imports (`VCRUNTIME140`, `VCRUNTIME140_1`, `MSVCP140` removed; newest MSVC linker 14.44).
+    - [x] Exclude the runtime; installer prerequisite check; bundle check fails if it reappears (decision P32).
+    - [x] Inventory, notices, docs and tests.
+    - [x] Windows build, checks and smoke tests (run 45225451223; missing runtime simulated only); CI (45221559952).
+    - [x] Draft pull request #1; vault audit note (`75 Home Lab and System/BOTH DEVICES/Audits/2026-11-23 - PDF Manager Visual C++ Runtime Prerequisite.md`).
+    - [ ] Clean-machine test without the redistributable; owner review and merge.

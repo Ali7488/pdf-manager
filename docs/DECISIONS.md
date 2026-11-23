@@ -21,6 +21,8 @@ Decisions made by the project owner, in their own direction (summarized, not quo
 | P14 | 2026-11-22 | **Roadmap:** v1 is a Windows product. It will then expand to Linux packages: an Ubuntu `.deb` and an Arch `PKGBUILD`. Later versions target Qt, then GNOME. Code should stay portable so these are possible. |
 | P15 | 2026-11-22 | **One codebase for Windows, Ubuntu/Debian and Arch-based Linux:** a shared React/TypeScript frontend and Python conversion engine. Platform-specific functionality sits behind minimal interfaces; shared application logic has no Windows-only assumptions. Windows PowerPoint (COM) stays **optional**; **LibreOffice** is the cross-platform slide renderer. **Linux packaging is not implemented yet**; its constraints and requirements are documented in `docs/PORTABILITY.md`. Running subagents are not interrupted for this. |
 | P16 | 2026-11-22 | **Documentation for a post-build review:** keep accurate, proportional docs tied to the actual code: architecture decisions, dependencies, execution flows, non-obvious choices, significant bugs, tests and CI. The owner must be able to understand, debug, modify and defend the app independently. No excessive docs, and never claim generated code was reviewed when it wasn't. |
+| P17 | 2026-11-23 | **Linux now (run from source):** refactor the API layer's platform-specific code into `api/platforms/` (Windows and Linux) and make the app run from source on Linux now. Still no Linux packages. |
+| P18 | 2026-11-23 | **"Qt, then GNOME" (was O9)** means pywebview **window backends**, not separate native UIs: one React UI everywhere; Qt backend first (fits KDE), then GTK/WebKitGTK (fits GNOME). |
 
 ## Converter (Python backend)
 
@@ -41,6 +43,8 @@ Decisions made by the project owner, in their own direction (summarized, not quo
 | P13 | 2026-11-22 | Push small commits as you go, and use as many parallel subagents as needed. |
 | C13 | 2026-11-22 | **Logging levels:** verbose logs in **development mode** (running from source, for the owner's testing). **Production** (the installed app) logs more concisely, but still keeps verbose records for errors. |
 | C14 | 2026-11-23 | **Untrusted presentations (audit R1):** never strip Windows Mark-of-the-Web. Presentations that came from the internet or email are rendered with **LibreOffice** (headless, macros not run), not PowerPoint automation, with a warning explaining why the slides may look slightly different. Trusted local files still use PowerPoint. |
+| C15 | 2026-11-23 | **Linux logs (was O10):** `~/.local/state/pdf-manager/logs` (XDG state folder) for an installed app; when run from source during development, logs stay in the repo's `logs/` folder. Windows keeps logs next to the app (C4). |
+| C16 | 2026-11-23 | **Linux "Install OCR":** show a simple popup with the exact command for the user's distribution (Ubuntu/Debian: `sudo apt install tesseract-ocr tesseract-ocr-eng`; Arch: `sudo pacman -S tesseract tesseract-data-eng`) with a Copy button, then "Search for OCR". The app never runs `sudo` itself. |
 
 ## Frontend and packaging
 
@@ -83,14 +87,9 @@ Decisions made by the project owner, in their own direction (summarized, not quo
 | F35 | 2026-11-22 | **Three separate layers:** the **frontend** (`frontend/`, React UI), the **API layer** (`api/`, the Python pywebview bridge: calls, events, job state, settings, saving) and the **service layer** (`converter/`, pure conversion logic with no UI or bridge code). |
 | F36 | 2026-11-22 | **`converter/` is split into subfolders by responsibility** (shared core types, actions, OCR, slides, tools, PDF helpers, files, platforms) instead of one flat folder. |
 | F37 | 2026-11-23 | **Automatic CI (audit R7):** on every push and pull request, run Python lint and the full tests on Linux (with Tesseract and LibreOffice installed) and on Windows, plus the frontend typecheck, lint, tests and build. Windows packaging stays a separate manual job. |
+| F38 | 2026-11-23 | **Settings (was O11):** neither a contents-page default nor a page-numbering switch. The contents page stays a per-tab checkbox (off by default); page numbering stays automatic (viewer labels). |
+| F39 | 2026-11-23 | **OCR language (was O12):** one language at a time, chosen in Settings (English by default). |
 
 ## Open questions
 
-Add new ones here as they come up, and never assume their answers.
-
-| # | Question |
-| --- | --- |
-| O9 | "Qt, then GNOME": does this mean Linux desktop integration using pywebview's Qt backend (KDE) and then its GTK backend (GNOME), or native Qt and GTK user interfaces replacing the React UI? (Not needed for v1.) |
-| O10 | On Linux, packaged apps live in read-only system folders, so logs can't go next to the app (C4). Where should Linux logs go, e.g. `~/.local/state/pdf-manager/logs`? (Not needed for v1.) |
-| O11 | Settings was approved (F11) with "contents page on/off" and "page numbering", but later decisions made the contents page a per-tab checkbox, off by default (F26), and page numbering always uses viewer labels (C8). Should Settings still have either (for example a default for the contents-page checkbox), or neither? |
-| O12 | Should OCR support several languages at once (Tesseract accepts e.g. "eng+deu"), or one language chosen in Settings? |
+None right now. Add new ones here as they come up, and never assume their answers.

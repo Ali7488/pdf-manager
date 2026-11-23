@@ -156,12 +156,12 @@ def client(app):
     return c
 
 
-def upload(client, path: Path, name=None, modified="1"):
+def upload(client, path: Path, name=None, body=None):
     name = name or path.name
     response, data = client.raw(
         "POST",
-        f"/api/files/upload?name={quote(name)}&modified={modified}",
-        body=path.read_bytes(),
+        f"/api/files/upload?name={quote(name)}",
+        body=path.read_bytes() if body is None else body,
         headers=client.headers({"Content-Type": "application/octet-stream"}),
     )
     assert response.status == 200, data
@@ -354,20 +354,134 @@ def test_folders_the_session_showed_can_be_opened_but_not_saved_to(client, app, 
 # ----- Files: native picks and uploads -----
 
 
-def test_uploads_become_opaque_ids_and_are_treated_as_downloaded(
-    client, app, tmp_path, monkeypatch
-):
-    marked = []
-    monkeypatch.setattr(service, "mark_untrusted", marked.append)
+def staged_bytes(app, file_id: str) -> bytes:
+    """The bytes the session's ID resolves to."""
+    return Path(app.ctx.session.resolve_files([file_id])[0]).read_bytes()
+
+
+def upload_folders(app) -> list[Path]:
+    root = app.ctx.session.staging / "uploads"
+    return sorted(p for p in root.iterdir()) if root.is_dir() else []
+
+
+def test_each_upload_gets_its_own_uuid_for_storage_and_lookup(client, app, tmp_path):
     pdf = make_pdf(tmp_path / "Report.pdf", 2)
     files = upload(client, pdf)
     assert len(files) == 1
-    assert files[0]["path"].startswith("f-") and files[0]["name"] == "Report.pdf"
-    assert files[0]["pageCount"] == 2 and str(tmp_path) not in json.dumps(files)
-    staged = Path(app.ctx.session.resolve_files([files[0]["path"]])[0])
-    assert staged.is_relative_to(app.ctx.session.staging) and marked == [staged]
-    assert upload(client, pdf)[0]["path"] == files[0]["path"]  # Same file, same ID.
-    assert upload(client, pdf, modified="2")[0]["path"] != files[0]["path"]
+    file_id = files[0]["path"]
+    assert files[0]["name"] == "Report.pdf" and files[0]["pageCount"] == 2
+    assert str(tmp_path) not in json.dumps(files)
+    staged = Path(app.ctx.session.resolve_files([file_id])[0])
+    # The ID is f-<uuid> and the same UUID names the private folder; the name is kept.
+    assert file_id.startswith("f-") and len(file_id) == 34
+    assert staged.parent == app.ctx.session.staging / "uploads" / file_id[2:]
+    assert staged.name == "Report.pdf" and staged.read_bytes() == pdf.read_bytes()
+    # The same file again is a new upload with a fresh UUID; the first is untouched.
+    again = upload(client, pdf)[0]["path"]
+    assert again != file_id and staged.read_bytes() == pdf.read_bytes()
+    assert len(upload_folders(app)) == 2
+
+
+def test_different_files_with_identical_name_size_and_time_stay_apart(client, app, tmp_path):
+    """What the old name+size+time key would have merged must stay two uploads."""
+    bodies = []
+    for letter in "AB":
+        doc = fitz.open()
+        doc.new_page().insert_text((72, 72), letter * 20)
+        path = tmp_path / f"{letter}.pdf"
+        doc.save(path)
+        doc.close()
+        bodies.append(path.read_bytes())
+    body_a, body_b = bodies
+    assert len(body_a) == len(body_b) and body_a != body_b
+    first = tmp_path / "A.pdf"
+    id_a = upload(client, first, name="Lecture.pdf", body=body_a)[0]["path"]
+    id_b = upload(client, first, name="Lecture.pdf", body=body_b)[0]["path"]
+    assert id_a != id_b
+    assert staged_bytes(app, id_a) == body_a and staged_bytes(app, id_b) == body_b
+
+
+def test_simultaneous_uploads_with_the_same_name_resolve_to_their_own_bytes(client, app, tmp_path):
+    bodies = []
+    for index in range(8):
+        path = make_pdf(tmp_path / f"src{index}.pdf", index + 1)
+        bodies.append(path.read_bytes())
+    results: dict[int, str] = {}
+    errors = []
+
+    def send(index: int) -> None:
+        try:
+            files = upload(client, tmp_path / "src0.pdf", name="Same.pdf", body=bodies[index])
+            results[index] = files[0]["path"]
+        except Exception as exc:  # Reported below; a thread can't fail the test itself.
+            errors.append(exc)
+
+    threads = [threading.Thread(target=send, args=(i,)) for i in range(len(bodies))]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(10)
+    assert not errors and len(results) == len(bodies)
+    assert len(set(results.values())) == len(bodies)
+    for index, file_id in results.items():
+        assert staged_bytes(app, file_id) == bodies[index]
+    assert len(upload_folders(app)) == len(bodies)
+
+
+def test_a_failed_upload_leaves_nothing_and_a_retry_is_a_fresh_upload(
+    client, app, tmp_path, monkeypatch
+):
+    pdf = make_pdf(tmp_path / "Report.pdf")
+    body = pdf.read_bytes()
+    attempts = []
+    real = app.ctx.session.add_upload
+
+    def counted(*args, **kwargs):
+        try:
+            return real(*args, **kwargs)
+        finally:
+            attempts.append(1)
+
+    monkeypatch.setattr(app.ctx.session, "add_upload", counted)
+    # The body stops early: the server sees fewer bytes than Content-Length.
+    connection = http.client.HTTPConnection(server.HOST, app.server_port, timeout=10)
+    connection.putrequest("POST", "/api/files/upload?name=Report.pdf", skip_host=True)
+    for key, value in client.headers({"Content-Type": "application/octet-stream"}).items():
+        connection.putheader(key, value)
+    connection.putheader("Content-Length", str(len(body)))
+    connection.endheaders()
+    connection.send(body[: len(body) // 2])
+    connection.close()  # The client gives up half way.
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline and not attempts:
+        time.sleep(0.02)
+    assert attempts and upload_folders(app) == []  # Cleaned up, and no ID was published.
+    assert app.ctx.session._files == {}
+    retried = upload(client, pdf)[0]["path"]
+    assert staged_bytes(app, retried) == body
+    assert len(upload_folders(app)) == 1
+
+
+def test_an_upload_is_published_only_after_it_is_staged_and_checked(tmp_path):
+    session = Session(tmp_path)
+    body = b"%PDF-1.4 whole"
+    seen = []
+
+    def describe(paths):
+        # While the file is checked, its ID isn't known to the session yet.
+        seen.append((paths[0].read_bytes(), dict(session._files)))
+        return [{"path": str(paths[0]), "name": paths[0].name, "kind": "pdf"}]
+
+    def reader():
+        chunks = iter([body])
+        return lambda size: next(chunks, b"")
+
+    files = session.add_upload("a.pdf", len(body), reader(), describe)
+    assert seen == [(body, {})]
+    assert session.resolve_files([files[0]["path"]]) == [str(next(session.staging.rglob("a.pdf")))]
+    unusable = session.add_upload("b.pdf", len(body), reader(), lambda paths: [])
+    assert unusable == [] and len(list((session.staging / "uploads").iterdir())) == 1
+    session.close()
 
 
 def test_unusable_uploads_add_nothing(client, tmp_path, monkeypatch):
@@ -394,28 +508,13 @@ def test_upload_names_are_made_safe():
         safe_upload_name("..")
 
 
-def test_the_same_upload_again_keeps_the_staged_copy(tmp_path):
-    """A repeated upload never replaces a copy a job may be reading (and Windows refuses)."""
-    session = Session(tmp_path)
-    body = b"%PDF-1.4 first"
-
-    def reader():
-        chunks = iter([body])
-        return lambda size: next(chunks, b"")
-
-    first = session.stage_upload("a.pdf", len(body), "1", reader())
-    first.write_bytes(b"in use")  # Stands for a copy a job has open.
-    again = session.stage_upload("a.pdf", len(body), "1", reader())
-    assert again == first and first.read_bytes() == b"in use"
-    session.close()
-
-
 def test_an_upload_that_ends_early_leaves_nothing(tmp_path):
     session = Session(tmp_path)
     chunks = iter([b"%PDF-1.4 part", b""])
     with pytest.raises(UploadError):
-        session.stage_upload("a.pdf", 1000, "1", lambda n: next(chunks))
-    assert not [p for p in session.staging.rglob("*") if p.is_file()]
+        session.add_upload("a.pdf", 1000, lambda n: next(chunks), lambda paths: [])
+    assert list((session.staging / "uploads").iterdir()) == []
+    assert session._files == {}
     session.close()
 
 

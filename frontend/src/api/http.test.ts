@@ -145,7 +145,7 @@ describe("createHttpApi", () => {
     const api = createHttpApi({ nativeDialogs: false });
     const files = await api.addDroppedFiles([new File(["%PDF"], "Report 1.pdf", { lastModified: 5 })]);
     expect(files.map((f) => f.path)).toEqual(["f-x"]);
-    expect(calls[0].url).toBe("/api/files/upload?name=Report%201.pdf&modified=5");
+    expect(calls[0].url).toBe("/api/files/upload?name=Report%201.pdf");
     expect(calls[0].init.headers).toMatchObject({ "Content-Type": "application/octet-stream" });
   });
 

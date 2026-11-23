@@ -13,7 +13,6 @@ a quick finish or a page refresh never loses the result.
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import os
 import re
@@ -21,6 +20,7 @@ import secrets
 import shutil
 import tempfile
 import threading
+import uuid
 from collections import OrderedDict
 from collections.abc import Callable
 from pathlib import Path
@@ -128,24 +128,35 @@ class Session:
                 raise dto.invalid_request(f"{len(unknown)} unknown file ID(s)")
             return [str(self._files[i]) for i in ids]
 
-    def stage_upload(
-        self, name: str, size: int, modified: str, read: Callable[[int], bytes]
-    ) -> Path:
-        """Store an uploaded file in the private staging folder.
+    def add_upload(
+        self,
+        name: str,
+        size: int,
+        read: Callable[[int], bytes],
+        describe: Callable[[list[Path]], list[dict[str, Any]]],
+    ) -> list[dict[str, Any]]:
+        """Stage one uploaded file under its own new UUID and publish its ID.
 
-        The same file (same name, size and modification time) is stored in the
-        same place, so dropping it twice adds it once, as with a picked file.
-        It is marked as coming from the Internet: a browser can't tell where a
-        dropped file came from, so it is treated like a download (decision C14).
+        Every upload gets a fresh, server-generated UUID (decision P34). The
+        UUID names its private folder (``uploads/<uuid>/<name>``) and is its
+        ID (``f-<uuid>``), so two uploads never share storage or an ID, even
+        for the same file sent twice or for different files with the same
+        name, size and date. The original name is kept for display and output
+        naming. The body is written to a hidden partial file, renamed into
+        place and checked with ``describe``; only then is the ID published.
+        Any failure removes the upload's folder, so a retry is a fresh upload.
+        Renderer choice doesn't depend on where the file came from (decision
+        C17), so no provenance marker is added.
 
         Args:
             name: The browser's file name.
             size: Its size in bytes (the request's Content-Length).
-            modified: The browser's ``lastModified``, only used to tell files apart.
             read: Reads up to ``n`` more bytes of the body.
+            describe: Turns the staged path into ``InputFile`` objects (an
+                empty list if the file isn't usable).
 
         Returns:
-            The stored file.
+            ``InputFile`` objects (one, or none if unusable) with the new ID as ``path``.
 
         Raises:
             UploadError: Unsupported type, or the body didn't arrive complete.
@@ -153,24 +164,16 @@ class Session:
         safe = safe_upload_name(name)
         if service.file_kind(Path(safe)) is None:
             raise UploadError(f"Unsupported file type: {Path(safe).suffix or '(none)'}")
-        digest = hashlib.sha256(f"{safe}\0{size}\0{modified}".encode()).hexdigest()[:20]
-        folder = self.staging / "uploads" / digest
-        folder.mkdir(parents=True, exist_ok=True)
-        target = folder / safe
-        if target.is_file():
-            # Already staged (same name, size and time): keep that copy, which a job may
-            # be reading, and read this body only to the end.
-            remaining = size
-            while remaining > 0:
-                chunk = read(min(CHUNK, remaining))
-                if not chunk:
-                    raise UploadError("The upload ended early")
-                remaining -= len(chunk)
-            return target
-        partial = folder / f".{safe}.part"
-        remaining = size
+        upload_id = uuid.uuid4().hex
+        uploads = self.staging / "uploads"
+        uploads.mkdir(exist_ok=True)
+        folder = uploads / upload_id
+        folder.mkdir()  # A new UUID: never an existing folder.
         try:
-            with open(partial, "wb") as out:
+            target = folder / safe
+            partial = folder / ".upload.part"
+            remaining = size
+            with open(partial, "xb") as out:
                 while remaining > 0:
                     chunk = read(min(CHUNK, remaining))
                     if not chunk:
@@ -178,11 +181,18 @@ class Session:
                     out.write(chunk)
                     remaining -= len(chunk)
             os.replace(partial, target)
+            files = describe([target])
+            if len(files) != 1:
+                log.info("Upload %s isn't a usable file", upload_id)
+                shutil.rmtree(folder, ignore_errors=True)
+                return []
         except BaseException:
-            partial.unlink(missing_ok=True)
+            shutil.rmtree(folder, ignore_errors=True)
             raise
-        service.mark_untrusted(target)
-        return target
+        file_id = FILE_PREFIX + upload_id
+        with self._lock:
+            self._files[file_id] = target
+        return [{**files[0], "path": file_id}]
 
     # ----- Folders -----
 

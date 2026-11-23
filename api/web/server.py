@@ -444,7 +444,6 @@ class Handler(BaseHTTPRequestHandler):
     def _upload(self, url) -> None:
         query = parse_qs(url.query)
         name = (query.get("name") or [""])[0]
-        modified = (query.get("modified") or [""])[0][:32]
         length = self._content_length()
         if self.headers.get("Content-Type") != "application/octet-stream" or length is None:
             self._refuse(400, "uploads must be application/octet-stream with a length")
@@ -460,7 +459,7 @@ class Handler(BaseHTTPRequestHandler):
             received += len(chunk)
             return chunk
 
-        files = ops.upload(self.server.ctx, name, length, modified, read)
+        files = ops.upload(self.server.ctx, name, length, read)
         self._consumed = received == length  # Otherwise the connection is closed.
         self._send_json(200, {"result": files})
 

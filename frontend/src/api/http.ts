@@ -116,9 +116,12 @@ async function call<T>(method: "GET" | "POST", path: string, body?: unknown, tim
   return payload.result;
 }
 
-/** Sends one file's bytes to the app, which keeps a private working copy. */
+/**
+ * Sends one file's bytes to the app, which keeps a private working copy under a new ID.
+ * Every call is a new upload with its own ID, even for a file sent before (decision P34).
+ */
 async function uploadOne(file: File): Promise<InputFile[]> {
-  const query = `name=${encodeURIComponent(file.name)}&modified=${encodeURIComponent(String(file.lastModified))}`;
+  const query = `name=${encodeURIComponent(file.name)}`;
   let response: Response;
   try {
     response = await fetch(`/api/files/upload?${query}`, {

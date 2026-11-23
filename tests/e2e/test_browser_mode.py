@@ -339,12 +339,17 @@ def test_dropped_and_chosen_files_share_one_list(page, inputs, tmp_path):
     go(page, "Merge")
     drop(page, inputs["b"])
     add(page, inputs["a"])
-    drop(page, inputs["b"])  # The same file again isn't added twice.
-    assert page.get_by_text("Beta.pdf", exact=True).count() == 1
+    # Dropping the same file again is a new upload with its own ID (decision P34).
+    drop(page, inputs["b"])
+    page.get_by_text("Beta.pdf", exact=True).nth(1).wait_for()
+    assert page.get_by_text("Beta.pdf", exact=True).count() == 2
     convert(page)
     (result,) = download(page, tmp_path)
     with fitz.open(result) as doc:
-        assert "B1" in doc[0].get_text()  # Beta first: the list's order.
+        first_pages = [sheet.get_text() for sheet in doc]
+    beta, alpha = pages(inputs["b"]), pages(inputs["a"])
+    assert len(first_pages) == 2 * beta + alpha
+    assert "B1" in first_pages[0] and "B1" in first_pages[beta + alpha]  # The list's order.
 
 
 def long_pdf(tmp_path: Path) -> Path:

@@ -315,18 +315,18 @@ def quit_app(ctx: Context, body: Any) -> None:
         ctx.request_stop()
 
 
-def upload(ctx: Context, name: str, size: int, modified: str, read) -> list[dict[str, Any]]:
-    """Stage a dropped or browser-selected file; ``InputFile[]`` (empty if unusable)."""
+def upload(ctx: Context, name: str, size: int, read) -> list[dict[str, Any]]:
+    """Stage a dropped or browser-selected file; ``InputFile[]`` (empty if unusable).
+
+    Each upload gets its own new ID (decision P34), even for a file already
+    uploaded; a file in the page's list keeps its ID for every later job.
+    """
 
     def run() -> list[dict[str, Any]]:
         try:
-            path = ctx.session.stage_upload(name, size, modified, read)
+            return ctx.session.add_upload(name, size, read, describe_files)
         except UploadError as exc:
             log.info("Upload refused: %s", exc)
             return []
-        files = describe_files([path])
-        if not files:
-            path.unlink(missing_ok=True)
-        return ctx.session.for_page(files)
 
     return ctx.workflow.guard("upload", lambda issue: [], run)

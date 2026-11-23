@@ -16,7 +16,7 @@ export function HomePage() {
 
   return (
     <>
-      <PageHeader title="Welcome" />
+      <PageHeader title="Welcome to PDF Manager" />
 
       <div className={styles.dropZone}>
         <Icon name="upload" size={36} className={styles.dropIcon} />

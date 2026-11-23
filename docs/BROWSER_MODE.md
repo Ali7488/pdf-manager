@@ -27,7 +27,8 @@ So app mode **expects Edge or a Chromium-based browser as the default**. With an
 
 - Browser mode needs only PyMuPDF (and pywin32 on Windows): `uv sync --no-group desktop`. It never imports pywebview, Qt or pythonnet (a test enforces this).
 - **Repeat start:** starting it again while it runs opens a new window onto the same instance.
-- **Quitting:** use **Settings → Quit PDF Manager**, Ctrl+C or a termination signal. It also quits after an hour without requests while nothing is running.
+- **Quitting:** use **Settings → Quit PDF Manager**, Ctrl+C or a termination signal. If a conversion is running or a finished result isn't saved yet, Quit says so and asks before deleting it (decision P35).
+- **Idle shutdown:** it quits by itself after an hour without requests, but only while nothing is running and no finished result is unsaved. Results saved to a folder, or sent to the browser's downloads, don't hold it open (open question O5). The loop is `launch.wait_for_stop`.
 - **Closing the window doesn't quit it.** A browser may hand the window to an already running process, or keep running itself, so the app doesn't rely on the browser exiting.
 
 ## Files, saving and Office
@@ -39,7 +40,9 @@ So app mode **expects Edge or a Chromium-based browser as the default**. With an
 | **Save** | The system's folder picker, or the default save folder, never overwriting. | **Download**: results go to the browser's downloads. They stay in the app for **Download again** until the user clicks Done. |
 
 - **Uploads** are staged in a private temporary folder that is deleted on quit. Originals are never touched.
-- **Dropped presentations use LibreOffice.** A browser can't say where a dropped file came from, so every upload gets the Internet zone mark (`mark_untrusted`). The existing rule (decision C14) then applies: PowerPoint is never automated on it, and LibreOffice renders it. Presentations picked with **Add files** keep their real provenance and can still use PowerPoint.
+- **One UUID per upload (decision P34).** Every upload gets a fresh, server-generated UUID. It names its private folder (`uploads/<uuid>/<name>`) and is its ID (`f-<uuid>`), so two uploads never share a copy or an ID. That holds even for the same file sent twice, or different files with the same name, size and date. The original name is kept for display and output names. The body goes to a hidden partial file, is renamed into place and checked; only then is the ID published. A failed upload's folder is deleted, and a retry is a new upload. A file already in the list keeps its ID for every later conversion.
+- **Presentations always use LibreOffice Impress (decision C17)**, whether dropped, uploaded or picked with **Add files**. No provenance marker is added or read to choose a renderer.
+- **Reloads (decision P36).** The page asks for the newest job not yet closed with **Done**, including how its results were saved. A job saved to a folder comes back as saved (**Open folder**, **Done**), never with a Save button whose results are gone. A download keeps **Download again** (as one .zip if it was) until **Done**.
 
 ## Security
 
@@ -86,7 +89,7 @@ Set `PDF_MANAGER_E2E_BROWSER` to use an installed Chromium-family browser, and `
 
 - **Default browser and app mode:** a real app-mode launch from the user's default browser (Edge, Chrome, Brave), a cold and an already running browser, and a Firefox default (a tab). Also whether a firewall prompt appears; none is expected for loopback.
 - **Native pickers:** whether they come to the front of the browser window, cancel cleanly and return focus.
-- **PowerPoint:** COM on a natively picked presentation, LibreOffice on a dropped one, and a truly downloaded (marked) file.
+- **Presentations:** conversion with LibreOffice installed (dropped and picked with **Add files**), and the explanation shown when it is missing (as soon as a presentation is added, and in the Convert window). Run `scripts/check_slide_fidelity.py` there too (docs/PRESENTATION_FIDELITY.md).
 - **The ZIP on a clean PC:** without the Visual C++ Redistributable, run as a standard user.
 - **Not tested at all:** Linux desktops other than this development PC (KDE/kdialog, Ubuntu/zenity), and macOS.
 

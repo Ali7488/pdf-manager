@@ -37,7 +37,7 @@ def run(capsys, *argv):
 
 def test_generator_makes_every_portable_sample(samples):
     names = {p.name for p in samples.iterdir()}
-    expected = set(make_samples.SAMPLES) - {"06-slides-legacy.ppt", "14-downloaded-slides.pptx"}
+    expected = set(make_samples.SAMPLES) - {"06-slides-legacy.ppt"}
     assert expected <= names
     assert (samples / "README.txt").read_text(encoding="utf-8").count(".pdf") >= 8
     with pymupdf.open(str(samples / "13-long-document.pdf")) as doc:

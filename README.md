@@ -29,7 +29,7 @@ Also: drag and drop, drag to reorder, optional **OCR** (Tesseract) on every tool
 2. **Double-click it.** Because the installer isn't signed yet, Windows SmartScreen may say "Windows protected your PC". Only for a file from this repository's Releases page: click **More info → Run anyway**.
 3. Follow the short wizard. It installs for your user only (no administrator rights needed) and can optionally install:
    - **Tesseract OCR**, to make pages searchable (Windows may ask for permission);
-   - **LibreOffice**, only needed if Microsoft PowerPoint isn't installed.
+   - **LibreOffice**, needed only for PowerPoint files (PDFs and images work without it).
 4. PDF Manager needs the free **Microsoft Visual C++ Redistributable (x64)**, version 14.44 or newer, which many Windows programs already installed. If it's missing, the wizard says so and offers Microsoft's download (`https://aka.ms/vc14/vc_redist.x64.exe`); run `vc_redist.x64.exe` to install it. That step needs administrator permission.
 5. Start **PDF Manager** from the Start menu or the desktop icon.
 
@@ -47,7 +47,7 @@ The same app, without the installer or the desktop window: it opens in your own 
    - If your **default browser is Microsoft Edge or a Chromium-based browser** (Google Chrome, Brave, Chromium), PDF Manager opens in **its own window, with no tabs or address bar** (app mode).
    - **With any other default browser (for example Firefox), it opens as a normal tab** in that browser, at a local address (`http://127.0.0.1:...`).
    - Either way it works offline, and your files never leave your computer.
-4. Closing the window leaves PDF Manager running, so it reopens quickly. Quit it from **Settings → Quit PDF Manager**; it also quits by itself after an hour without use.
+4. Closing the window leaves PDF Manager running, so it reopens quickly. Quit it from **Settings → Quit PDF Manager**. It also quits by itself after an hour without use, but never while a result is waiting to be saved.
 
 ### Linux (Ubuntu/Debian, Arch)
 
@@ -84,11 +84,10 @@ Python desktop bridge (api/)       jobs, settings, progress, file dialogs, savin
 Document engine (converter/)       one entry point: run_action(action, settings, data)
          +-- PyMuPDF       PDF processing, rendering, merging, splitting, compressing
          +-- Tesseract     optional offline OCR
-         +-- PowerPoint    optional Windows slide renderer (COM)
-         +-- LibreOffice   cross-platform slide renderer and fallback
+         +-- LibreOffice   converts PowerPoint files (Impress), on every system
 ```
 
-The interface is one self-contained HTML file loaded in the window: **no local web server**. Presentations downloaded from the internet or email are converted with LibreOffice rather than opened by PowerPoint automation, to keep your computer safe.
+The interface is one self-contained HTML file loaded in the window: **no local web server** (browser mode adds a loopback-only one, [details](docs/BROWSER_MODE.md)). PowerPoint files are converted with **LibreOffice Impress**, which PDF files and images never need. For a deck that has to look exactly as it does in PowerPoint, export it to PDF in PowerPoint and add that PDF ([fidelity notes](docs/PRESENTATION_FIDELITY.md)).
 
 ## Development
 

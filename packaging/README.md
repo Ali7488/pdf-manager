@@ -54,6 +54,10 @@ The run also checks licensing. `scripts/check_licenses.py` fails the build if an
 - **No installer:** nothing checks for the Microsoft Visual C++ Redistributable, so `READ ME FIRST.txt` and the README say to install it first.
 - **On GitHub:** the `browser-zip` job of `build-windows.yml` builds it, unzips it, checks the unzipped folder, and runs `tests/e2e` against the packaged exe with the runner's Edge. It uploads **PDF-Manager-browser-ZIP**, and the sources job uploads **PDF-Manager-browser-third-party-sources**.
 
+## Which source a build links to
+
+Settings → About links to the exact Git commit a build was made from (decision P37), not a version tag. `pdf-manager.spec` writes it into the bundle as `_internal/build-info.json` (`api/build_info.py`). The build stops if tracked files differ from the commit; set `PDF_MANAGER_ALLOW_DIRTY=1` only for a local test build, which is then marked modified. `PDF_MANAGER_SOURCE_REVISION` names the commit the build must be: the workflow sets it to `github.sha`. `collect_sources.py` puts a `git archive` of the same commit in the source bundle (`app/pdf-manager-<commit>-source.tar.gz`, `SOURCE_REVISION`). The workflow's `same-commit` job checks that the ZIP, the source bundle and the run agree.
+
 ## Releasing (only with the owner's approval)
 
 1. Bump the version in `pyproject.toml`; regenerate the notices if dependencies changed (`uv run --with pip python scripts/collect_licenses.py`) and commit.
@@ -66,7 +70,7 @@ The run also checks licensing. `scripts/check_licenses.py` fails the build if an
 2. **Install location** (first install only). The default is `%LOCALAPPDATA%\Programs\PDF Manager`. The install is for the current user only, so no administrator rights are needed.
 3. **Optional helper programs:**
    - **Tesseract OCR**: unchecked. OCR reads the words in scanned pages and pictures so they can be searched and copied.
-   - **LibreOffice**: checked only if Microsoft PowerPoint isn't found; otherwise unchecked, with a note that PowerPoint was found and LibreOffice is only a backup.
+   - **LibreOffice**: converts PowerPoint files (decision C17) and isn't needed for PDFs or images. It is checked unless already installed (an interim choice, open question O4).
    - Programs that are already installed are shown as such and greyed out.
    - Both are installed with **winget** after the app files. They install for everyone on the PC, so Windows may show a permission (UAC) prompt. If winget is missing or an install fails, setup still finishes and explains how to add them later (OCR from the app's Settings, LibreOffice from libreoffice.org).
 4. **Desktop shortcut** (ticked by default). A Start menu shortcut is always added.

@@ -15,7 +15,7 @@ PDF Manager ships first on **Windows 11** (v1). The same code base must later su
 ## Rules for shared code
 
 1. **No platform checks in shared logic.** `os.name`, `sys.platform`, `winreg`, COM (`win32com`, `pythoncom`), `os.startfile`, `taskkill` and `CREATE_NO_WINDOW` belong only in the platform modules. Shared code calls the platform interface.
-2. **Optional, never required, Windows features.** Microsoft PowerPoint (COM) is an optional, higher-fidelity slide renderer on Windows. **LibreOffice is the cross-platform renderer** and must always work as the fallback. No feature may depend on PowerPoint.
+2. **One presentation renderer everywhere.** **LibreOffice Impress converts every PowerPoint file** on every platform (decision C17); Microsoft PowerPoint is never automated. No feature may depend on Windows-only software.
 3. **Paths:** use `pathlib`; never hard-code drive letters, `\` separators, `Program Files` or `%LOCALAPPDATA%` outside platform modules. Remember Linux file names are case-sensitive.
 4. **External tools are found, not assumed:** Tesseract and LibreOffice are located through the platform interface (PATH first, then platform-specific places).
 5. **User-facing text:** wording that names a platform-specific fix (for example "Microsoft Print to PDF" or a Windows download page) must be platform-aware. `converter/core/issues.py` chooses wording with `platforms.os_family()`; `tests/test_issue_wording.py` checks Linux messages contain no Windows-only steps.
@@ -31,20 +31,17 @@ PDF Manager ships first on **Windows 11** (v1). The same code base must later su
 | `kill_process_tree(process)` | `taskkill /F /T`. | `killpg(SIGKILL)` on the process group. |
 | `tesseract_candidates()` | Program Files / LocalAppData folders and installer registry entries. | None beyond `PATH` (packages install to `/usr/bin`). |
 | `libreoffice_candidates()` | Program Files / LocalAppData folders. | None beyond `PATH` (`soffice`, `libreoffice`). |
-| `powerpoint_installed()` / `powerpoint_path()` | Registry checks for PowerPoint's automation class and executable. | Always `False` / `None`. |
 | `os_family()` | `"windows"` | `"linux"` (or `"mac"`) |
-| `is_untrusted(path)` / `copy_with_provenance(src, dst)` | Read the Mark-of-the-Web zone; copy a file with its `Zone.Identifier` stream (never strip it, audit R1). | Always `False`; plain copy. |
-| `export_slides_with_powerpoint` | The optional COM-based renderer (`windows_powerpoint.py`). | `None`: LibreOffice renders slides. |
+| `copy_with_provenance(src, dst)` | Copy a file with its `Zone.Identifier` stream (never strip it, audit R1). | Plain copy. |
 
-The service layer's public functions (`find_tesseract`, `find_libreoffice`, `run_command`, `powerpoint_installed` and so on in `converter/tools/`) stay the same on every platform.
+The service layer's public functions (`find_tesseract`, `find_libreoffice`, `run_command` and so on in `converter/tools/`) stay the same on every platform.
 
 ## External programs per platform
 
 | Program | Windows | Ubuntu/Debian | Arch-based |
 | --- | --- | --- | --- |
 | Tesseract OCR + English data | UB-Mannheim build (installer wizard or in-app via winget) | `tesseract-ocr`, `tesseract-ocr-eng` | `tesseract`, `tesseract-data-eng` |
-| LibreOffice (slides) | Optional backup (installer wizard offers it) | `libreoffice-impress` | `libreoffice-fresh` or `libreoffice-still` |
-| Microsoft PowerPoint | Optional, preferred when present | Not available | Not available |
+| LibreOffice Impress (PowerPoint files only) | Installer wizard offers it | `libreoffice-impress` | `libreoffice-fresh` or `libreoffice-still` |
 | Web view for the window | Edge WebView2 (built into Windows 11) | WebKitGTK via PyGObject, or Qt WebEngine | Same as Debian |
 
 ## Future Linux release requirements

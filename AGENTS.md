@@ -53,7 +53,7 @@ For the Windows installer, see `packaging/README.md` and `packaging/build.ps1`.
 - **Never modify originals.** Work in scratch space, validate outputs and save collision-safe new files.
 - **No real user documents or identifying data.** Synthetic fixtures only; local processing only unless expressly approved otherwise.
 - **No speaker notes.** Removed intentionally.
-- **Keep platform-specific code isolated.** Windows PowerPoint COM is optional, LibreOffice is the cross-platform renderer. Linux packages come later; don't compromise Windows v1.
+- **Keep platform-specific code isolated.** LibreOffice Impress is the only presentation converter, on every platform (decision C17); PowerPoint is not automated. Linux packages come later; don't compromise Windows v1.
 - **No unnecessary infrastructure.** No database, Docker runtime, web server, telemetry, accounts or new abstraction layers without a demonstrated requirement. The one exception is browser mode's loopback-only server (`api/web/`, decision P33); keep it on `127.0.0.1` with its explicit operation list.
 - **Accessible UI.** Plain-language controls, visible focus, readable contrast, friendly actionable error messages, minimal installation friction.
 - **Coordinate subagents.** Check current working tree and integration contracts before parallel edits. Use focused commits and tests; do not silently change owner decisions.
@@ -64,4 +64,4 @@ For the Windows installer, see `packaging/README.md` and `packaging/build.ps1`.
 
 ## Current quality gate
 
-The repo contains a React frontend, API layer, conversion engine and Windows installer source. **Real Windows runtime and installer testing remains outstanding**, including PowerPoint automation, WebView2, optional component installation, upgrades and uninstall. Report the exact tests actually executed, on which platform, and their result.
+The repo contains a React frontend, API layer, conversion engine and Windows installer source. **Real Windows runtime and installer testing remains outstanding**, including LibreOffice presentation conversion, WebView2, browser-mode launch and native pickers, optional component installation, upgrades and uninstall. Report the exact tests actually executed, on which platform, and their result.

@@ -9,7 +9,9 @@ The desktop app is a **pywebview** window (Edge WebView2 on Windows 11) showing 
 - the routes are listed in `api/web/server.py` (`ROUTES`);
 - files, picked folders and downloads are opaque IDs; `InputFile.path` is an ID there;
 - the page polls job and OCR-install status instead of receiving events, and dispatches the same events itself;
-- dropped files are uploaded.
+- dropped files are uploaded, each under its own new ID (decision P34);
+- `quit` answers `{ quit, running, unsavedResults }` and doesn't quit while a job runs or results are unsaved unless called with `discardUnsaved: true` (decision P35);
+- `latestJob` (after a reload) also says how the job's results were saved (`saved`, `savedAsZip`), so a saved job never comes back with a Save that fails (decision P36).
 
 See [BROWSER_MODE.md](BROWSER_MODE.md). The rest of this page describes the desktop transport; the calls, models and rules apply to both.
 
@@ -34,7 +36,7 @@ A web page can't see real file paths, so dropped files are handled on the Python
 
 | Python method | Client method | Purpose |
 | --- | --- | --- |
-| `get_app_info()` | `getAppInfo()` | Version, logs folder, licences folder, platform. |
+| `get_app_info()` | `getAppInfo()` | Version, logs folder, licences folder, platform, and `sourceRevision` / `sourceModified`: the exact Git commit this copy was built from (decision P37; `api/build_info.py`). |
 | `get_settings()` | `getSettings()` | Saved settings. |
 | `save_settings(patch)` | `saveSettings(patch)` | Merge and persist a partial settings object. Returns `{ settings, issue }`: the settings now in effect, and a `SETTINGS_SAVE_FAILED` issue if they couldn't be written to disk (they then apply only until the app closes). Calls are applied in the order received; the UI must not let an older response overwrite a newer choice. |
 | `pick_files(kind)` | `pickFiles(kind)` | Native file picker. `kind`: `"all"` (every supported type), `"documents"` (PDF/PPTX/PPT) or `"images"` (PNG/JPG). Returns `InputFile[]` (empty if cancelled). |
@@ -95,8 +97,7 @@ The file list is shared, so it can hold files a mode doesn't accept. The UI show
 `check_tools(action, settings, data)` decides what the job needs:
 
 - **OCR (Tesseract)** is required only if `settings.useOcr` is true (never for Compress).
-- **PowerPoint or LibreOffice** is needed only if `data.files` contains PPT/PPTX files. Microsoft PowerPoint is preferred. If PowerPoint is present, a missing LibreOffice is reported as `"not present"` but **doesn't block**. If neither is present, the check fails.
-- **Downloaded presentations** (Windows Mark-of-the-Web) are never opened with PowerPoint (decision C14), so they need LibreOffice even when PowerPoint is installed; without it the check fails with an explanation.
+- **LibreOffice Impress** is needed exactly when `data.files` contains PPT/PPTX files (decision C17); PDF and image jobs never look for it. `ToolCheckResult` has `ocr` and `libreoffice` rows (no PowerPoint row).
 
 The Convert modal runs this on **every Convert** and only starts the job if `ok` is true. Otherwise it shows the returned issues.
 
@@ -104,7 +105,7 @@ The Convert modal runs this on **every Convert** and only starts the job if `ok`
 
 Every problem the user should see is an `Issue`:
 
-- `severity`: `"error"` (the job or action failed) or `"warning"` (it succeeded, but something needs attention, for example PowerPoint failed and LibreOffice was used instead).
+- `severity`: `"error"` (the job or action failed) or `"warning"` (it succeeded, but something needs attention, for example one page couldn't be read).
 - `title` and `message`: short, plain language for non-technical users.
 - `troubleshooting`: a few simple steps for the likely cause. Written by the backend so the wording lives in one place.
 - `details`: technical text (raw error output) for an optional "Show details" section.

@@ -34,7 +34,8 @@ When `window.pywebview` is missing (a normal browser), `npm run dev` uses an in-
 - **Add files** and **Add images** return sample files (a browser can't give real paths).
 - Dropping real files on the window turns them into fake entries in the list.
 - Jobs show progress over a few seconds and can be cancelled.
-- PowerPoint files produce a "LibreOffice was used" warning.
+- A file whose name contains `warn` produces a warning, to show how warnings are listed.
+- LibreOffice starts as installed; `createMockApi({ tools: { libreoffice: false } })` shows the notice for PowerPoint files.
 - A file whose name contains `fail` makes the job fail, to show the error popup.
 - OCR starts as "not installed", so ticking **Use OCR** shows the missing-tool check. **Install OCR** then "installs" it.
 - Start with `VITE_MOCK_PLATFORM=linux npm run dev` to act like Linux: **Install OCR** installs nothing and instead shows the command to copy and run (`sudo apt install tesseract-ocr tesseract-ocr-eng`, decision C16).

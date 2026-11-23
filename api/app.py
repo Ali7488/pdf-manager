@@ -29,8 +29,8 @@ from .settings_store import SettingsStore
 log = logging.getLogger(__name__)
 
 WINDOW_TITLE = "PDF Manager"
-WINDOW_SIZE = (1200, 800)  # Comfortable on a 1080p screen; users can resize it.
-MIN_SIZE = (960, 640)  # Below this the sidebar and file list get cramped.
+WINDOW_SIZE = (1040, 720)  # Compact; fits small laptop screens. Users can resize it.
+MIN_SIZE = (860, 600)  # Below this the side pane and file list get cramped.
 # Development only: load the UI from a dev server (e.g. Vite) instead of the built files.
 UI_URL_ENV = "PDF_MANAGER_UI_URL"
 

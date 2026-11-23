@@ -114,8 +114,8 @@ def test_main_creates_window_and_shuts_down(monkeypatch, tmp_path, window, logs)
     assert code == 0
     created = fake.created
     assert created["title"] == "PDF Manager"
-    assert (created["width"], created["height"]) == (1200, 800)
-    assert created["min_size"] == (960, 640)
+    assert (created["width"], created["height"]) == (1040, 720)
+    assert created["min_size"] == (860, 600)
     assert isinstance(created["js_api"], Api)
     assert created["url"] is None and "missing" in created["html"]
     # The GUI comes from the platform module (Qt with PySide6 on Linux, P18/P19).

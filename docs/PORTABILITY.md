@@ -31,7 +31,8 @@ PDF Manager ships first on **Windows 11** (v1). The same code base must later su
 | `kill_process_tree(process)` | `taskkill /F /T`. | `killpg(SIGKILL)` on the process group. |
 | `tesseract_candidates()` | Program Files / LocalAppData folders and installer registry entries. | None beyond `PATH` (packages install to `/usr/bin`). |
 | `libreoffice_candidates()` | Program Files / LocalAppData folders. | None beyond `PATH` (`soffice`, `libreoffice`). |
-| `powerpoint_renderer()` | A COM-based renderer if PowerPoint is installed, else `None`. | Always `None`. |
+| `powerpoint_installed()` / `powerpoint_path()` | Registry checks for PowerPoint's automation class and executable. | Always `False` / `None`. |
+| `export_slides_with_powerpoint` | The optional COM-based renderer (`windows_powerpoint.py`). | `None`: LibreOffice renders slides. |
 
 The service layer's public functions (`find_tesseract`, `find_libreoffice`, `run_command`, `powerpoint_installed` and so on in `converter/tools.py`) stay the same on every platform.
 

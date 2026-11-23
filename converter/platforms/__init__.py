@@ -18,6 +18,10 @@ Interface:
         Whether Microsoft PowerPoint can be automated (always False off Windows).
     powerpoint_path() -> Path | None
         Path of PowerPoint's executable, for display only.
+    export_slides_with_powerpoint: Callable | None
+        ``(source, output, timeout, cancel) -> None``: the optional PowerPoint
+        slide renderer on Windows; ``None`` elsewhere. LibreOffice is always
+        the cross-platform fallback.
 """
 
 from __future__ import annotations
@@ -33,6 +37,7 @@ if os.name == "nt":
         powerpoint_path,
         tesseract_candidates,
     )
+    from .windows_powerpoint import export_slides as export_slides_with_powerpoint
 else:
     from .posix import (
         kill_process_tree,
@@ -43,7 +48,10 @@ else:
         tesseract_candidates,
     )
 
+    export_slides_with_powerpoint = None
+
 __all__ = [
+    "export_slides_with_powerpoint",
     "kill_process_tree",
     "libreoffice_candidates",
     "popen_options",

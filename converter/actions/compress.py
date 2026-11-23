@@ -19,9 +19,9 @@ from pathlib import Path
 
 import fitz
 
-from .common import CompressLevel, Stage
-from .context import JobContext
-from .issues import ConversionError, empty_pdf, password_protected, unreadable_file
+from ..core.context import JobContext
+from ..core.issues import ConversionError, empty_pdf, password_protected, unreadable_file
+from ..core.types import CompressLevel, Stage
 
 log = logging.getLogger(__name__)
 

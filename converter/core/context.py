@@ -10,8 +10,8 @@ import subprocess
 import threading
 from dataclasses import dataclass, field
 
-from .common import ActionSettings, Progress, ProgressEvent, Stage
 from .issues import Cancelled, Issue
+from .types import ActionSettings, Progress, ProgressEvent, Stage
 
 
 class CancelToken:

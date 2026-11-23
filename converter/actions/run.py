@@ -21,7 +21,15 @@ from pathlib import Path
 
 import fitz
 
-from .common import (
+from ..core.context import CancelToken, JobContext
+from ..core.issues import (
+    ConversionError,
+    empty_pdf,
+    password_protected,
+    unreadable_file,
+    unsupported_file,
+)
+from ..core.types import (
     ACCEPTS,
     POWERPOINT_EXTENSIONS,
     Action,
@@ -32,20 +40,12 @@ from .common import (
     Progress,
     Stage,
 )
+from ..ocr import add_text_layer, require_ocr
+from ..slides import render_slides
 from .compress import compress_pdf
-from .context import CancelToken, JobContext
 from .flatten import flatten_pdf
 from .images import images_to_pdf
-from .issues import (
-    ConversionError,
-    empty_pdf,
-    password_protected,
-    unreadable_file,
-    unsupported_file,
-)
 from .merge import Part, merge_documents
-from .ocr import add_text_layer, require_ocr
-from .powerpoint import render_slides
 from .split import split_pdf
 
 log = logging.getLogger(__name__)

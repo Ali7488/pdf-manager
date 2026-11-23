@@ -5,9 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .common import POWERPOINT_EXTENSIONS, Action, ActionData, ActionSettings
-from .issues import Issue, ocr_missing, slide_renderer_missing
-from .tools import find_libreoffice, find_powerpoint, find_tesseract, powerpoint_installed
+from ..core.issues import Issue, ocr_missing, slide_renderer_missing
+from ..core.types import POWERPOINT_EXTENSIONS, Action, ActionData, ActionSettings
+from .locate import find_libreoffice, find_powerpoint, find_tesseract, powerpoint_installed
 
 
 @dataclass

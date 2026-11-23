@@ -9,7 +9,7 @@ from pathlib import Path
 
 import fitz
 
-from .common import IMAGE_EXTENSIONS
+from ..core.types import IMAGE_EXTENSIONS
 
 log = logging.getLogger(__name__)
 

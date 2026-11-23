@@ -7,17 +7,17 @@ from pathlib import Path
 
 import fitz
 
-from .bookmarks import read_bookmarks, set_bookmarks
-from .common import Stage
-from .context import JobContext
-from .issues import (
+from ..core.context import JobContext
+from ..core.issues import (
     ConversionError,
     empty_pdf,
     flatten_check_failed,
     password_protected,
     unreadable_file,
 )
-from .ocr import ocr_image_to_pdf, render_page, require_ocr
+from ..core.types import Stage
+from ..ocr import ocr_image_to_pdf, render_page, require_ocr
+from ..pdf import read_bookmarks, set_bookmarks
 
 log = logging.getLogger(__name__)
 

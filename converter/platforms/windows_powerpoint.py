@@ -24,8 +24,8 @@ import time
 import traceback
 from pathlib import Path
 
-from ..context import CancelToken
-from ..issues import Cancelled
+from ..core.context import CancelToken
+from ..core.issues import Cancelled
 
 log = logging.getLogger(__name__)
 

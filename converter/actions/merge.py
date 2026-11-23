@@ -10,10 +10,16 @@ from pathlib import Path
 
 import fitz
 
-from .bookmarks import Bookmark, read_bookmarks, set_bookmarks
-from .common import Stage
-from .context import JobContext
-from .issues import ConversionError, empty_pdf, merge_failed, password_protected, unreadable_file
+from ..core.context import JobContext
+from ..core.issues import (
+    ConversionError,
+    empty_pdf,
+    merge_failed,
+    password_protected,
+    unreadable_file,
+)
+from ..core.types import Stage
+from ..pdf import Bookmark, read_bookmarks, set_bookmarks
 
 log = logging.getLogger(__name__)
 

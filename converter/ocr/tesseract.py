@@ -17,10 +17,10 @@ from pathlib import Path
 
 import fitz
 
-from .common import Stage
-from .context import JobContext
-from .issues import ConversionError, ocr_failed, ocr_missing, ocr_timeout, unreadable_file
-from .tools import find_tesseract, run_command
+from ..core.context import JobContext
+from ..core.issues import ConversionError, ocr_failed, ocr_missing, ocr_timeout, unreadable_file
+from ..core.types import Stage
+from ..tools import find_tesseract, run_command
 
 log = logging.getLogger(__name__)
 

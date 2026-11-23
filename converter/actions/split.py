@@ -15,15 +15,15 @@ from pathlib import Path
 
 import fitz
 
-from .common import OutputFile, SplitMethod, SplitSettings, Stage
-from .context import JobContext
-from .issues import (
+from ..core.context import JobContext
+from ..core.issues import (
     ConversionError,
     empty_pdf,
     invalid_page_ranges,
     password_protected,
     unreadable_file,
 )
+from ..core.types import OutputFile, SplitMethod, SplitSettings, Stage
 
 log = logging.getLogger(__name__)
 

@@ -27,16 +27,16 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from . import platforms
-from .common import Stage
-from .context import JobContext
-from .issues import (
+from .. import platforms
+from ..core.context import JobContext
+from ..core.issues import (
     ConversionError,
     powerpoint_failed,
     powerpoint_fallback,
     slide_renderer_missing,
 )
-from .tools import find_libreoffice, run_command
+from ..core.types import Stage
+from ..tools import find_libreoffice, run_command
 
 log = logging.getLogger(__name__)
 

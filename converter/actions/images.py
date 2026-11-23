@@ -20,9 +20,9 @@ from pathlib import Path
 
 import fitz
 
-from .common import OutputFile, Stage
-from .context import JobContext
-from .issues import ConversionError, unreadable_file
+from ..core.context import JobContext
+from ..core.issues import ConversionError, unreadable_file
+from ..core.types import OutputFile, Stage
 
 log = logging.getLogger(__name__)
 

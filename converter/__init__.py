@@ -22,7 +22,10 @@ Supporting pieces: ``check_tools`` (the Convert modal's tool check),
 when saving), and ``converter.platforms`` (all OS-specific code).
 """
 
-from .common import (
+from .actions.run import run_action
+from .core.context import CancelToken, JobContext
+from .core.issues import Cancelled, ConversionError, Issue, IssueCode, Severity
+from .core.types import (
     ACCEPTS,
     DOCUMENT_EXTENSIONS,
     DPI,
@@ -39,13 +42,9 @@ from .common import (
     SplitSettings,
     Stage,
 )
-from .context import CancelToken, JobContext
-from .files import FileInfo, FileKind, inspect_file
-from .issues import Cancelled, ConversionError, Issue, IssueCode, Severity
-from .output import safe_destination
-from .pipeline import run_action
-from .toolcheck import ToolCheck, ToolStatus, check_tools
+from .files import FileInfo, FileKind, inspect_file, safe_destination
 from .tools import find_libreoffice, find_powerpoint, find_tesseract, tesseract_languages
+from .tools.check import ToolCheck, ToolStatus, check_tools
 
 __all__ = [
     "ACCEPTS",

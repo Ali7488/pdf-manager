@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "PyMuPDF>=1.25,<2",
+    "pywebview>=6.2.1,<7",
     "pywin32>=308; sys_platform == 'win32'",
 ]
 

@@ -284,6 +284,9 @@ def python_components() -> list[Component]:
         ids = set(re.split(r"\s+(?:OR|AND)\s+", spdx))
         if not files or ids & COPYLEFT:
             files += [f for f in _standard_text(spdx, target) if f not in files]
+        # A wheel can list the same licence through multiple metadata locations.
+        # Preserve its first occurrence without duplicating notice/manifest entries.
+        files = list(dict.fromkeys(files))
         components.append(
             Component(
                 name,
@@ -856,7 +859,9 @@ def main() -> int:
                 "mupdf": mupdf_source,
                 "python_runtime": {
                     "url": f"https://www.python.org/ftp/python/{PYTHON_WINDOWS_VERSION}/"
-                    f"Python-{PYTHON_WINDOWS_VERSION}.tar.xz"
+                    f"Python-{PYTHON_WINDOWS_VERSION}.tar.xz",
+                    # Hash published on the matching Python.org release page.
+                    "sha256": "6020bd10aff3bf4821be16f088ebb1591beb7b811dcd8fab1da8f7c22a7b27e7",
                 },
                 "pyinstaller": _pypi_sdist("pyinstaller", PYINSTALLER_VERSION),
             },

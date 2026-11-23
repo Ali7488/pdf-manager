@@ -3,6 +3,7 @@
  * which files it accepts. Mirrors the table in docs/API.md.
  */
 import { Action, type ActionSettings, type FileKind, type InputFile } from "../api/types";
+import type { IconName } from "../components/Icon/Icon";
 
 /** Display and behaviour details for one action. */
 export interface ActionInfo {
@@ -21,6 +22,8 @@ export interface ActionInfo {
   merges: boolean;
   /** Which native file picker the "Add files" button opens on this tab. */
   pickKind: "documents" | "images";
+  /** Sidebar and Home icon. */
+  icon: IconName;
 }
 
 const DOCUMENTS: readonly FileKind[] = ["pdf", "pptx", "ppt"];
@@ -37,6 +40,7 @@ export const ACTIONS: readonly ActionInfo[] = [
     offersOcr: true,
     merges: false,
     pickKind: "documents",
+    icon: "flatten",
   },
   {
     action: Action.FlattenMerge,
@@ -48,6 +52,7 @@ export const ACTIONS: readonly ActionInfo[] = [
     offersOcr: true,
     merges: true,
     pickKind: "documents",
+    icon: "flattenMerge",
   },
   {
     action: Action.Merge,
@@ -59,6 +64,7 @@ export const ACTIONS: readonly ActionInfo[] = [
     offersOcr: true,
     merges: true,
     pickKind: "documents",
+    icon: "merge",
   },
   {
     action: Action.Split,
@@ -70,6 +76,7 @@ export const ACTIONS: readonly ActionInfo[] = [
     offersOcr: true,
     merges: false,
     pickKind: "documents",
+    icon: "split",
   },
   {
     action: Action.ImagesToPdf,
@@ -81,6 +88,7 @@ export const ACTIONS: readonly ActionInfo[] = [
     offersOcr: true,
     merges: false,
     pickKind: "images",
+    icon: "image",
   },
   {
     action: Action.Compress,
@@ -92,6 +100,7 @@ export const ACTIONS: readonly ActionInfo[] = [
     offersOcr: false,
     merges: false,
     pickKind: "documents",
+    icon: "compress",
   },
 ];
 

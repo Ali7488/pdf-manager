@@ -205,3 +205,8 @@ def copy_with_provenance(source: Path, target: Path) -> None:
     if text is not None:
         with open(f"{target}:Zone.Identifier", "w", encoding="utf-8") as stream:
             stream.write(text)
+
+
+def os_family() -> str:
+    """Which operating system family this is, for choosing user-facing wording."""
+    return "windows"

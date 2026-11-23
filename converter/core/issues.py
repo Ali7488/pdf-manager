@@ -92,6 +92,14 @@ _LOGS_STEP = (
 )
 
 
+def _on_windows() -> bool:
+    """Whether to use Windows wording. Imported at call time to avoid an import cycle
+    (the platform modules import this module)."""
+    from .. import platforms
+
+    return platforms.os_family() == "windows"
+
+
 def _clip(text: str | None, limit: int = 4000) -> str | None:
     """Keep technical details readable; very long tool output is cut."""
     if not text:
@@ -160,9 +168,17 @@ def ocr_install_failed(details: str | None) -> Issue:
         "OCR couldn't be installed automatically",
         "The OCR program didn't install. Your files are not affected.",
         (
-            "Check your internet connection and try Install OCR again.",
-            "Or install Tesseract OCR from github.com/UB-Mannheim/tesseract/wiki, "
-            "then click Search for OCR in Settings.",
+            (
+                "Check your internet connection and try Install OCR again.",
+                "Or install Tesseract OCR from github.com/UB-Mannheim/tesseract/wiki, "
+                "then click Search for OCR in Settings.",
+            )
+            if _on_windows()
+            else (
+                "Install Tesseract OCR with your system's software manager (package "
+                "'tesseract-ocr' on Ubuntu/Debian, 'tesseract' on Arch).",
+                "Then click Search for OCR in Settings.",
+            )
         ),
         _clip(details),
     )
@@ -233,11 +249,21 @@ def powerpoint_failed(file: str, details: str | None) -> Issue:
         "Couldn't convert the slides",
         f"{file} couldn't be turned into a PDF.",
         (
-            "Open the presentation in PowerPoint to check it isn't damaged or password-protected.",
-            "If PowerPoint shows 'Waiting for printer connection', set a local printer "
-            "such as 'Microsoft Print to PDF' as your default printer.",
-            "Save it as a PDF from PowerPoint yourself and add that PDF instead.",
-            _LOGS_STEP,
+            (
+                "Open the presentation in PowerPoint to check it isn't damaged or "
+                "password-protected.",
+                "If PowerPoint shows 'Waiting for printer connection', set a local printer "
+                "such as 'Microsoft Print to PDF' as your default printer.",
+                "Save it as a PDF from PowerPoint yourself and add that PDF instead.",
+                _LOGS_STEP,
+            )
+            if _on_windows()
+            else (
+                "Open the presentation in LibreOffice Impress to check it isn't damaged or "
+                "password-protected.",
+                "Save it as a PDF from LibreOffice Impress yourself and add that PDF instead.",
+                _LOGS_STEP,
+            )
         ),
         _clip(details),
         file,
@@ -246,16 +272,26 @@ def powerpoint_failed(file: str, details: str | None) -> Issue:
 
 def slide_renderer_missing() -> Issue:
     """PowerPoint files were added but neither PowerPoint nor LibreOffice is installed."""
+    if _on_windows():
+        message = (
+            "Converting PowerPoint files needs Microsoft PowerPoint or LibreOffice, "
+            "and neither was found."
+        )
+        install = (
+            "Install Microsoft PowerPoint, or install the free LibreOffice from libreoffice.org."
+        )
+    else:
+        message = "Converting PowerPoint files needs LibreOffice, which wasn't found."
+        install = (
+            "Install LibreOffice Impress with your system's software manager (package "
+            "'libreoffice-impress' on Ubuntu/Debian, 'libreoffice-fresh' on Arch)."
+        )
     return Issue(
         IssueCode.SLIDE_RENDERER_MISSING,
         Severity.ERROR,
         "No program to open PowerPoint files",
-        "Converting PowerPoint files needs Microsoft PowerPoint or LibreOffice, "
-        "and neither was found.",
-        (
-            "Install Microsoft PowerPoint, or install the free LibreOffice from libreoffice.org.",
-            "Or save the presentation as a PDF yourself and add that PDF instead.",
-        ),
+        message,
+        (install, "Or save the presentation as a PDF yourself and add that PDF instead."),
     )
 
 
@@ -378,7 +414,9 @@ def settings_save_failed(details: str | None) -> Issue:
         "The change works for now, but it will be lost when PDF Manager closes.",
         (
             "Check the drive isn't full.",
-            "Make sure your user folder (AppData) isn't read-only or blocked by security software.",
+            "Make sure your user folder (AppData) isn't read-only or blocked by security software."
+            if _on_windows()
+            else "Make sure your settings folder (~/.config/pdf-manager) isn't read-only.",
             _LOGS_STEP,
         ),
         _clip(details),

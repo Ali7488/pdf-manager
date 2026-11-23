@@ -18,6 +18,8 @@ Interface:
         Whether Microsoft PowerPoint can be automated (always False off Windows).
     powerpoint_path() -> Path | None
         Path of PowerPoint's executable, for display only.
+    os_family() -> str
+        "windows", "linux" or "mac", for choosing user-facing wording.
     is_untrusted(path) -> bool
         Whether the file came from the Internet or a restricted site
         (Windows Mark-of-the-Web). Always False where there's no such marker.
@@ -39,6 +41,7 @@ if os.name == "nt":
         is_untrusted,
         kill_process_tree,
         libreoffice_candidates,
+        os_family,
         popen_options,
         powerpoint_installed,
         powerpoint_path,
@@ -51,6 +54,7 @@ else:
         is_untrusted,
         kill_process_tree,
         libreoffice_candidates,
+        os_family,
         popen_options,
         powerpoint_installed,
         powerpoint_path,
@@ -63,6 +67,7 @@ __all__ = [
     "copy_with_provenance",
     "export_slides_with_powerpoint",
     "is_untrusted",
+    "os_family",
     "kill_process_tree",
     "libreoffice_candidates",
     "popen_options",

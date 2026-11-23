@@ -54,6 +54,8 @@ class Issue:
         details: Raw technical text for a "Show details" section, if any.
         file: Name of the input file this is about, if any.
         log_file: Log file holding the full record; filled in when logged.
+        command: A command the user can copy and run themselves (e.g. a Linux
+            package install), shown with a Copy button; the app never runs it.
     """
 
     code: IssueCode
@@ -64,6 +66,7 @@ class Issue:
     details: str | None = None
     file: str | None = None
     log_file: str | None = None
+    command: str | None = None
 
     def with_log_file(self, path: str) -> Issue:
         """Return a copy pointing at the log file it was written to."""

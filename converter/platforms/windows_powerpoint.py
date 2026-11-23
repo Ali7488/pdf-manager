@@ -12,7 +12,9 @@ Behaviour that protects the user's own work:
   the presentation it opened.
 * The export runs on a helper thread so it can time out or be cancelled. If it
   hangs (for example on PowerPoint's "Waiting for printer connection" dialog),
-  the converter kills PowerPoint **only if the converter started it**.
+  the converter kills PowerPoint **only if it can prove the process is its own**
+  (audit R2, see :func:`owned_pid`). When ownership is uncertain, PowerPoint is
+  never killed or quit; the job just reports the timeout.
 """
 
 from __future__ import annotations
@@ -34,6 +36,62 @@ PP_SAVE_AS_PDF = 32  # PowerPoint's ppSaveAsPDF file format constant.
 
 class PowerPointExportError(RuntimeError):
     """PowerPoint couldn't export the slides. The message holds technical details."""
+
+
+def _powerpoint_pids() -> set[int] | None:
+    """Process ids of every running ``POWERPNT.EXE``, or None if they can't be listed."""
+    try:
+        proc = subprocess.run(
+            ["tasklist", "/FI", "IMAGENAME eq POWERPNT.EXE", "/FO", "CSV", "/NH"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if proc.returncode != 0:
+        return None
+    return parse_tasklist_pids(proc.stdout)
+
+
+def parse_tasklist_pids(output: str) -> set[int]:
+    """Pids from ``tasklist /FO CSV /NH`` output (``"Image","PID",...`` per line).
+
+    Lines that aren't process rows (such as "INFO: No tasks are running...")
+    are ignored.
+    """
+    pids = set()
+    for line in output.splitlines():
+        fields = [field.strip().strip('"') for field in line.split('","')]
+        if len(fields) >= 2 and fields[1].isdigit():
+            pids.add(int(fields[1]))
+    return pids
+
+
+def owned_pid(
+    was_running: bool, before: set[int] | None, after: set[int] | None, window_pid: int | None
+) -> int | None:
+    """Decide which PowerPoint process the converter may stop, if any (audit R2).
+
+    The converter owns a PowerPoint process only when **all** of these hold:
+
+    * PowerPoint wasn't running before (no automation object and no
+      ``POWERPNT.EXE`` in the process list),
+    * exactly one new ``POWERPNT.EXE`` appeared after starting it, and
+    * that process is the one behind the automation object's window.
+
+    Any doubt (process list unavailable, several new processes, a mismatch)
+    returns None, and then PowerPoint is never killed or quit.
+    """
+    if was_running or before is None or after is None or window_pid is None:
+        return None
+    if before:
+        return None
+    new = after - before
+    if new == {window_pid}:
+        return window_pid
+    return None
 
 
 def _process_id(app) -> int | None:
@@ -62,7 +120,8 @@ def _export(source: Path, output: Path, state: dict) -> None:
     """Helper-thread body: open the file read-only and hidden, save it as PDF, clean up.
 
     Results go into ``state``: ``was_running``, ``pid`` (only when the converter
-    started PowerPoint), and ``error`` / ``traceback`` on failure.
+    can prove it started this PowerPoint, see :func:`owned_pid`), and
+    ``error`` / ``traceback`` on failure.
     """
     import pythoncom
     import win32com.client
@@ -72,15 +131,20 @@ def _export(source: Path, output: Path, state: dict) -> None:
     app = None
     presentation = None
     try:
+        before = _powerpoint_pids()
         try:
             win32com.client.GetActiveObject("PowerPoint.Application")
             state["was_running"] = True
         except Exception:
-            state["was_running"] = False
+            # Not registered as running; a POWERPNT.EXE in the list still counts.
+            state["was_running"] = bool(before)
         app = win32com.client.DispatchEx("PowerPoint.Application")
-        if not state["was_running"]:
-            state["pid"] = _process_id(app)
-        log.debug("PowerPoint attached (already running: %s)", state["was_running"])
+        pid = owned_pid(state["was_running"], before, _powerpoint_pids(), _process_id(app))
+        if pid is not None:
+            state["pid"] = pid
+        log.debug(
+            "PowerPoint attached (already running: %s, owned pid: %s)", state["was_running"], pid
+        )
         # Open(FileName, ReadOnly=True, Untitled=False, WithWindow=False)
         presentation = app.Presentations.Open(str(source), True, False, False)
         presentation.SaveAs(str(output), PP_SAVE_AS_PDF)
@@ -93,9 +157,10 @@ def _export(source: Path, output: Path, state: dict) -> None:
                 presentation.Close()
             except Exception:
                 log.debug("Closing the presentation failed", exc_info=True)
-        # Quit only a PowerPoint the converter started, and only if nothing else
-        # is open in it. The user's own PowerPoint is never closed (decision C2).
-        if app is not None and not state.get("was_running", True):
+        # Quit only a PowerPoint the converter provably started, and only if
+        # nothing else is open in it. The user's own PowerPoint is never closed
+        # (decision C2, audit R2).
+        if app is not None and state.get("pid") is not None:
             try:
                 if app.Presentations.Count == 0:
                     app.Quit()
@@ -132,7 +197,12 @@ def export_slides(source: Path, output: Path, timeout: float, cancel: CancelToke
                 _kill(pid)  # Only ever set when the converter started PowerPoint.
             if cancel.cancelled:
                 raise Cancelled()
-            note = "" if pid else " PowerPoint was already open, so it was left running."
+            note = (
+                ""
+                if pid
+                else " PowerPoint wasn't provably started by PDF Manager (it may be yours), "
+                "so it was left running."
+            )
             raise PowerPointExportError(
                 f"PowerPoint didn't finish within {int(timeout)} seconds. It may be waiting "
                 f"on a dialog such as 'Waiting for printer connection'.{note}"

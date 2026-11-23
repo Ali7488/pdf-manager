@@ -270,6 +270,16 @@ def test_duplicate_manifest_license_paths_fail(monkeypatch):
     )
 
 
+def test_pywin32_source_uses_fixed_upstream_commit():
+    item = next(
+        s for s in check.load_manifest()["sources"]["python"] if s["component"] == "pywin32"
+    )
+    assert item["url"] == (
+        "https://github.com/mhammond/pywin32/archive/"
+        "2a277cb5552756c2b4d42b524dc36d25e0bb6354.tar.gz"
+    )
+
+
 def test_cpython_source_archive_has_pinned_sha256():
     item = check.load_manifest()["sources"]["python_runtime"]
     assert item["url"].endswith("Python-3.13.17.tar.xz")

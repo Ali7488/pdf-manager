@@ -2,25 +2,18 @@ $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
 Write-Host '=== PDF Manager - Windows setup ===' -ForegroundColor Magenta
 
-$python = $null
-$prefix = @()
-try { & py -3 -c 'import sys; print(sys.executable)' *> $null; if ($LASTEXITCODE -eq 0) { $python = 'py'; $prefix = @('-3') } } catch {}
-if (-not $python) {
-    try { & python -c 'import sys; print(sys.executable)' *> $null; if ($LASTEXITCODE -eq 0) { $python = 'python' } } catch {}
-}
-if (-not $python) {
-    Write-Host 'Python is missing; trying Windows Package Manager.'
-    if (-not (Get-Command winget -ErrorAction SilentlyContinue)) { throw 'Install Python 3.13 from python.org, then rerun INSTALL.bat.' }
-    & winget install --id Python.Python.3.13 -e --accept-source-agreements --accept-package-agreements
-    if ($LASTEXITCODE -ne 0) { throw 'Could not install Python. Install it from python.org.' }
-    throw 'Python was installed. Close this window and run INSTALL.bat again so Windows can update its command paths.'
+# uv manages Python itself, so no separate Python install is needed.
+if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
+    Write-Host 'Installing uv (Python package manager)...'
+    if (-not (Get-Command winget -ErrorAction SilentlyContinue)) { throw 'Install uv from https://docs.astral.sh/uv/, then rerun INSTALL.bat.' }
+    & winget install --id astral-sh.uv -e --accept-source-agreements --accept-package-agreements
+    if ($LASTEXITCODE -ne 0) { throw 'Could not install uv. Install it from https://docs.astral.sh/uv/.' }
+    # Pick up the new PATH entry without reopening the window.
+    $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [Environment]::GetEnvironmentVariable('Path', 'User')
+    if (-not (Get-Command uv -ErrorAction SilentlyContinue)) { throw 'uv was installed. Close this window and run INSTALL.bat again.' }
 }
 Write-Host 'Creating isolated Python environment...'
-& $python @prefix -m venv '.venv'
-if ($LASTEXITCODE -ne 0) { throw 'Could not create Python environment.' }
-& '.\.venv\Scripts\python.exe' -m pip install --disable-pip-version-check --upgrade pip
-if ($LASTEXITCODE -ne 0) { throw 'Could not update pip.' }
-& '.\.venv\Scripts\python.exe' -m pip install --disable-pip-version-check -r requirements.txt
+& uv sync --frozen --no-dev
 if ($LASTEXITCODE -ne 0) { throw 'Could not install Python dependencies.' }
 
 $tesseract = @('C:\Program Files\Tesseract-OCR\tesseract.exe', 'C:\Program Files (x86)\Tesseract-OCR\tesseract.exe') | Where-Object { Test-Path $_ }

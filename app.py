@@ -15,14 +15,19 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
 from converter import (
-    ALLOWED,
-    FLATTEN,
-    FLATTEN_MERGE,
-    MERGE,
+    DOCUMENT_EXTENSIONS,
+    Action,
+    ActionData,
+    ActionSettings,
+    ConversionError,
     find_tesseract,
-    process_files,
+    run_action,
     safe_destination,
 )
+
+# The old Tkinter UI only offers these three actions; it is replaced by the React app.
+ALLOWED = DOCUMENT_EXTENSIONS
+FLATTEN, FLATTEN_MERGE, MERGE = Action.FLATTEN, Action.FLATTEN_MERGE, Action.MERGE
 
 BG = "#1b141b"
 SURFACE = "#2b1e29"
@@ -734,10 +739,19 @@ class Dashboard:
         ``("complete", None, error_message)`` on failure.
         """
         try:
-            results = process_files(
-                files, mode, scratch, lambda msg: self.events.put(("status", msg)), engine=engine
+            # The old UI always used OCR when flattening and never when merging.
+            settings = ActionSettings(use_ocr=mode != MERGE, tesseract_path=engine)
+            result = run_action(
+                mode,
+                settings,
+                ActionData(list(files)),
+                scratch=scratch,
+                progress=lambda event: self.events.put(("status", event.message)),
             )
+            results = [(output.name, output.path) for output in result.outputs]
             self.events.put(("complete", results, None))
+        except ConversionError as exc:
+            self.events.put(("complete", None, f"{exc.issue.title}\n\n{exc.issue.message}"))
         except Exception as exc:
             self.events.put(("complete", None, str(exc)))
 
@@ -793,7 +807,7 @@ class Dashboard:
         picker discards the converted files and the job must be run again.
 
         Args:
-            results: ``(suggested name, path)`` pairs from ``process_files``, or ``None``.
+            results: ``(suggested name, path)`` pairs from ``run_action``, or ``None``.
             error: Error message if the conversion failed, otherwise ``None``.
         """
         try:

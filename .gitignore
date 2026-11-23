@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+Desktop.ini
+*~
+
+# User documents (never commit real user documents or annotations)
+*.pdf
+*.ppt
+*.pptx
+*.key
+*.docx
+*.png.pdf
+
+# Scratch / outputs
+input/
+output/
+outputs/
+scratch/
+tmp/
+temp/
+logs/
+backup*/
+ocr_work/
+
+# Raw historical releases for local forensic inspection only
+.migration/
+
+# Installer artifacts and builds
+build/
+dist/
+*.spec
+*.zip
+*.7z
+*.log

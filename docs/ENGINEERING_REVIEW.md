@@ -2,7 +2,7 @@
 
 These are **issues to investigate**, not claims that fixes are already complete.
 
-1. **Notes contamination:** `speaker_notes()` / `notes_pdf()` append every PPTX note; unrelated template notes appeared in an actual output. Design optional append/preview or explicit notes filtering without silently dropping legitimate presenter notes.
+1. **Notes contamination:** resolved by removing the speaker-notes feature. Only slides are converted.
 2. **PowerPoint automation:** on Windows `powerpoint_to_pdf()` prefers PowerPoint COM and may trigger an unavailable printer dialog. Review explicit fallback/engine selection and cleanup after failure.
 3. **File-lock testing:** regression test simulates WinError 32 from `Path.unlink`; verify real Windows AV/PowerPoint/Explorer interactions and scratch cleanup with acceptance fixtures.
 4. **Installer quality:** v1.0 `install_windows.ps1` may install LibreOffice even if Microsoft Office exists; VBScript updaters are legacy and **not part of the active public release**.

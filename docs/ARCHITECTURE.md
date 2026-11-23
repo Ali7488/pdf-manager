@@ -65,7 +65,7 @@ Started by `main.py` → `api.app.main()`, which configures logging, creates the
 
 | Module | Responsibility |
 | --- | --- |
-| `app.py` | Window creation (1200×800, min 960×640), choosing what to load (the built `frontend/dist/index.html` as a `file://` URL; in dev mode an `http(s)` URL from `PDF_MANAGER_UI_URL`), a fallback page if the UI is missing, clean shutdown. |
+| `app.py` | Window creation (1040×720, min 860×600), choosing what to load (the built `frontend/dist/index.html` as a `file://` URL; in dev mode an `http(s)` URL from `PDF_MANAGER_UI_URL`), a fallback page if the UI is missing, clean shutdown. |
 | `bridge.py` | `Api`: exactly the contract's methods (`docs/API.md`). Every public method catches errors and returns contract-shaped results with an `Issue`, so nothing raises into JavaScript. Events go to the page by dispatching `pdfmanager:<name>` DOM events. Also native pickers, OCR search/install (winget), opening folders, and drag-and-drop paths. |
 | `jobs.py` | `JobManager`: one job at a time on a worker thread calling `converter.run_action`; throttled progress (≤ 1 event / 100 ms, final event always delivered); one state per job (running → ready → saving → gone) so save, discard and shutdown never race (audit R4); saving copies in chunks with exclusive-create (never overwrites), optional zip. |
 | `settings_store.py` | Persisted settings (`%LOCALAPPDATA%\PDFManager\settings.json` on Windows, XDG elsewhere): validated fields, atomic writes, updates applied first-come-first-served; a failed write returns the in-memory settings plus a `SETTINGS_SAVE_FAILED` issue (audit R6). |
@@ -76,7 +76,7 @@ Started by `main.py` → `api.app.main()`, which configures logging, creates the
 
 **Drag and drop:** a web page can't see real file paths, so Python subscribes to the document's `drop` event (pywebview `DOMEventHandler`), reads `pywebviewFullPath` for each file, describes it with `converter.inspect_file` and sends a `filesAdded` event.
 
-**Platform note:** the API layer's Windows-specific behaviour (winget, `os.startfile`, picker filters) is currently gated by `paths.on_windows()` checks inside `bridge.py`, not isolated in one platform module as P15 asks. Tracked in `ENGINEERING_REVIEW.md`.
+**Platform code:** everything OS-specific in the API layer (opening folders, OCR install, picker filters, settings and logs folders, which window backend to use) lives in `api/platforms/` (`windows.py`, `linux.py`, `mac.py`), selected once; `tests/api/test_api_portability.py` keeps it out of shared API code. `api/smoke.py` is the start-up self-test used by CI and the Windows build.
 
 ## Frontend (`frontend/`)
 
@@ -86,7 +86,7 @@ Vite + React + TypeScript, CSS Modules, feature folders (`pages/`, `components/`
 - `src/state/`: app state (reducer + context). Settings changes apply on screen immediately; saves are queued one at a time, with pending changes merged, so a late reply can never undo a newer choice (audit R5). A failed save shows a "Not saved" warning in Settings (R6).
 - `src/pages/`: Home (drop zone, shared file list, action buttons), one `ActionPage` per action, Settings.
 - `src/components/`: shared pieces (file list with dnd-kit reordering, `InfoTip` (?) tooltips, the Convert modal's issue view, buttons, modal, progress).
-- **Build:** `npm run build` produces **one self-contained `dist/index.html`** (JS, CSS and IBM Plex fonts inlined, via `vite-plugin-singlefile`). WebView2 blocks module scripts and fonts loaded over `file://`, and the app has no local server (F18), so nothing may be fetched at runtime.
+- **Build:** `npm run build` produces **one self-contained `dist/index.html`** (JS, CSS and the Open Sans font inlined, via `vite-plugin-singlefile`). WebView2 blocks module scripts and fonts loaded over `file://`, and the app has no local server (F18), so nothing may be fetched at runtime.
 - **Themes:** CSS custom properties per theme (`data-theme` on `<html>`): system (follows Windows), light, dark, burgundy, green. A tiny inline script picks light/dark before first paint.
 
 ## Non-obvious implementation choices
@@ -116,7 +116,7 @@ Known dependency notes: the code imports `pymupdf` (the old `fitz` name is depre
 
 ## Tests
 
-Python: `uv run pytest` (on 2026-11-23, Linux: **355 passed, 5 skipped**; the skipped ones are Windows-only NTFS tests). Tests needing Tesseract or LibreOffice skip when those aren't installed. Frontend: `npm test` in `frontend/` (**83 passed**).
+Python: `uv run pytest` (on 2026-11-23, Linux: **449 passed, 5 skipped**; the skipped ones are Windows-only NTFS tests). Tests needing Tesseract or LibreOffice skip when those aren't installed. Frontend: `npm test` in `frontend/` (**95 passed**).
 
 | Where | Covers |
 | --- | --- |
@@ -130,5 +130,5 @@ Python: `uv run pytest` (on 2026-11-23, Linux: **355 passed, 5 skipped**; the sk
 
 ## CI
 
-- **`.github/workflows/ci.yml`** (every push and pull request, decision F37): Python lint, format check and tests on **Linux** (with Tesseract and LibreOffice installed) and on **Windows** (without them, so OCR/slide tests skip there); frontend typecheck, lint, tests and the single-file build check. A newer push cancels an older run on the same branch.
+- **`.github/workflows/ci.yml`** (every push and pull request, decision F37): Python lint, format check and tests on **Linux** (with Tesseract and LibreOffice installed) and on **Windows** (without them, so OCR/slide tests skip there); frontend typecheck, lint, tests and the single-file build check; and a **Linux start-up** job that starts the real app (Qt window) under Xvfb in self-test mode. A newer push cancels an older run on the same branch.
 - **`.github/workflows/build-windows.yml`**: builds the Windows installer (PyInstaller + Inno Setup). **Manual trigger only.** Not run yet.

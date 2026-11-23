@@ -83,7 +83,7 @@ cd frontend && npm ci && npm run build && cd ..
 uv run main.py
 ```
 
-Checks (the same ones CI runs):
+Checks (CI runs the same tests; it lints `api`, `converter`, `tests` and `main.py`):
 
 ```bash
 uv run pytest
@@ -121,7 +121,7 @@ main.py                Desktop application entry point
 
 ## Verification status
 
-The Python suite (360 tests on Linux; on Windows CI, tests needing OCR or LibreOffice skip) and the frontend suite (92 tests) pass in CI. The packaged app, the installer, Microsoft PowerPoint automation and real-user workflows **still need testing on a real Windows 11 PC**; that's what this pre-release is for. Report problems via [Issues](https://github.com/Ali7488/pdf-manager/issues).
+The Python suite (449 tests on Linux; on Windows CI, tests needing OCR or LibreOffice skip) and the frontend suite (95 tests) pass in CI. The packaged app, the installer, Microsoft PowerPoint automation and real-user workflows **still need testing on a real Windows 11 PC**; that's what this pre-release is for. Report problems via [Issues](https://github.com/Ali7488/pdf-manager/issues).
 
 ## Privacy and contributions
 

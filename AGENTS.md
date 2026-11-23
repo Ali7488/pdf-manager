@@ -34,8 +34,8 @@ Checks:
 
 ```bash
 uv run pytest
-uvx ruff check --line-length 100 .
-uvx ruff format --check --line-length 100 .
+uvx ruff check --select F,E9,I,E501 --line-length 100 api converter tests main.py cli.py scripts
+uvx ruff format --check --line-length 100 api converter tests main.py cli.py scripts
 cd frontend
 npm run lint
 npm run typecheck

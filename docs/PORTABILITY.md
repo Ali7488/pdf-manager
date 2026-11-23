@@ -53,17 +53,17 @@ To be done in a later release; not implemented now.
 
 - **Packages:** an Ubuntu/Debian `.deb` and an Arch `PKGBUILD`.
 - **Python strategy:** decide between bundling the app with its own Python environment (as on Windows, which avoids distro version differences, especially for PyMuPDF) and depending on distro Python packages. To decide later.
-- **Dependencies to declare:** Tesseract and English data, LibreOffice Impress (optional or recommended), a pywebview backend (GTK: PyGObject + WebKitGTK; or Qt: PyQt6 + Qt WebEngine), with the exact package names per distribution (see the table above).
+- **Dependencies to declare:** Tesseract and English data, LibreOffice Impress (optional or recommended), a pywebview backend (Qt via PySide6, decision P19; GTK: PyGObject + WebKitGTK later), with the exact package names per distribution (see the table above).
 - **Desktop integration:** a `.desktop` launcher, icons in PNG/SVG sizes (only a Windows `.ico` exists today), optional AppStream metadata.
 - **Locations (XDG):** settings in `$XDG_CONFIG_HOME/pdf-manager/`. Logs go to `$XDG_STATE_HOME/pdf-manager/logs` (default `~/.local/state/pdf-manager/logs`, decision C15), because a packaged install lives in a read-only system folder; from source they stay in the repo's `logs/`. Scratch files in the system temp folder.
 - **Opening folders:** `xdg-open`.
 - **Installing OCR from the app:** Windows uses winget. On Linux the app never runs `sudo`; "Install OCR" shows the exact command for the user's distribution with a Copy button (decision C16).
-- **Qt and GNOME** (P14, P18) mean pywebview window backends for the same React UI: Qt first (`pywebview[qt]`), then GTK/WebKitGTK. Running from source on Linux is being added now (P17); packages come later.
+- **Qt and GNOME** (P14, P18) mean pywebview window backends for the same React UI: Qt first (`pywebview[pyside6]`, PySide6, LGPL; never PyQt6), then GTK/WebKitGTK. Running from source on Linux is being added now (P17); packages come later.
 - **CI:** build and test on Linux runners once packaging exists.
 
 ## Known Windows-specific spots to address
 
 | Where | What | Plan |
 | --- | --- | --- |
-| `api/bridge.py`, `api/paths.py` | Opening folders (`os.startfile` / `xdg-open`), OCR install via winget, picker filters and the settings path are gated by `paths.on_windows()` checks inside these modules | Move behind one API-layer platform module (P15); tracked in `ENGINEERING_REVIEW.md`. |
+| `api/platforms/` | Opening folders, OCR install (winget / Linux command popup), picker filters, settings and logs folders, window backend | Done: one API-layer platform module (P15), enforced by `tests/api/test_api_portability.py`. |
 | `packaging/` | Windows installer (PyInstaller + Inno Setup) | Windows only by design; Linux packaging is separate future work. |

@@ -36,7 +36,7 @@ A web page can't see real file paths, so dropped files are handled on the Python
 | `get_ocr_status()` | `getOcrStatus()` | `{ present, path }`: whether Tesseract is installed (for Settings). |
 | `get_ocr_languages()` | `getOcrLanguages()` | Installed Tesseract languages, e.g. `["eng", "deu"]`. Empty if OCR isn't found. |
 | `search_ocr()` | `searchOcr()` | Settings → "Search for OCR": search the usual places; if not found, open a picker for `tesseract.exe`. Saves the path. Returns `OcrSearchResult`. |
-| `install_ocr()` | `installOcr()` | Start installing Tesseract (winget). Progress via `ocrInstallProgress`, end via `ocrInstallFinished`. Returns immediately. |
+| `install_ocr()` | `installOcr()` | Windows: start installing Tesseract with winget. Linux: nothing is installed; it finishes at once with an issue whose `command` is the apt/pacman command for the user's distribution (decision C16). Progress via `ocrInstallProgress`, end via `ocrInstallFinished`. Returns immediately. |
 | `start_job(action, settings, data)` | `startJob(action, settings, data)` | **The single entry point for every conversion** (see below). Returns `{ jobId }`, or `{ issue }` if it can't start (for example a job is already running). Only one job runs at a time. |
 | `cancel_job(job_id)` | `cancelJob(jobId)` | Request cancellation. The job ends with status `"cancelled"`. |
 | `save_results(job_id, options)` | `saveResults(jobId, options)` | Copy results out of the scratch folder. Never overwrites (adds ` (2)` and so on). Returns `SaveOutcome`. |
@@ -49,7 +49,7 @@ A web page can't see real file paths, so dropped files are handled on the Python
 | Event | Payload | When |
 | --- | --- | --- |
 | `filesAdded` | `{ files: InputFile[] }` | Files were dropped onto the window. |
-| `jobProgress` | `JobProgress` | Regularly while a job runs (at least once per page and per file). |
+| `jobProgress` | `JobProgress` | Regularly while a job runs, at most about 10 per second (faster updates are merged; the last one is always delivered before `jobFinished`). |
 | `jobFinished` | `JobFinished` | A job succeeded, failed or was cancelled. Results stay in scratch until `saveResults` or `discardResults`. |
 | `ocrInstallProgress` | `{ message: string }` | During an OCR install. |
 | `ocrInstallFinished` | `{ ok: boolean, issue: Issue \| null }` | OCR install ended. |
@@ -89,6 +89,7 @@ The file list is shared, so it can hold files a mode doesn't accept. The UI show
 
 - **OCR (Tesseract)** is required only if `settings.useOcr` is true (never for Compress).
 - **PowerPoint or LibreOffice** is needed only if `data.files` contains PPT/PPTX files. Microsoft PowerPoint is preferred. If PowerPoint is present, a missing LibreOffice is reported as `"not present"` but **doesn't block**. If neither is present, the check fails.
+- **Downloaded presentations** (Windows Mark-of-the-Web) are never opened with PowerPoint (decision C14), so they need LibreOffice even when PowerPoint is installed; without it the check fails with an explanation.
 
 The Convert modal runs this on **every Convert** and only starts the job if `ok` is true. Otherwise it shows the returned issues.
 
@@ -101,6 +102,8 @@ Every problem the user should see is an `Issue`:
 - `troubleshooting`: a few simple steps for the likely cause. Written by the backend so the wording lives in one place.
 - `details`: technical text (raw error output) for an optional "Show details" section.
 - `logFile`: path of the log file holding the full record, if one was written.
+- `file`: the input file the issue is about, if any.
+- `command`: a command the user can copy and run themselves (shown with a Copy button), otherwise null.
 - `command`: a command the user can copy and run themselves, shown with a Copy button (for example installing Tesseract on Linux, decision C16); otherwise null. The app never runs such commands for the user.
 
 Every issue is also written to the logs folder.

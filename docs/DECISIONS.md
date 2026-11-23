@@ -90,3 +90,5 @@ Add new ones here as they come up, and never assume their answers.
 | --- | --- |
 | O9 | "Qt, then GNOME": does this mean Linux desktop integration using pywebview's Qt backend (KDE) and then its GTK backend (GNOME), or native Qt and GTK user interfaces replacing the React UI? (Not needed for v1.) |
 | O10 | On Linux, packaged apps live in read-only system folders, so logs can't go next to the app (C4). Where should Linux logs go, e.g. `~/.local/state/pdf-manager/logs`? (Not needed for v1.) |
+| O11 | Settings was approved (F11) with "contents page on/off" and "page numbering", but later decisions made the contents page a per-tab checkbox, off by default (F26), and page numbering always uses viewer labels (C8). Should Settings still have either (for example a default for the contents-page checkbox), or neither? |
+| O12 | Should OCR support several languages at once (Tesseract accepts e.g. "eng+deu"), or one language chosen in Settings? |

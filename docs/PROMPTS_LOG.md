@@ -72,4 +72,5 @@ A short, summarized record of each request made to the coding agent, and what ca
 22. **Split the converter into folders by responsibility.** Checklist:
     - [x] Record decision F36.
     - [x] Restructure `converter/` into subpackages (the API-layer branch's imports still need updating when it's merged).
+23. **Frontend agent's contract proposals** (engineering follow-up, no new owner request). Adopted: `pickFiles("all")`, `getOcrStatus()`, a `converting_images` stage, and `discardResults` being safe to call twice. Logged as open questions for the owner: O11 (contents page / page numbering in Settings) and O12 (several OCR languages).
 

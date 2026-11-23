@@ -281,7 +281,8 @@
       "sha256": "44075a84e329db55b9bef5f342a70fd26d69e48ad1d33cb89d9664581c641156"
     },
     "python_runtime": {
-      "url": "https://www.python.org/ftp/python/3.13.17/Python-3.13.17.tar.xz"
+      "url": "https://www.python.org/ftp/python/3.13.17/Python-3.13.17.tar.xz",
+      "sha256": "6020bd10aff3bf4821be16f088ebb1591beb7b811dcd8fab1da8f7c22a7b27e7"
     },
     "pyinstaller": {
       "url": "https://files.pythonhosted.org/packages/63/41/f90302845945abd4ed647933ff5ee7c6ac93983187be67f897b6cb613331/pyinstaller-6.22.3.tar.gz",
@@ -482,13 +483,9 @@
         "python/pywin32-312/adodbapi/license.txt",
         "python/pywin32-312/pythonwin/License.txt",
         "python/pywin32-312/pythonwin/pywin/idle/LICENSE.txt",
-        "python/pywin32-312/adodbapi/license.txt",
         "python/pywin32-312/com/License.txt",
         "python/pywin32-312/com/win32comext/mapi/src/MAPIStubLibrary/LICENSE",
-        "python/pywin32-312/pythonwin/License.txt",
         "python/pywin32-312/pythonwin/Scintilla/License.txt",
-        "python/pywin32-312/pythonwin/pywin/idle/LICENSE.txt",
-        "python/pywin32-312/win32/License.txt",
         "python/pywin32-312/win32/License.txt",
         "python/pywin32-312/win32com/License.txt",
         "python/pywin32-312/win32comext/License.txt",

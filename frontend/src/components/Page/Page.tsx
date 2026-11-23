@@ -2,20 +2,26 @@
  * Building blocks shared by the pages: a header and a card-like section.
  */
 import type { ReactNode } from "react";
+import { InfoTip } from "../InfoTip/InfoTip";
 import styles from "./Page.module.css";
 
 /** Props for {@link PageHeader}. */
 export interface PageHeaderProps {
   title: string;
-  /** Short plain-language description under the title. */
+  /** At most one short instruction or status line under the title (no decorative subtitles). */
   description?: ReactNode;
+  /** Optional explanation shown in a (?) tooltip beside the title. */
+  tip?: string;
 }
 
 /** The page title (the only <h1> on a page) and its description. */
-export function PageHeader({ title, description }: PageHeaderProps) {
+export function PageHeader({ title, description, tip }: PageHeaderProps) {
   return (
     <header className={styles.header}>
-      <h1 className={styles.title}>{title}</h1>
+      <div className={styles.titleRow}>
+        <h1 className={styles.title}>{title}</h1>
+        {tip && <InfoTip label={title} text={tip} />}
+      </div>
       {description && <p className={styles.description}>{description}</p>}
     </header>
   );

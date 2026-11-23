@@ -56,7 +56,11 @@ export function ActionPage({ action }: ActionPageProps) {
 
   return (
     <>
-      <PageHeader title={info.label} description={`${info.description} Your original files are never changed.`} />
+      <PageHeader
+        title={info.label}
+        tip={`${info.description} Your original files are never changed.`}
+        description="Add files, choose options, then click Convert."
+      />
 
       <FileList action={action} headerActions={<AddFilesButton kind={info.pickKind} size="sm" />} />
 

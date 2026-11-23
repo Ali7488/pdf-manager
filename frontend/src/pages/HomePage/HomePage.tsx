@@ -16,15 +16,11 @@ export function HomePage() {
 
   return (
     <>
-      <PageHeader
-        title="Welcome"
-        description="Add your files, then choose what to do with them. Your original files are never changed."
-      />
+      <PageHeader title="Welcome" />
 
       <div className={styles.dropZone}>
         <Icon name="upload" size={36} className={styles.dropIcon} />
-        <p className={styles.dropTitle}>Drop PDFs, PowerPoints or images here</p>
-        <p className={styles.dropHint}>You can drop files on any page of this window.</p>
+        <p className={styles.dropTitle}>Drop files here, or click Add files</p>
         <div className={styles.dropButtons}>
           <AddFilesButton kind="all" variant="primary" />
         </div>
@@ -36,7 +32,7 @@ export function HomePage() {
 
       <section aria-labelledby="home-actions" className={styles.actions}>
         <h2 id="home-actions" className={styles.actionsTitle}>
-          What would you like to do?
+          Then choose a tool
         </h2>
         <div className={styles.grid}>
           {ACTIONS.map((info) => (
@@ -44,15 +40,13 @@ export function HomePage() {
               key={info.action}
               type="button"
               className={styles.card}
+              aria-label={`Open ${info.label}`}
               onClick={() => dispatch({ type: "navigate", page: info.action })}
             >
               <span className={styles.cardIcon} aria-hidden="true">
                 <Icon name={info.icon} size={22} />
               </span>
-              <span className={styles.cardText}>
-                <span className={styles.cardLabel}>{info.label}</span>
-                <span className={styles.cardSummary}>{info.summary}</span>
-              </span>
+              <span className={styles.cardLabel}>{info.label}</span>
             </button>
           ))}
         </div>

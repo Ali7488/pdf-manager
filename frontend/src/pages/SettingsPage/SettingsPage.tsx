@@ -34,9 +34,7 @@ export function SettingsPage() {
               <Icon name="alert" className={styles.unsavedIcon} />
               Not saved: your changes apply until you close PDF Manager.
             </span>
-          ) : (
-            "Changes are saved straight away."
-          )
+          ) : undefined
         }
       />
 

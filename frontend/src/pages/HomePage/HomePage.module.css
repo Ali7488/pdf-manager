@@ -19,9 +19,6 @@
   font-weight: var(--font-weight-regular);
 }
 
-.dropHint {
-  color: var(--color-text-muted);
-}
 
 .dropButtons {
   display: flex;
@@ -84,17 +81,8 @@
   color: var(--color-link);
 }
 
-.cardText {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
 
 .cardLabel {
   font-weight: var(--font-weight-medium);
 }
 
-.cardSummary {
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
-}

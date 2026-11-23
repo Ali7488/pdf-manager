@@ -117,11 +117,6 @@
   font-weight: var(--font-weight-medium);
 }
 
-.themeHint {
-  padding: 0 var(--space-1);
-  color: var(--color-text-muted);
-  font-size: var(--text-xs);
-}
 
 .previewRow {
   display: flex;

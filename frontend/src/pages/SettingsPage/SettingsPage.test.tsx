@@ -141,7 +141,7 @@ describe("SettingsPage", () => {
 
     it("says the change isn't saved, keeps it, and clears the warning after a save that works", async () => {
       const { user, mock } = await renderApp({ state: { page: "settings" }, mock: { settingsSaveFails: true } });
-      expect(screen.getByText("Changes are saved straight away.")).toBeInTheDocument();
+      expect(screen.queryByText(NOT_SAVED)).not.toBeInTheDocument();
 
       await user.click(screen.getByRole("radio", { name: /^Burgundy/ }));
       const alert = (await screen.findByText("Your settings couldn't be saved")).closest("[role=alert]");
@@ -158,7 +158,7 @@ describe("SettingsPage", () => {
 
       mock.setSettingsSaveFails(false);
       await user.click(screen.getByRole("radio", { name: /^Green/ }));
-      expect(await screen.findByText("Changes are saved straight away.")).toBeInTheDocument();
+      await waitFor(() => expect(screen.queryByText(NOT_SAVED)).not.toBeInTheDocument());
       expect(screen.queryByText(NOT_SAVED)).not.toBeInTheDocument();
       expect(screen.queryByText("Your settings couldn't be saved")).not.toBeInTheDocument();
       expect(document.documentElement.dataset.theme).toBe("green");
@@ -175,7 +175,7 @@ describe("SettingsPage", () => {
       mock.setSettingsSaveFails(false);
       const saveSettings = vi.spyOn(mock, "saveSettings");
       await user.click(screen.getByRole("button", { name: "Try saving again" }));
-      expect(await screen.findByText("Changes are saved straight away.")).toBeInTheDocument();
+      await waitFor(() => expect(screen.queryByText(NOT_SAVED)).not.toBeInTheDocument());
       expect(saveSettings).toHaveBeenCalledWith({});
       expect((await mock.getSettings()).dpi).toBe(300);
     });

@@ -7,7 +7,7 @@ describe("HomePage", () => {
   it("shows the drop zone and adds every kind of file with one button", async () => {
     const { user, mock } = await renderApp();
     const pickFiles = vi.spyOn(mock, "pickFiles");
-    expect(screen.getByText("Drop PDFs, PowerPoints or images here")).toBeInTheDocument();
+    expect(screen.getByText("Drop files here, or click Add files")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Add images" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Add files" }));
@@ -26,7 +26,7 @@ describe("HomePage", () => {
 
   it("opens a mode tab from its button", async () => {
     const { user } = await renderApp();
-    await user.click(screen.getByRole("button", { name: /Split\s*Break a file/ }));
+    await user.click(screen.getByRole("button", { name: "Open Split" }));
     expect(screen.getByRole("heading", { level: 1, name: "Split" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Split" })).toHaveAttribute("aria-current", "page");
   });

@@ -69,7 +69,6 @@ export function DropOverlay() {
       <div className={styles.card}>
         <Icon name="upload" size={40} />
         <p className={styles.title}>Drop to add your files</p>
-        <p className={styles.hint}>PDFs, PowerPoints and images (PNG or JPG)</p>
       </div>
     </div>
   );

@@ -4,12 +4,12 @@
 import type { Theme } from "../../api/types";
 import styles from "./SettingsPage.module.css";
 
-const THEMES: readonly { value: Theme; label: string; hint: string }[] = [
-  { value: "system", label: "System", hint: "Follows Windows light or dark" },
-  { value: "light", label: "Light", hint: "Gold on white" },
-  { value: "dark", label: "Dark", hint: "Gold on charcoal" },
-  { value: "burgundy", label: "Burgundy", hint: "Burgundy and pink" },
-  { value: "green", label: "Green", hint: "Forest green, cream and coral" },
+const THEMES: readonly { value: Theme; label: string }[] = [
+  { value: "system", label: "System" },
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
+  { value: "burgundy", label: "Burgundy" },
+  { value: "green", label: "Green" },
 ];
 
 /** Props for {@link ThemePicker}. */
@@ -47,7 +47,6 @@ export function ThemePicker({ value, onChange }: ThemePickerProps) {
               )}
             </span>
             <span className={styles.themeLabel}>{theme.label}</span>
-            <span className={styles.themeHint}>{theme.hint}</span>
           </label>
         ))}
       </div>

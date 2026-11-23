@@ -70,35 +70,32 @@ export function ActionOptions({ action, settings, onChange, usedFiles }: ActionO
 }
 
 const IMAGE_OPTIONS: readonly RadioOption<"combine" | "separate">[] = [
-  { value: "combine", label: "One PDF with all images", hint: "One picture per page, in the order of the list." },
-  { value: "separate", label: "One PDF per image", hint: "A separate PDF for each picture." },
+  { value: "combine", label: "One PDF with all images" },
+  { value: "separate", label: "One PDF per image" },
 ];
 
 const COMPRESS_OPTIONS: readonly RadioOption<CompressLevel>[] = [
   {
     value: "light",
     label: "Light",
-    hint: "Looks the same",
     tip: "Keeps the quality almost the same. The file gets a little smaller.",
   },
   {
     value: "balanced",
     label: "Balanced",
-    hint: "Recommended",
     tip: "Noticeably smaller, and pictures still look sharp. A good choice for most files.",
   },
   {
     value: "strong",
     label: "Strong",
-    hint: "Smallest file",
     tip: "Makes the file as small as possible. Pictures may look blurry or blocky up close.",
   },
 ];
 
 const SPLIT_OPTIONS: readonly RadioOption<SplitMethod>[] = [
-  { value: "ranges", label: "Pages I choose", hint: "For example 1-3, 5, 8-10" },
-  { value: "every_n", label: "Every few pages", hint: "Same number of pages in each file" },
-  { value: "per_page", label: "One file per page", hint: "Every page on its own" },
+  { value: "ranges", label: "Pages I choose" },
+  { value: "every_n", label: "Every few pages" },
+  { value: "per_page", label: "One file per page" },
 ];
 
 const SPLIT_TIP =

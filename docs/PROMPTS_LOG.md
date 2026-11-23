@@ -129,4 +129,4 @@ A short, summarized record of each request made to the coding agent, and what ca
     - [x] Fix confirmed problems, with regression tests and automated checks (MuPDF source and notices, WebView2 and Windows Python licences, pywin32 overwrite, Feather licence, Inno Setup, UCRT/MFC excluded, VC++ runtime listed; `check_licenses.py`, `collect_sources.py`).
     - [x] Run the checks (Python, frontend, typecheck, lint, build, licence inventory; Windows build run 45202300026 green after three runs caught real gaps).
     - [x] `docs/LICENSING_AUDIT_2026-11-23.md`, DECISIONS (O1–O3), ENGINEERING_REVIEW, LICENSING, README, release notes.
-    - [ ] Vault audit note.
+    - [x] Vault audit note (`75 Home Lab and System/BOTH DEVICES/Audits/2026-11-23 - PDF Manager v0.5 Licensing Verification and Fixes.md`).

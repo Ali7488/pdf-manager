@@ -22,6 +22,7 @@ the exclusions and the Windows version resource.
 """
 
 import platform
+import re
 import struct
 import sys
 import tomllib
@@ -189,6 +190,8 @@ def _webview_runtime_id() -> str:
 
 
 _RID = _webview_runtime_id()
+# The same pattern as VC_RUNTIME_DLL in scripts/check_licenses.py.
+_VC_RUNTIME_DLL = re.compile(r"(vcruntime|msvcp|concrt|vccorlib|vcomp|vcamp|mfcm?)14\d\w*\.dll$")
 
 
 def _unneeded(dest: str) -> bool:
@@ -217,9 +220,16 @@ def _unneeded(dest: str) -> bool:
     # keeps Microsoft binaries the app doesn't need out of the AGPL-3.0 distribution.
     if name == "ucrtbase.dll" or (name.startswith("api-ms-win-") and name.endswith(".dll")):
         return True
-    # Microsoft's MFC runtime is only for pywin32's Pythonwin GUI (win32ui), which the
-    # app never imports; PowerPoint automation uses win32com and pythoncom.
-    if name == "mfc140u.dll":
+    # The Microsoft Visual C++ runtime (vcruntime140*.dll, msvcp140*.dll, MFC and the
+    # rest of the v14 Redistributable's DLLs) isn't bundled, wherever PyInstaller finds
+    # it (decision P32). The app uses the separately installed Microsoft Visual C++
+    # Redistributable (x64), which the installer checks for: that is Microsoft's
+    # recommended central deployment, keeps Microsoft's runtime serviced by Windows
+    # Update, and keeps it outside the AGPL-3.0 distribution, where the GNU FAQ treats it
+    # as a System Library only while it isn't shipped with the program. MFC is needed only
+    # by pywin32's Pythonwin GUI (win32ui), which the app never imports.
+    # scripts/check_licenses.py fails the build if any of them is bundled again.
+    if _VC_RUNTIME_DLL.match(name):
         return True
     return False
 

@@ -10,7 +10,7 @@ Current as of **2026-11-23**:
 - **Automated checks (CI):** `.github/workflows/ci.yml` runs on every push: Python on Linux (with Tesseract and LibreOffice) and on Windows, the frontend checks, and a Linux start-up check. The licence inventory check (`tests/test_licensing.py`) is part of the Python suite. Latest local run: Python 483 passed, 5 skipped; frontend 95 passed.
 - **Windows build (CI, manual trigger):** `build-windows.yml` builds the installer, checks the bundle against the licence notices, installs it silently, checks the installed licence files, and starts the installed app in smoke-test mode. Last green run: [45202300026](https://github.com/Ali7488/pdf-manager/actions/runs/45202300026) (commit `fcd8531`). That's a GitHub virtual machine, **not a real Windows 11 PC**.
 - **Not verified on a real Windows 11 machine (R10):** PowerPoint automation (COM), native dialogs, drag and drop, the wizard's optional installs, upgrade and uninstall.
-- **Licensing:** the strategy (P31) is coherent. Open questions O1–O3 in `docs/DECISIONS.md` need the owner.
+- **Licensing:** the strategy (P31) is coherent. Open questions O1–O3 in `docs/DECISIONS.md` need the owner. Branch `fix/windows-vc-runtime` (P32, pending review) stops bundling the Visual C++ runtime. The installer checks for Microsoft's separately installed redistributable instead. The missing-runtime path has only been simulated on the runner; it still needs a test on a clean Windows PC.
 
 Historical counts from earlier snapshots (163 and 317 tests, the pre-CI state) are kept in the fix log below for the record only.
 

@@ -544,28 +544,8 @@ def mupdf_components(mupdf_version: str) -> tuple[list[Component], dict]:
     return out, source
 
 
-MSVC_RUNTIME_NOTE = """Microsoft Visual C++ runtime files in PDF Manager for Windows
-
-Files: vcruntime140.dll, vcruntime140_1.dll and msvcp140*.dll in the _internal folder.
-Copyright (c) Microsoft Corporation. All rights reserved.
-
-These are Microsoft's Visual C++ runtime libraries. The Python runtime and PyMuPDF
-were built with Microsoft Visual C++ and need them. They are not open source and are
-not covered by PDF Manager's licences. Microsoft lets them be redistributed with a
-program, unmodified, under the "Distributable Code" terms of the Visual Studio licence;
-the list of such files is at
-https://learn.microsoft.com/visualstudio/releases/2022/redistribution
-("Visual C++ Runtime Files"). The python.org Windows build's own conditions for them
-are in python-runtime-windows-*/LICENSE.txt, under "Additional Conditions for this
-Windows binary build".
-
-The same files are installed system-wide by Microsoft's Visual C++ Redistributable:
-https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist
-"""
-
-
 def other_components() -> list[Component]:
-    """The PyInstaller bootloader, the Microsoft C++ runtime and the icon credit."""
+    """The PyInstaller bootloader, Inno Setup and the icon credit."""
     out = []
     # PyInstaller's bootloader is linked into the app's executable.
     target = LICENSES / "other" / f"pyinstaller-{PYINSTALLER_VERSION}"
@@ -586,23 +566,6 @@ def other_components() -> list[Component]:
             {"windows", "linux"},
             "Starts the app; the exception allows any licence for the app",
             [f"other/{target.name}/{f}" for f in files],
-            "other",
-        )
-    )
-    # The Microsoft C++ runtime DLLs the Windows app carries (Python and PyMuPDF are
-    # built with Visual C++). Microsoft publishes no licence file to copy, so this is
-    # a plain statement of what they are and whose terms apply.
-    target = LICENSES / "other" / "microsoft-vc-runtime"
-    target.mkdir(parents=True, exist_ok=True)
-    (target / "README.txt").write_text(MSVC_RUNTIME_NOTE, encoding="utf-8")
-    out.append(
-        Component(
-            "Microsoft Visual C++ runtime (vcruntime140.dll, vcruntime140_1.dll, msvcp140*.dll)",
-            "14.x",
-            'Microsoft Visual Studio "Distributable Code" terms (proprietary; see note)',
-            {"windows"},
-            "Needed by the Python runtime and PyMuPDF",
-            ["other/microsoft-vc-runtime/README.txt"],
             "other",
         )
     )
@@ -804,12 +767,10 @@ byte-for-byte as they are in Microsoft's `Microsoft.Web.WebView2` NuGet package
 code for them. Whether the AGPL-3.0 requires it is an open question; see
 [LICENSING.md](LICENSING.md).
 
-**Note on the Microsoft Visual C++ runtime:** the Windows app carries Microsoft's C++
-runtime DLLs, which the Python runtime and PyMuPDF need. They are proprietary Microsoft
-files, redistributed under Visual Studio's "Distributable Code" terms
-(`licenses/other/microsoft-vc-runtime/README.txt`). How they fit the AGPL-3.0's "System
-Libraries" rule is an open question; see [LICENSING.md](LICENSING.md). The Universal C
-Runtime is part of Windows 10 and 11 and is not shipped.
+**Note on the Microsoft C and C++ runtimes:** the Windows app doesn't ship them. The
+Python runtime, PyMuPDF and pywin32 need Microsoft's Visual C++ runtime, which comes from
+the separately installed Microsoft Visual C++ Redistributable (see below); the installer
+checks for it. The Universal C Runtime is part of Windows 10 and 11.
 
 ## Not included (installed separately, by the user or the installer wizard)
 
@@ -819,7 +780,11 @@ Runtime is part of Windows 10 and 11 and is not shipped.
 | LibreOffice | MPL-2.0 | Optional; installed separately. |
 | Microsoft PowerPoint | Proprietary | Optional; used only if already installed. |
 | Microsoft Edge WebView2 Runtime | Microsoft software licence | Part of Windows 11; not shipped. |
+| Microsoft Visual C++ Redistributable (x64) | Microsoft software licence | Required; see note. |
 | Segoe UI font | Proprietary | Used only if Windows provides it; never bundled. |
+
+The Microsoft Visual C++ Redistributable (x64, version 14.44 or newer) is installed from
+Microsoft (the installer offers the download); it is never shipped with the app.
 
 The app runs the separately installed Tesseract program for OCR. MuPDF also compiles a
 copy of the Tesseract library into PyMuPDF (listed above), which PDF Manager doesn't use.

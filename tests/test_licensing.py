@@ -13,6 +13,7 @@ import hashlib
 import importlib.util
 import json
 import shutil
+import struct
 import sys
 from pathlib import Path
 
@@ -38,6 +39,43 @@ def _failures(run) -> list[str]:
     report = check.Report()
     run(report)
     return report.failures
+
+
+def _pe(imports=(), delay=(), linker=(14, 44)) -> bytes:
+    """A minimal 64-bit PE image that imports ``imports`` (and delay-loads ``delay``).
+
+    Enough structure for ``check_licenses.pe_imports``: DOS and PE headers, a PE32+
+    optional header with the linker version and data directories, one section holding
+    the import and delay-load descriptor tables and the DLL names.
+    """
+    section_rva, section_raw = 0x1000, 0x200
+    tables = len(imports) * 20 + 20
+    delay_at = tables
+    names_at = delay_at + len(delay) * 32 + 32
+    body = bytearray(names_at)
+    names = b""
+    for i, name in enumerate(list(imports) + list(delay)):
+        rva = section_rva + names_at + len(names)
+        names += name.encode() + b"\0"
+        if i < len(imports):
+            struct.pack_into("<I", body, i * 20 + 12, rva)
+        else:
+            struct.pack_into("<I", body, delay_at + (i - len(imports)) * 32 + 4, rva)
+    body += names
+    optional = bytearray(240)
+    struct.pack_into("<HBB", optional, 0, 0x20B, *linker)
+    struct.pack_into("<II", optional, 112 + 8 * 1, section_rva, tables)
+    if delay:
+        struct.pack_into("<II", optional, 112 + 8 * 13, section_rva + delay_at, len(delay) * 32)
+    header = bytearray(0x40)
+    header[:2] = b"MZ"
+    struct.pack_into("<I", header, 0x3C, 0x40)
+    coff = b"PE\0\0" + struct.pack("<HHIIIHH", 0x8664, 1, 0, 0, 0, len(optional), 0x22)
+    section = b".idata\0\0" + struct.pack(
+        "<IIII12xI", len(body), section_rva, len(body), section_raw, 0xC0000040
+    )
+    image = bytes(header) + coff + bytes(optional) + section
+    return image.ljust(section_raw, b"\0") + bytes(body)
 
 
 @pytest.mark.skipif(shutil.which("uv") is None, reason="needs uv to read uv.lock")
@@ -82,8 +120,8 @@ def test_frontend_inventory_reads_only_runtime_packages():
         ("PDF Manager.exe", "PyInstaller bootloader"),
         ("unins000.exe", "INNO SETUP"),
         ("_internal/python313.dll", "PYTHON RUNTIME"),
-        ("_internal/vcruntime140_1.dll", "MSVC RUNTIME"),
-        ("_internal/MSVCP140.dll", "MSVC RUNTIME"),
+        ("_internal/vcruntime140_1.dll", None),
+        ("_internal/MSVCP140.dll", None),
         ("_internal/mupdfcpp64.dll", "pymupdf"),
         ("_internal/libcrypto-3.dll", "PYTHON RUNTIME"),
         ("_internal/_ssl.pyd", "PYTHON RUNTIME"),
@@ -128,8 +166,6 @@ def test_complete_fake_app_passes_the_bundle_check(tmp_path):
     internal = app / "_internal"
     for relative in [
         "unins000.exe",
-        "_internal/vcruntime140.dll",
-        "_internal/MSVCP140.dll",
         "_internal/mupdfcpp64.dll",
         "_internal/libcrypto-3.dll",
         "_internal/pythonnet/runtime/Python.Runtime.dll",
@@ -163,12 +199,141 @@ def test_changed_webview2_file_fails(tmp_path):
     )
 
 
-@pytest.mark.parametrize("name", ["ucrtbase.dll", "api-ms-win-crt-heap-l1-1-0.dll", "mfc140u.dll"])
-def test_microsoft_files_windows_provides_must_not_be_bundled(tmp_path, name):
+@pytest.mark.parametrize(
+    "relative",
+    [
+        "_internal/ucrtbase.dll",
+        "_internal/api-ms-win-crt-heap-l1-1-0.dll",
+        "_internal/mfc140u.dll",
+        "_internal/VCRUNTIME140.dll",
+        "_internal/VCRUNTIME140_1.dll",
+        "_internal/MSVCP140.dll",
+        "_internal/msvcp140_2.dll",
+        "_internal/concrt140.dll",
+        "_internal/vcomp140.dll",
+        # Anywhere in the app, not just next to python313.dll.
+        "_internal/pymupdf/msvcp140.dll",
+        "_internal/pythonwin/mfc140u.dll",
+        "vcruntime140.dll",
+    ],
+)
+def test_microsoft_runtime_files_must_not_be_bundled(tmp_path, relative):
     app = _fake_app(tmp_path)
-    (app / "_internal" / name).write_bytes(b"MZ")
+    (app / relative).parent.mkdir(parents=True, exist_ok=True)
+    (app / relative).write_bytes(b"MZ")
     failures = _failures(lambda r: check.check_bundle(r, app, installed=False))
-    assert any(f"_internal/{name} shouldn't be bundled" in f for f in failures)
+    assert any(f.startswith(f"{relative} shouldn't be bundled") for f in failures)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "vcruntime140.dll",
+        "VCRUNTIME140_1.dll",
+        "msvcp140.dll",
+        "msvcp140_atomic_wait.dll",
+        "mfc140u.dll",
+        "mfcm140u.dll",
+        "vccorlib140.dll",
+        "vcamp140.dll",
+    ],
+)
+def test_visual_cpp_runtime_names_are_recognised(name):
+    assert check.VC_RUNTIME_DLL.match(name)
+
+
+@pytest.mark.parametrize(
+    "name", ["python313.dll", "mupdfcpp64.dll", "msvcrt.dll", "libcrypto-3.dll", "vcruntime.txt"]
+)
+def test_other_dlls_are_not_taken_for_the_visual_cpp_runtime(name):
+    assert not check.VC_RUNTIME_DLL.match(name)
+
+
+def test_the_spec_excludes_the_same_runtime_files_the_check_rejects():
+    spec = (ROOT / "packaging" / "pdf-manager.spec").read_text(encoding="utf-8")
+    assert check.VC_RUNTIME_DLL.pattern in spec
+    assert "_VC_RUNTIME_DLL.match(name)" in spec
+
+
+def test_pe_imports_reads_normal_and_delay_loaded_imports(tmp_path):
+    path = tmp_path / "module.pyd"
+    path.write_bytes(_pe(["KERNEL32.dll", "VCRUNTIME140.dll"], ["ole32.dll"], (14, 50)))
+    assert check.pe_imports(path) == (["kernel32.dll", "vcruntime140.dll", "ole32.dll"], (14, 50))
+
+
+@pytest.mark.parametrize("data", [b"", b"MZ", b"MZ" + b"\0" * 100, b"not a binary"])
+def test_pe_imports_ignores_files_that_are_not_pe_images(tmp_path, data):
+    path = tmp_path / "broken.dll"
+    path.write_bytes(data)
+    assert check.pe_imports(path) is None
+
+
+def test_installer_checks_for_the_visual_cpp_redistributable():
+    files, minimum = check.installer_vc_runtime()
+    assert {"vcruntime140.dll", "vcruntime140_1.dll", "msvcp140.dll"} <= files
+    assert minimum >= (14, 44)
+
+
+def test_runtime_dll_the_installer_doesnt_check_for_fails(tmp_path, monkeypatch):
+    app = _fake_app(tmp_path)
+    (app / "_internal" / "pymupdf" / "_mupdf.pyd").write_bytes(
+        _pe(["mupdfcpp64.dll", "MSVCP140.dll", "VCRUNTIME140.dll", "VCOMP140.dll"])
+    )
+    failures = _failures(lambda r: check.check_bundle(r, app, installed=False))
+    assert any(
+        "_internal/pymupdf/_mupdf.pyd needs vcomp140.dll" in f and "VCRuntimeFiles" in f
+        for f in failures
+    )
+    assert not any("needs msvcp140.dll" in f or "needs vcruntime140.dll" in f for f in failures)
+    monkeypatch.setattr(check, "installer_vc_runtime", lambda: None)
+    failures = _failures(lambda r: check.check_bundle(r, app, installed=False))
+    assert any("doesn't check for the Microsoft Visual C++ Redistributable" in f for f in failures)
+
+
+def test_binary_built_by_a_newer_toolset_than_the_installer_requires_fails(tmp_path):
+    app = _fake_app(tmp_path)
+    _, (major, minor) = check.installer_vc_runtime()
+    internal = app / "_internal"
+    (internal / "python313.dll").write_bytes(_pe(["VCRUNTIME140.dll"], linker=(major, minor)))
+    assert not [
+        f
+        for f in _failures(lambda r: check.check_bundle(r, app, installed=False))
+        if "linked by MSVC" in f
+    ]
+    (internal / "python313.dll").write_bytes(_pe(["VCRUNTIME140.dll"], linker=(major, minor + 1)))
+    failures = _failures(lambda r: check.check_bundle(r, app, installed=False))
+    assert any(
+        f"_internal/python313.dll was linked by MSVC {major}.{minor + 1}" in f for f in failures
+    )
+    # A newer linker doesn't matter for files that don't use the Visual C++ runtime.
+    (internal / "python313.dll").write_bytes(_pe(["KERNEL32.dll"], linker=(major, minor + 5)))
+    assert not [
+        f
+        for f in _failures(lambda r: check.check_bundle(r, app, installed=False))
+        if "linked by MSVC" in f
+    ]
+
+
+def test_installer_without_a_runtime_check_fails_the_repo_check(monkeypatch):
+    if shutil.which("uv") is None:
+        pytest.skip("needs uv")
+    monkeypatch.setattr(check, "installer_vc_runtime", lambda: None)
+    assert any(
+        "doesn't check for the Microsoft Visual C++ Redistributable" in f
+        for f in _failures(check.check_repo)
+    )
+
+
+def test_installer_never_offers_to_start_the_app_without_the_runtime():
+    iss = (ROOT / "packaging" / "installer.iss").read_text(encoding="utf-8")
+    run = [line for line in iss.splitlines() if line.startswith("Filename:")]
+    assert run and all("Check: CanStartApp" in line for line in run)
+    body = iss.split("function CanStartApp", 1)[1].split("end;", 1)[0]
+    assert "IsVCRuntimeInstalled" in body and "IsWebView2Installed" in body
+    # Offered before installing and again after, and never downloaded or run silently.
+    assert iss.count("OfferVCRuntimeDownload('VCRuntime") == 2
+    assert "https://aka.ms/vc14/vc_redist.x64.exe" in iss
+    assert "vc_redist.x64.exe /" not in iss and "DownloadTemporaryFile" not in iss
 
 
 def test_qt_in_windows_bundle_fails(tmp_path):
@@ -224,6 +389,12 @@ def test_notices_cover_mupdf_webview2_and_the_windows_runtime():
     names = " ".join(c["name"] for c in manifest["components"])
     for expected in ("MuPDF", "Tesseract", "FreeType", "WebView2", "python.org Windows"):
         assert expected in names
+    # The Visual C++ runtime isn't bundled, so it isn't listed as a bundled component,
+    # and the notices say it is a separately installed prerequisite.
+    assert "Visual C++" not in names
+    assert not (ROOT / "licenses" / "other" / "microsoft-vc-runtime").exists()
+    notices = (ROOT / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8")
+    assert "Microsoft Visual C++ Redistributable (x64)" in notices.split("## Not included")[1]
     webview2 = next(c for c in manifest["components"] if "WebView2" in c["name"])
     assert any(f.endswith("NOTICE.txt") for f in webview2["files"])
 

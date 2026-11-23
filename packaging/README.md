@@ -65,6 +65,16 @@ The run also checks licensing. `scripts/check_licenses.py` fails the build if an
 
 Setup also checks for the **Microsoft Edge WebView2 Runtime**, which the app window needs. It ships with Windows 11. If it's missing, setup says so and offers Microsoft's download (`https://go.microsoft.com/fwlink/p/?LinkId=2124703`); the **Launch** box is hidden until it's installed.
 
+### Microsoft Visual C++ Redistributable (prerequisite, not bundled)
+
+The app doesn't ship Microsoft's Visual C++ runtime DLLs (decision P32). The Python runtime, PyMuPDF, pywin32 and cffi need `vcruntime140.dll`, `vcruntime140_1.dll` and `msvcp140.dll` (and pywin32's unused `win32ui` needs `mfc140u.dll`), so the app uses the system-wide **Microsoft Visual C++ Redistributable (x64), version 14.44 or newer**: Microsoft's recommended central deployment, serviced by Windows Update.
+
+- **Detection.** Setup looks for those four DLLs in the 64-bit `System32` and reads their file versions; each must be 14.44 or newer (Microsoft requires the redistributable to be at least as new as the MSVC toolset that built the app; the newest toolset in the bundle is 14.44). The redistributable's registry entry (`HKLM\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64`, 32-bit view) is written to the setup log, but the files decide, because they are what Windows loads.
+- **When it's missing or too old.** Setup explains, says installing it needs administrator permission, and offers to open Microsoft's permalink `https://aka.ms/vc14/vc_redist.x64.exe` in the browser; the welcome page mentions it too. Setup continues either way, asks again after installing, and hides the **Launch** box until it's there. Setup never downloads or runs the redistributable itself, and nothing Microsoft's goes into the installer.
+- **If the app is started without it.** Windows can't load `python313.dll`, and PyInstaller's launcher shows "Failed to load Python DLL '…\_internal\python313.dll'" with a LoadLibrary error. Installing the redistributable fixes it.
+- **Keeping it out.** `packaging/pdf-manager.spec` excludes every Visual C++ runtime DLL wherever PyInstaller collects it. `scripts/check_licenses.py bundle` fails if one is bundled again, reads every bundled binary's imports, and fails unless `installer.iss` checks for each runtime DLL they import (`VCRuntimeFiles`) and requires at least the newest linker version among them (`VCRuntimeMinMajor`/`VCRuntimeMinMinor`). Upgrades delete the old `_internal` folder first, so the DLLs an earlier build shipped don't survive an upgrade.
+- **Testing.** GitHub's Windows runner already has the redistributable, so the workflow's smoke test only shows the app works with the system-wide copy. It also simulates a missing runtime with `/VCRUNTIMEDIR=<folder>` (a testing-only setup parameter that replaces `System32` in the detection) and checks that setup reports it. Neither is a clean PC: test the missing-runtime path in Windows Sandbox or on a Windows 11 PC without the redistributable (see below).
+
 Upgrading: run a newer installer over the old one. It closes a running PDF Manager, replaces the program files and keeps settings and logs.
 
 ### "Windows protected your PC" (SmartScreen)
@@ -87,6 +97,8 @@ The installer isn't code-signed in v1 (decision F17), so Windows SmartScreen may
 ## Testing an installed build
 
 1. Install on a Windows 11 PC as a standard (non-admin) user. Confirm there's no UAC prompt for the app itself.
+   - **Without the Visual C++ Redistributable** (Windows Sandbox starts without it; check *Installed apps* for "Microsoft Visual C++ v14 Redistributable (x64)" or "2015-2022 Redistributable (x64)"): setup must explain that it's missing, offer the download, and hide **Launch**; starting the app must show "Failed to load Python DLL". Then install `vc_redist.x64.exe` (administrator prompt), and the app must start.
+   - **With it installed:** no message about it, and **Launch** is shown.
 2. Open PDF Manager from the Start menu and the desktop shortcut. The window should open with no console window behind it.
 3. Run each mode once (with and without OCR, with a PowerPoint file), then check `logs\` next to the app.
 4. Use the "Open logs folder" button and confirm it opens the folder above.

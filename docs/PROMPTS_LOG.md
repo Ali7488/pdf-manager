@@ -130,3 +130,17 @@ A short, summarized record of each request made to the coding agent, and what ca
     - [x] Run the checks (Python, frontend, typecheck, lint, build, licence inventory; Windows build run 45202300026 green after three runs caught real gaps).
     - [x] `docs/LICENSING_AUDIT_2026-11-23.md`, DECISIONS (O1–O3), ENGINEERING_REVIEW, LICENSING, README, release notes.
     - [x] Vault audit note (`75 Home Lab and System/BOTH DEVICES/Audits/2026-11-23 - PDF Manager v0.5 Licensing Verification and Fixes.md`).
+40. **Remove the bundled Visual C++ runtime (branch `fix/windows-vc-runtime`).** Inspect the real PyInstaller output and separate the Microsoft Visual C++ runtime DLLs from CPython, Windows and application DLLs; check Microsoft's redistributable deployment guidance and the GPL/AGPL System Libraries exception; stop bundling the runtime and require the separately installed Microsoft Visual C++ Redistributable (x64), with reliable detection and clear messages when it is missing; update the build exclusions, licence inventory, bundle checks, installer documentation and tests; run the Windows build, licence checks, install smoke test and CI, separating runner results from clean-machine testing; open a pull request. Keep WebView2, PyMuPDF and the licensing strategy; don't weaken checks; don't edit the dependency licensing research documents handled separately; don't merge or publish. Log the result in the vault's Audits folder. Checklist:
+    - [x] Inspect the built app's DLLs and their imports (`VCRUNTIME140`, `VCRUNTIME140_1`, `MSVCP140` removed; newest MSVC linker 14.44).
+    - [x] Exclude the runtime; installer prerequisite check; bundle check fails if it reappears (decision P32).
+    - [x] Inventory, notices, docs and tests.
+    - [x] Windows build, checks and smoke tests (run 45225451223; missing runtime simulated only); CI (45221559952).
+    - [x] Draft pull request #1; vault audit note (`75 Home Lab and System/BOTH DEVICES/Audits/2026-11-23 - PDF Manager Visual C++ Runtime Prerequisite.md`).
+    - [x] Owner asked to finish and merge PR #1 (item 41).
+    - [ ] Clean-machine test without the redistributable (carried over to the Windows 11 acceptance test, R10).
+41. **Browser-window app (branch `migrate/browser-app`).** Answers given: the original code can stay MIT, but the distributed app must be AGPL-3.0 while it includes PyMuPDF (or needs Artifex's commercial licence). Brave gets app mode like Edge and Chrome. Firefox has no app mode, so it gets a normal window or tab. Drag and drop works in a browser, but as file uploads, because browsers never reveal file paths. Requests: finish PR #1. Convert the app from a pywebview window to a local web app on 127.0.0.1, opened as a separate app-mode window (no tabs) in Edge or another Chromium-based browser (Chrome, Brave, Chromium). Otherwise open a normal tab in the default browser, and say so explicitly in the documentation. Do it on a separate migration branch for the owner to test and review before it is merged into main. Checklist:
+    - [ ] Merge PR #1.
+    - [ ] Local server, browser launcher, native dialogs, upload for drag and drop; pywebview, Qt and WebView2 removed.
+    - [ ] Frontend transport; tests; packaging, licence inventory and checks; docs and decisions.
+    - [ ] CI and Windows build; draft pull request for review.
+

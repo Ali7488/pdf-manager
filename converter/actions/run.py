@@ -67,7 +67,7 @@ def run_action(
         settings: How to do it; each action reads only the fields it needs.
         data: The input files, in the user's order.
         scratch: Empty working folder; outputs are left in it.
-        progress: Receives :class:`~converter.common.ProgressEvent` updates.
+        progress: Receives :class:`~converter.core.types.ProgressEvent` updates.
         cancel: Lets the caller stop the job.
 
     Returns:

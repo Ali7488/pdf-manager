@@ -38,8 +38,8 @@ A short, summarized record of each request made to the coding agent, and what ca
     - [x] Get answers to the open questions (O1 to O8); recorded as F26 to F33.
     - [x] Final confirmation of the plan before starting work.
 15. **Start as planned.** Write the API contract first, then build the frontend with a parallel agent in its own worktree while the converter work continues. Checklist:
-    - [ ] API contract (`docs/API.md` and `frontend/src/api/types.ts`).
-    - [ ] Launch the frontend agent.
+    - [x] API contract (`docs/API.md` and `frontend/src/api/types.ts`).
+    - [x] Launch the frontend agent.
     - [ ] Converter fixes and new modes (checklist in item 12 plus Split, Images to PDF and Compress).
     - [ ] pywebview shell connecting the UI to the converter.
     - [ ] Packaging: PyInstaller and the Inno Setup install wizard.

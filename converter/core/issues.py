@@ -25,6 +25,7 @@ class IssueCode(StrEnum):
     OCR_TIMEOUT = "OCR_TIMEOUT"
     OCR_INSTALL_FAILED = "OCR_INSTALL_FAILED"
     POWERPOINT_FALLBACK = "POWERPOINT_FALLBACK"
+    UNTRUSTED_PRESENTATION = "UNTRUSTED_PRESENTATION"
     POWERPOINT_CONVERSION_FAILED = "POWERPOINT_CONVERSION_FAILED"
     SLIDE_RENDERER_MISSING = "SLIDE_RENDERER_MISSING"
     PASSWORD_PROTECTED = "PASSWORD_PROTECTED"
@@ -183,6 +184,44 @@ def powerpoint_fallback(file: str, details: str | None) -> Issue:
     )
 
 
+def untrusted_presentation(file: str) -> Issue:
+    """A downloaded presentation was rendered with LibreOffice instead of PowerPoint (C14)."""
+    return Issue(
+        IssueCode.UNTRUSTED_PRESENTATION,
+        Severity.WARNING,
+        "Downloaded slides were converted with LibreOffice",
+        f"{file} came from the internet or an email, so PDF Manager didn't open it with "
+        "PowerPoint, to keep your computer safe. LibreOffice converted it instead; the slides "
+        "may look slightly different.",
+        (
+            "If the slides look wrong and you trust where the file came from, open it in "
+            "PowerPoint, check it, and save it as a PDF yourself.",
+            "Or, if you trust the file: right-click it, choose Properties, tick Unblock, "
+            "then convert it again.",
+        ),
+        None,
+        file,
+    )
+
+
+def untrusted_needs_libreoffice(file: str) -> Issue:
+    """A downloaded presentation must be rendered with LibreOffice, which isn't installed."""
+    return Issue(
+        IssueCode.SLIDE_RENDERER_MISSING,
+        Severity.ERROR,
+        "LibreOffice is needed for downloaded slides",
+        f"{file} came from the internet or an email. To keep your computer safe, PDF Manager "
+        "converts such files with LibreOffice, which isn't installed.",
+        (
+            "Install the free LibreOffice from libreoffice.org, then try again.",
+            "Or, if you trust the file: right-click it, choose Properties, tick Unblock, "
+            "then convert it again.",
+        ),
+        None,
+        file,
+    )
+
+
 def powerpoint_failed(file: str, details: str | None) -> Issue:
     """Neither PowerPoint nor LibreOffice could render the slides."""
     return Issue(
@@ -315,10 +354,11 @@ def save_failed(details: str | None) -> Issue:
         IssueCode.SAVE_FAILED,
         Severity.ERROR,
         "Couldn't save the results",
-        "The finished files couldn't be written to the chosen folder. They are still kept, "
-        "so you can try again.",
+        "The finished files couldn't be written to the chosen folder. Nothing in that "
+        "folder was overwritten.",
         (
-            "Choose a different folder, such as Documents or Desktop.",
+            "If the Save button is still there, try again with a different folder, such as "
+            "Documents or Desktop. Otherwise, convert the files again.",
             "Check the drive isn't full and the folder isn't read-only.",
             "Close the file if it's open in another program.",
         ),

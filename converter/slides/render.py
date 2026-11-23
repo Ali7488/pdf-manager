@@ -11,12 +11,20 @@ If PowerPoint fails and LibreOffice succeeds, the job continues with a
 ``POWERPOINT_FALLBACK`` warning that carries PowerPoint's real error. If both
 fail, the job stops with ``POWERPOINT_CONVERSION_FAILED`` and both errors.
 
-Why the input is copied first: files downloaded from the internet or email
-carry a Windows "Mark of the Web" tag (a hidden ``Zone.Identifier`` stream).
-PowerPoint opens such files in Protected View, which hidden automation can't
-use, so the export fails and every such file fell back to LibreOffice. A plain
-byte-for-byte copy into the scratch folder doesn't carry the tag. The copy also
-guarantees the original is never touched by either renderer.
+**Untrusted files (decision C14, audit R1).** Files downloaded from the
+internet or received by email carry Windows' Mark-of-the-Web. That provenance
+is **kept** on the scratch copy (never stripped). Such files are not opened by
+PowerPoint automation at all: LibreOffice renders them (headless, with its
+default macro security, so no macros run) and the job gets an
+``UNTRUSTED_PRESENTATION`` warning. If LibreOffice isn't installed, the job
+stops with an issue explaining why LibreOffice is needed.
+
+**Isolated outputs (audit R3).** Each renderer writes into its own folder
+(``powerpoint/`` and a fresh, empty ``libreoffice/``), so a partial file left by
+a failed PowerPoint export can never be mistaken for LibreOffice's result.
+
+The input is always copied into scratch first, so the original is never
+touched by either renderer.
 """
 
 from __future__ import annotations
@@ -34,6 +42,8 @@ from ..core.issues import (
     powerpoint_failed,
     powerpoint_fallback,
     slide_renderer_missing,
+    untrusted_needs_libreoffice,
+    untrusted_presentation,
 )
 from ..core.types import Stage
 from ..tools import find_libreoffice, run_command
@@ -50,16 +60,23 @@ class LibreOfficeError(RuntimeError):
 
 
 def copy_for_rendering(source: Path, folder: Path) -> Path:
-    """Copy ``source`` into ``folder`` as plain bytes, keeping its file name.
+    """Copy ``source`` into ``folder``, keeping its file name **and** its provenance.
 
-    ``shutil.copyfileobj`` copies only the file's contents, never Windows
-    alternate data streams such as the Mark-of-the-Web ``Zone.Identifier``.
+    The Windows Mark-of-the-Web is copied too (``platforms.copy_with_provenance``),
+    so the renderer sees the copy exactly as trusted as the original (audit R1).
     """
     folder.mkdir(parents=True, exist_ok=True)
     target = folder / source.name
-    with open(source, "rb") as src, open(target, "wb") as dst:
-        shutil.copyfileobj(src, dst, length=1024 * 1024)
+    platforms.copy_with_provenance(source, target)
     return target
+
+
+def _fresh_folder(folder: Path) -> Path:
+    """Return ``folder``, emptied first if it exists, so no leftover can pose as output."""
+    if folder.exists():
+        shutil.rmtree(folder)
+    folder.mkdir(parents=True)
+    return folder
 
 
 def libreoffice_convert(
@@ -145,12 +162,15 @@ def render_slides(source: Path, dest_dir: Path, ctx: JobContext, file_label: str
     """
     dest_dir.mkdir(parents=True, exist_ok=True)
     local = copy_for_rendering(source, dest_dir / "input")
-    output = dest_dir / f"{source.stem}.pdf"
+    untrusted = platforms.is_untrusted(source)
     powerpoint_error: str | None = None
 
     exporter = platforms.export_slides_with_powerpoint
-    if exporter is not None and platforms.powerpoint_installed():
+    if untrusted:
+        log.info("%s is marked as downloaded; not opening it with PowerPoint.", file_label)
+    elif exporter is not None and platforms.powerpoint_installed():
         ctx.report(Stage.RENDERING_SLIDES, f"Converting slides with PowerPoint: {file_label}")
+        output = _fresh_folder(dest_dir / "powerpoint") / f"{source.stem}.pdf"
         try:
             exporter(local, output, POWERPOINT_TIMEOUT_SEC, ctx.cancel)
             return output
@@ -166,8 +186,12 @@ def render_slides(source: Path, dest_dir: Path, ctx: JobContext, file_label: str
     ctx.check_cancel()
     ctx.report(Stage.RENDERING_SLIDES, f"Converting slides with LibreOffice: {file_label}")
     try:
-        result = libreoffice_convert(local, dest_dir, "pdf:impress_pdf_Export", ".pdf", ctx)
+        result = libreoffice_convert(
+            local, _fresh_folder(dest_dir / "libreoffice"), "pdf:impress_pdf_Export", ".pdf", ctx
+        )
     except ConversionError as exc:
+        if untrusted:
+            raise ConversionError(untrusted_needs_libreoffice(file_label)) from exc
         if powerpoint_error is None:
             raise  # LibreOffice missing and PowerPoint not available: renderer missing.
         details = f"PowerPoint: {powerpoint_error}\n\nLibreOffice: not installed."
@@ -178,6 +202,8 @@ def render_slides(source: Path, dest_dir: Path, ctx: JobContext, file_label: str
             details = f"PowerPoint: {powerpoint_error}\n\n{details}"
         raise ConversionError(powerpoint_failed(file_label, details)) from exc
 
-    if powerpoint_error is not None:
+    if untrusted:
+        ctx.warn(untrusted_presentation(file_label))
+    elif powerpoint_error is not None:
         ctx.warn(powerpoint_fallback(file_label, powerpoint_error))
     return result

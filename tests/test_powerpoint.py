@@ -7,8 +7,11 @@ real (skipped if not installed).
 from __future__ import annotations
 
 import shutil
+import subprocess
+import sys
 import threading
 import time
+from pathlib import Path
 
 import pymupdf
 import pytest
@@ -149,3 +152,100 @@ def test_export_error_carries_details(tmp_path, monkeypatch):
     monkeypatch.setattr(windows_powerpoint, "_export", failing)
     with pytest.raises(windows_powerpoint.PowerPointExportError, match="Presentations.Open failed"):
         windows_powerpoint.export_slides(tmp_path / "a.pptx", tmp_path / "a.pdf", 10, CancelToken())
+
+
+# --- Audit R3: a leftover from a failed PowerPoint export is never taken as output. ---
+
+
+def test_partial_powerpoint_output_is_not_accepted_when_libreoffice_fails(
+    tmp_path, pptx, monkeypatch
+):
+    def partial_then_fail(source, output, timeout, cancel):
+        output.write_bytes(b"%PDF-1.7 partial garbage")  # Non-empty leftover.
+        raise RuntimeError("PowerPoint crashed mid-export")
+
+    use_fake_powerpoint(monkeypatch, partial_then_fail)
+    # A "LibreOffice" that reports success (exit code 0) but writes nothing, which
+    # real LibreOffice does. Before the fix, the leftover partial PowerPoint PDF had
+    # the same path as LibreOffice's expected output and was accepted as the result.
+    monkeypatch.setattr("converter.slides.render.find_libreoffice", lambda: Path(sys.executable))
+    monkeypatch.setattr(
+        "converter.slides.render.run_command",
+        lambda args, **kwargs: subprocess.CompletedProcess(args, 0, "", ""),
+    )
+    with pytest.raises(ConversionError) as err:
+        render_slides(pptx, tmp_path / "w", JobContext(), "Deck.pptx")
+    assert err.value.issue.code is IssueCode.POWERPOINT_CONVERSION_FAILED
+    assert "crashed mid-export" in err.value.issue.details
+
+
+# --- Audit R1 / decision C14: downloaded presentations never go to PowerPoint. ---
+
+
+def test_untrusted_presentation_skips_powerpoint(tmp_path, pptx, monkeypatch):
+    calls = []
+    use_fake_powerpoint(monkeypatch, lambda *args: calls.append(args))
+    monkeypatch.setattr(platforms, "is_untrusted", lambda path: True)
+    if not (shutil.which("soffice") or shutil.which("libreoffice")):
+        pytest.skip("LibreOffice not installed")
+    ctx = JobContext()
+    pdf = render_slides(pptx, tmp_path / "w", ctx, "Deck.pptx")
+    assert pdf.is_file() and calls == [], "PowerPoint must not be automated"
+    [warning] = ctx.warnings
+    assert warning.code is IssueCode.UNTRUSTED_PRESENTATION
+
+
+def test_untrusted_presentation_without_libreoffice_explains_why(tmp_path, pptx, monkeypatch):
+    use_fake_powerpoint(monkeypatch, lambda *args: None)
+    monkeypatch.setattr(platforms, "is_untrusted", lambda path: True)
+    monkeypatch.setattr("converter.slides.render.find_libreoffice", lambda: None)
+    with pytest.raises(ConversionError) as err:
+        render_slides(pptx, tmp_path / "w", JobContext(), "Deck.pptx")
+    assert err.value.issue.code is IssueCode.SLIDE_RENDERER_MISSING
+    assert "internet" in err.value.issue.message
+
+
+def test_tool_check_requires_libreoffice_for_untrusted_files(tmp_path, pptx, monkeypatch):
+    from converter import Action, ActionData, ActionSettings, check_tools
+
+    monkeypatch.setattr("converter.tools.check.powerpoint_installed", lambda: True)
+    monkeypatch.setattr("converter.tools.check.find_libreoffice", lambda: None)
+    monkeypatch.setattr(platforms, "is_untrusted", lambda path: False)
+    assert check_tools(Action.FLATTEN, ActionSettings(), ActionData([pptx])).ok
+    monkeypatch.setattr(platforms, "is_untrusted", lambda path: True)
+    result = check_tools(Action.FLATTEN, ActionSettings(), ActionData([pptx]))
+    assert not result.ok and "internet" in result.issues[0].message
+
+
+# --- Audit R2: only a provably owned PowerPoint process may be stopped. ---
+
+
+@pytest.mark.parametrize(
+    "was_running,before,after,window_pid,expected",
+    [
+        (False, set(), {500}, 500, 500),  # We started the only PowerPoint: ours.
+        (True, set(), {500}, 500, None),  # Automation object already existed.
+        (False, {100}, {100, 500}, 500, None),  # The user already had PowerPoint open.
+        (False, set(), {500, 600}, 500, None),  # Two new processes: ambiguous.
+        (False, set(), {600}, 500, None),  # Window belongs to another process.
+        (False, None, {500}, 500, None),  # Process list unavailable before.
+        (False, set(), None, 500, None),  # Process list unavailable after.
+        (False, set(), {500}, None, None),  # Window process unknown.
+    ],
+)
+def test_owned_pid_requires_proof(was_running, before, after, window_pid, expected):
+    assert windows_powerpoint.owned_pid(was_running, before, after, window_pid) == expected
+
+
+def test_parse_tasklist_pids():
+    output = (
+        '"POWERPNT.EXE","4242","Console","1","250,000 K"\r\n'
+        '"POWERPNT.EXE","77","Console","1","90,000 K"\r\n'
+    )
+    assert windows_powerpoint.parse_tasklist_pids(output) == {4242, 77}
+    assert (
+        windows_powerpoint.parse_tasklist_pids(
+            "INFO: No tasks are running which match the specified criteria."
+        )
+        == set()
+    )

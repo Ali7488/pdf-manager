@@ -5,7 +5,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from ..core.issues import Issue, ocr_missing, slide_renderer_missing
+from .. import platforms
+from ..core.issues import (
+    Issue,
+    ocr_missing,
+    slide_renderer_missing,
+    untrusted_needs_libreoffice,
+)
 from ..core.types import POWERPOINT_EXTENSIONS, Action, ActionData, ActionSettings
 from .locate import find_libreoffice, find_powerpoint, find_tesseract, powerpoint_installed
 
@@ -39,6 +45,9 @@ def check_tools(action: Action, settings: ActionSettings, data: ActionData) -> T
       Microsoft PowerPoint is preferred and LibreOffice is the backup. If
       PowerPoint is present, a missing LibreOffice is reported as not present
       but doesn't block the job. If neither is present, the job can't start.
+    * **Downloaded presentations** (Windows Mark-of-the-Web) are never opened
+      with PowerPoint (decision C14), so they need LibreOffice even when
+      PowerPoint is installed.
 
     Args:
         action: The action about to run.
@@ -56,7 +65,9 @@ def check_tools(action: Action, settings: ActionSettings, data: ActionData) -> T
     if needs_ocr and tesseract is None:
         issues.append(ocr_missing())
 
-    needs_slides = any(Path(f).suffix.lower() in POWERPOINT_EXTENSIONS for f in data.files)
+    slides = [Path(f) for f in data.files if Path(f).suffix.lower() in POWERPOINT_EXTENSIONS]
+    needs_slides = bool(slides)
+    untrusted = [f for f in slides if platforms.is_untrusted(f)]
     has_powerpoint = powerpoint_installed()
     libreoffice_path = find_libreoffice()
     powerpoint = ToolStatus(needs_slides, has_powerpoint, find_powerpoint())
@@ -64,7 +75,9 @@ def check_tools(action: Action, settings: ActionSettings, data: ActionData) -> T
     # (as "not present" if missing). It only *blocks* the job when PowerPoint is
     # missing too; that decision is made by `ok` below, not by `required`.
     libreoffice = ToolStatus(needs_slides, libreoffice_path is not None, libreoffice_path)
-    if needs_slides and not has_powerpoint and libreoffice_path is None:
+    if libreoffice_path is None and untrusted:
+        issues.append(untrusted_needs_libreoffice(untrusted[0].name))
+    elif needs_slides and not has_powerpoint and libreoffice_path is None:
         issues.append(slide_renderer_missing())
 
     return ToolCheck(not issues, ocr, powerpoint, libreoffice, issues)

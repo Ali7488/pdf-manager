@@ -35,6 +35,7 @@ class IssueCode(StrEnum):
     FLATTEN_CHECK_FAILED = "FLATTEN_CHECK_FAILED"
     MERGE_FAILED = "MERGE_FAILED"
     SAVE_FAILED = "SAVE_FAILED"
+    SETTINGS_SAVE_FAILED = "SETTINGS_SAVE_FAILED"
     JOB_ALREADY_RUNNING = "JOB_ALREADY_RUNNING"
     UNEXPECTED_ERROR = "UNEXPECTED_ERROR"
 
@@ -320,6 +321,22 @@ def save_failed(details: str | None) -> Issue:
             "Choose a different folder, such as Documents or Desktop.",
             "Check the drive isn't full and the folder isn't read-only.",
             "Close the file if it's open in another program.",
+        ),
+        _clip(details),
+    )
+
+
+def settings_save_failed(details: str | None) -> Issue:
+    """Settings couldn't be written to disk; they still apply until the app closes."""
+    return Issue(
+        IssueCode.SETTINGS_SAVE_FAILED,
+        Severity.WARNING,
+        "Your settings couldn't be saved",
+        "The change works for now, but it will be lost when PDF Manager closes.",
+        (
+            "Check the drive isn't full.",
+            "Make sure your user folder (AppData) isn't read-only or blocked by security software.",
+            _LOGS_STEP,
         ),
         _clip(details),
     )

@@ -46,6 +46,7 @@ ISSUE_KEYS = {
     "troubleshooting",
     "details",
     "logFile",
+    "command",
     "file",
 }
 SETTINGS = {

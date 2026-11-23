@@ -1,5 +1,6 @@
 """Tests for api.dto: camelCase JSON <-> service-layer dataclasses."""
 
+import dataclasses
 import json
 from pathlib import Path
 
@@ -144,10 +145,36 @@ def test_issue_to_json():
         "troubleshooting": list(issue.troubleshooting),
         "details": None,
         "logFile": "/logs/pdf-manager.log",
+        "command": None,
         "file": None,
     }
     assert isinstance(result["troubleshooting"], list)
     json.dumps(result)  # Must be JSON-serializable.
+
+
+def test_issue_to_json_sends_command():
+    """An issue's copyable command is sent as ``command`` (decision C16)."""
+    issue = dataclasses.replace(ocr_missing(), command="sudo apt install tesseract-ocr")
+    assert dto.issue_to_json(issue)["command"] == "sudo apt install tesseract-ocr"
+
+
+def test_every_issue_in_results_carries_command():
+    """Issues nested in other results have the ``command`` key too (null when absent)."""
+    issue = ocr_missing()
+    check = ToolCheck(
+        ok=False,
+        ocr=ToolStatus(True, False, None),
+        powerpoint=ToolStatus(False, False, None),
+        libreoffice=ToolStatus(False, False, None),
+        issues=[issue],
+    )
+    nested = [
+        dto.tool_check_to_json(check)["issues"][0],
+        dto.save_settings_json(dict(DEFAULTS), issue)["issue"],
+        dto.save_outcome_json(issue=issue)["issue"],
+        dto.failed_tool_check_json(issue)["issues"][0],
+    ]
+    assert all("command" in value and value["command"] is None for value in nested)
 
 
 def test_input_file_to_json():

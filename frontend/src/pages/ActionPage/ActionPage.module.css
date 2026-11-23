@@ -8,12 +8,15 @@
 @container page (min-width: 46rem) {
   .columns {
     grid-template-columns: minmax(0, 1fr) minmax(16rem, 20rem);
-    align-items: start;
+    align-items: stretch;
     gap: var(--space-6);
   }
 }
 
+/* A flex column, so the file list (and its empty drop box) can fill its height. */
 .filesColumn {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
 }
 

@@ -1,5 +1,6 @@
 .panel {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: var(--space-3);
 }
@@ -26,6 +27,7 @@
 
 .title {
   font-size: var(--text-lg);
+  font-weight: var(--font-weight-medium);
 }
 
 .count {
@@ -34,7 +36,14 @@
   font-size: var(--text-sm);
 }
 
+/* Fills the space it's given (level with the options beside it on wide windows). */
 .empty {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-height: 6rem;
+  margin: 0;
   padding: var(--space-6);
   border: var(--border-width) dashed var(--color-border);
   border-radius: var(--radius-lg);

@@ -17,7 +17,7 @@
 
 .title {
   font-size: var(--text-2xl);
-  font-weight: var(--font-weight-regular);
+  font-weight: var(--font-weight-medium);
   line-height: var(--line-height-tight);
 }
 
@@ -46,6 +46,6 @@
 }
 
 .sectionTitle {
-  font-size: var(--text-md);
+  font-size: var(--text-lg);
   font-weight: var(--font-weight-medium);
 }

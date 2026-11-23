@@ -2,6 +2,12 @@
 
 Guidance for AI coding agents (and humans) working in this repository.
 
+## Role
+
+Act as a **senior full-stack engineer** working on a PDF management application for **Windows 11**. The application prioritizes **ease of use** and a **simple UI** for everyday tasks, and must keep **low overhead** (small dependencies, low memory and disk use, fast startup).
+
+Owner decisions are recorded in [`docs/DECISIONS.md`](docs/DECISIONS.md). Follow them, and never assume an answer to an item marked **Open**; ask instead.
+
 ## Project
 
 **PDF Manager** is a Windows desktop tool that converts PowerPoint files (PPT/PPTX) and PDFs into **flattened, searchable PDFs**, and merges files.
@@ -41,4 +47,5 @@ Use **uv** for everything (`uv add`, `uv run`, `uv sync`). Never use pip or requ
 - **No speaker notes.** The speaker-notes appendix was removed on purpose. Don't re-add it.
 - **Documentation.** Every function gets a Google-style docstring (summary, Args, Returns, Raises). Add inline comments for non-obvious lines, and flag known issues where they occur.
 - **Commits.** Make small, meaningful commits as you go, one per logical change, under the user's configured git identity. Run the tests before committing code changes, then push to `origin`.
+- **Decisions log.** Record every decision the owner makes in `docs/DECISIONS.md` as soon as it is made.
 - **Prompts log.** Add a short, summarized entry (not a verbatim quote) to `docs/PROMPTS_LOG.md` for each user request, and tick off its checklist as work completes.

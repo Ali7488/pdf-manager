@@ -12,10 +12,20 @@ npm run dev          # browser preview at http://localhost:5173 with the mock ba
 npm test             # run the tests once (npm run test:watch to keep watching)
 npm run lint         # ESLint
 npm run typecheck    # TypeScript, no output files
-npm run build        # type-check, then build to dist/
+npm run build        # type-check, then build dist/index.html
 ```
 
-`npm run build` writes `dist/index.html` with relative asset paths, so pywebview can load it straight from disk.
+## The build is one self-contained file
+
+The desktop app opens `dist/index.html` straight from disk as a `file://` URL (no web server). Chromium and WebView2 block module scripts and font downloads from `file://`, so `npm run build` produces a **single `dist/index.html` with nothing else next to it**:
+
+- [`vite-plugin-singlefile`](https://github.com/richardtallent/vite-plugin-singlefile) inlines the JavaScript and CSS (no code-splitting).
+- The IBM Plex Sans font files are inlined as data URIs (see `src/styles/fonts.css`). To keep the file small, only weights 400 and 500, the woff2 format, and the Latin and Latin Extended subsets are bundled; other scripts fall back to Segoe UI.
+- The small inline script in `index.html` that picks light or dark before the first paint stays as it is.
+
+The result is about 450 kB (about 186 kB gzipped). Don't add anything the page has to fetch at runtime (fonts from a CDN, lazy-loaded chunks, images by URL); it would break in the desktop app.
+
+To check a build, open `dist/index.html` directly in a Chromium-based browser (double-click it, or use `file://` in the address bar). It should show the Home page in IBM Plex Sans with no console errors. Without Python, the page waits for pywebview, so settings don't load.
 
 ## Running with the mock
 

@@ -36,19 +36,10 @@ from typing import Any
 import webview
 from webview.dom import DOMEventHandler
 
-from converter import toolcheck, tools
-from converter.files import inspect_file
-from converter.issues import (
-    ConversionError,
-    Issue,
-    ocr_install_failed,
-    ocr_missing,
-    unexpected_error,
-)
-
-from . import __version__, dto, logging_setup, paths
+from . import __version__, dto, logging_setup, paths, service
 from .jobs import JobManager
 from .logging_setup import log_issue
+from .service import ConversionError, Issue, ocr_install_failed, ocr_missing, unexpected_error
 from .settings_store import DEFAULTS, SettingsStore
 
 log = logging.getLogger(__name__)
@@ -138,7 +129,7 @@ def _describe_files(candidates: Iterable[str | Path]) -> list[dict[str, Any]]:
         if key in seen:
             continue
         seen.add(key)
-        info = inspect_file(path)
+        info = service.inspect_file(path)
         if info is None:
             log.info("Skipped (unsupported, a folder, or missing): %s", path)
             continue
@@ -183,7 +174,7 @@ def _check_tesseract(path: Path) -> str | None:
     if path.stem.casefold() != "tesseract":
         return f"Expected a file named tesseract{'.exe' if paths.on_windows() else ''}: {path}"
     try:
-        proc = tools.run_command([path, "--version"], timeout=TESSERACT_VERSION_TIMEOUT_SEC)
+        proc = service.run_command([path, "--version"], timeout=TESSERACT_VERSION_TIMEOUT_SEC)
     except (OSError, subprocess.SubprocessError) as exc:
         return f"Couldn't run {path} --version: {exc}"
     output = f"{proc.stdout or ''}{proc.stderr or ''}"
@@ -413,7 +404,7 @@ class Api:
             parsed = dto.parse_action(action)
             job_settings = dto.action_settings_from_json(settings, self._settings.get())
             job_data = dto.action_data_from_json(data)
-            check = toolcheck.check_tools(parsed, job_settings, job_data)
+            check = service.check_tools(parsed, job_settings, job_data)
             check.issues = [log_issue(issue) for issue in check.issues]
             log.debug("Tool check for %s: %s", parsed, check)
             return dto.tool_check_to_json(check)
@@ -424,8 +415,8 @@ class Api:
         """Return the installed Tesseract languages, e.g. ``["eng", "deu"]``; empty if no OCR."""
 
         def body() -> list[str]:
-            tesseract = tools.find_tesseract(self._settings.get().get("tesseractPath"))
-            return tools.tesseract_languages(tesseract) if tesseract else []
+            tesseract = service.find_tesseract(self._settings.get().get("tesseractPath"))
+            return service.tesseract_languages(tesseract) if tesseract else []
 
         return self._guard("get_ocr_languages", lambda issue: [], body)
 
@@ -444,7 +435,7 @@ class Api:
             return {"found": False, "path": None, "issue": dto.issue_to_json(issue)}
 
         def body() -> dict[str, Any]:
-            found = tools.find_tesseract(self._settings.get().get("tesseractPath"))
+            found = service.find_tesseract(self._settings.get().get("tesseractPath"))
             if found is None:
                 filters = ("Programs (*.exe)",) if paths.on_windows() else ()
                 picked = self._window.create_file_dialog(
@@ -510,7 +501,7 @@ class Api:
             log.info("Installing OCR: %s", " ".join(WINGET_INSTALL))
             details = None
             try:
-                proc = tools.run_command(WINGET_INSTALL, timeout=WINGET_TIMEOUT_SEC)
+                proc = service.run_command(WINGET_INSTALL, timeout=WINGET_TIMEOUT_SEC)
                 details = (
                     f"winget exit code {proc.returncode}\n"
                     f"{(proc.stdout or '').strip()}\n{(proc.stderr or '').strip()}"
@@ -522,7 +513,7 @@ class Api:
             self._emit("ocrInstallProgress", {"message": "Checking the installation."})
             # Judge by the result, not the exit code: winget also exits non-zero
             # when Tesseract is already installed.
-            found = tools.find_tesseract(self._settings.get().get("tesseractPath"))
+            found = service.find_tesseract(self._settings.get().get("tesseractPath"))
             if found is not None:
                 self._settings.update({"tesseractPath": str(found)})
                 log.info("OCR installed at %s", found)

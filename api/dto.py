@@ -1,7 +1,7 @@
 """Conversion at the boundary: the UI's camelCase JSON <-> the service layer's dataclasses.
 
 Everything coming from JavaScript is untrusted: it is type-checked here and
-anything malformed raises :class:`converter.issues.ConversionError` carrying
+anything malformed raises the service layer's ``ConversionError`` carrying
 an ``UNEXPECTED_ERROR`` issue (a malformed call is a UI bug, not a user
 mistake), so the bridge can answer with an issue instead of crashing.
 
@@ -17,19 +17,22 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-from converter.common import (
+from .service import (
     Action,
     ActionData,
     ActionSettings,
     CompressLevel,
+    ConversionError,
+    FileInfo,
+    Issue,
     OutputFile,
     ProgressEvent,
     SplitMethod,
     SplitSettings,
+    ToolCheck,
+    ToolStatus,
+    unexpected_error,
 )
-from converter.files import FileInfo
-from converter.issues import ConversionError, Issue, unexpected_error
-from converter.toolcheck import ToolCheck, ToolStatus
 
 # jobFinished statuses.
 SUCCEEDED = "succeeded"
@@ -112,7 +115,7 @@ def action_settings_from_json(value: Any, saved: dict[str, Any]) -> ActionSettin
         saved: The persisted ``Settings`` (already validated by the settings store).
 
     Returns:
-        A :class:`converter.common.ActionSettings`.
+        The service layer's ``ActionSettings``.
 
     Raises:
         ConversionError: Malformed settings.

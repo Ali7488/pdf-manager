@@ -21,9 +21,8 @@ import tempfile
 import traceback
 from pathlib import Path
 
-from converter.issues import Issue, Severity
-
 from . import __version__, paths
+from .service import Issue, Severity
 
 log = logging.getLogger(__name__)
 

@@ -1,7 +1,7 @@
 """Running conversion jobs: one at a time, on a worker thread, with progress and cancel.
 
 Each job gets its own scratch folder and a worker thread that calls the
-service layer's single entry point, ``converter.pipeline.run_action``. When
+service layer's single entry point, ``run_action`` (via :mod:`api.service`). When
 the job ends, ``jobFinished`` is emitted. Results stay in the scratch folder
 until :meth:`JobManager.save` or :meth:`JobManager.discard` (decision F12:
 cancelling the folder picker never loses results). Every scratch folder is
@@ -26,21 +26,23 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from converter import pipeline
-from converter.common import Action, ActionData, ActionSettings, OutputFile, ProgressEvent
-from converter.context import CancelToken
-from converter.issues import (
+from . import dto, service
+from .logging_setup import log_issue
+from .service import (
+    Action,
+    ActionData,
+    ActionSettings,
     Cancelled,
+    CancelToken,
     ConversionError,
     Issue,
+    OutputFile,
+    ProgressEvent,
     job_already_running,
+    safe_destination,
     save_failed,
     unexpected_error,
 )
-from converter.output import safe_destination
-
-from . import dto
-from .logging_setup import log_issue
 
 log = logging.getLogger(__name__)
 
@@ -170,7 +172,7 @@ class JobManager:
     Args:
         emit: ``emit(name, payload)`` for ``jobProgress`` and ``jobFinished``.
         run_action: The service entry point; defaults to
-            ``converter.pipeline.run_action`` (looked up at call time).
+            ``service.run_action`` (looked up at call time).
         progress_interval: Minimum seconds between progress events.
         temp_dir: Parent folder for scratch folders (default: system temp).
     """
@@ -277,7 +279,7 @@ class JobManager:
 
     def _call_run_action(self, job: _Job, settings: ActionSettings, progress) -> Any:
         """Call the service entry point (resolved now, so tests can replace it)."""
-        run = self._run_action or pipeline.run_action
+        run = self._run_action or service.run_action
         return run(
             job.action,
             settings,
@@ -361,7 +363,7 @@ class JobManager:
         """Copy a finished job's results into a folder, never overwriting anything.
 
         Names that already exist get `` (2)``, `` (3)`` and so on
-        (:func:`converter.output.safe_destination`). With ``as_zip``, all
+        (the service layer's ``safe_destination``). With ``as_zip``, all
         outputs go into one ``.zip`` named after the first input file, for
         example ``"Report - Split.zip"``. After a successful save the scratch
         folder is deleted; after a failed one, results are kept so the user

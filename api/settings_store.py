@@ -20,7 +20,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from converter.common import DPI, OCR_LANGUAGE, OCR_PAGE_TIMEOUT_SEC
+from .service import DPI, OCR_LANGUAGE, OCR_PAGE_TIMEOUT_SEC
 
 log = logging.getLogger(__name__)
 

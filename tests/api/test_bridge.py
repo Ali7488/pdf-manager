@@ -12,14 +12,11 @@ from pathlib import Path
 import fitz
 import pytest
 
-from api import bridge, paths
+from api import bridge, paths, service
 from api.bridge import Api, event_script
 from api.jobs import JobManager
+from api.service import JobResult, OutputFile, ToolCheck, ToolStatus, ocr_missing
 from api.settings_store import SettingsStore
-from converter import toolcheck, tools
-from converter.common import JobResult, OutputFile
-from converter.issues import ocr_missing
-from converter.toolcheck import ToolCheck, ToolStatus
 
 # Every method in the contract's Calls table, with its argument names.
 CONTRACT = {
@@ -79,7 +76,7 @@ def wait_for(predicate, timeout=5.0):
 
 
 class FakeRun:
-    """A fake converter.pipeline.run_action that records its call and writes one output."""
+    """A fake service run_action that records its call and writes one output."""
 
     def __init__(self):
         self.calls = []
@@ -170,7 +167,7 @@ def test_unexpected_exception_becomes_issue(api_obj, monkeypatch, logs):
     def broken(*args):
         raise ZeroDivisionError("bug")
 
-    monkeypatch.setattr(toolcheck, "check_tools", broken)
+    monkeypatch.setattr(service, "check_tools", broken)
     result = api_obj.check_tools("merge", SETTINGS, {"files": []})
     assert result["ok"] is False
     issue = result["issues"][0]
@@ -304,7 +301,7 @@ def test_check_tools_shape_and_logged_issues(api_obj, monkeypatch, logs):
             [ocr_missing()],
         )
 
-    monkeypatch.setattr(toolcheck, "check_tools", fake)
+    monkeypatch.setattr(service, "check_tools", fake)
     result = api_obj.check_tools("flatten", dict(SETTINGS, useOcr=True), {"files": ["/a.pdf"]})
     assert seen == {"action": "flatten", "ocr": True, "files": [Path("/a.pdf")]}
     assert result["ok"] is False
@@ -315,17 +312,17 @@ def test_check_tools_shape_and_logged_issues(api_obj, monkeypatch, logs):
 
 def test_get_ocr_languages(api_obj, monkeypatch):
     """Languages come from the found Tesseract; none if it's missing."""
-    monkeypatch.setattr(tools, "find_tesseract", lambda configured=None: None)
+    monkeypatch.setattr(service, "find_tesseract", lambda configured=None: None)
     assert api_obj.get_ocr_languages() == []
-    monkeypatch.setattr(tools, "find_tesseract", lambda configured=None: Path("/t/tesseract"))
-    monkeypatch.setattr(tools, "tesseract_languages", lambda path: ["deu", "eng"])
+    monkeypatch.setattr(service, "find_tesseract", lambda configured=None: Path("/t/tesseract"))
+    monkeypatch.setattr(service, "tesseract_languages", lambda path: ["deu", "eng"])
     assert api_obj.get_ocr_languages() == ["deu", "eng"]
 
 
 def test_search_ocr_found_automatically(api_obj, monkeypatch, store, window):
     """A Tesseract found in the usual places is saved without opening a picker."""
     found = Path("/apps/Tesseract-OCR/tesseract.exe")
-    monkeypatch.setattr(tools, "find_tesseract", lambda configured=None: found)
+    monkeypatch.setattr(service, "find_tesseract", lambda configured=None: found)
     assert api_obj.search_ocr() == {"found": True, "path": str(found), "issue": None}
     assert store.get()["tesseractPath"] == str(found)
     assert window.dialog_calls == []
@@ -333,7 +330,7 @@ def test_search_ocr_found_automatically(api_obj, monkeypatch, store, window):
 
 def test_search_ocr_picker_cancelled(api_obj, monkeypatch, window):
     """Not found and picker cancelled: OCR_MISSING."""
-    monkeypatch.setattr(tools, "find_tesseract", lambda configured=None: None)
+    monkeypatch.setattr(service, "find_tesseract", lambda configured=None: None)
     window.dialog_results = [None]
     result = api_obj.search_ocr()
     assert result["found"] is False and result["path"] is None
@@ -342,7 +339,7 @@ def test_search_ocr_picker_cancelled(api_obj, monkeypatch, window):
 
 def test_search_ocr_rejects_wrong_file(api_obj, monkeypatch, window, tmp_path, store):
     """A picked file that isn't named tesseract is refused and not saved."""
-    monkeypatch.setattr(tools, "find_tesseract", lambda configured=None: None)
+    monkeypatch.setattr(service, "find_tesseract", lambda configured=None: None)
     wrong = tmp_path / "notepad.exe"
     wrong.write_bytes(b"sample")
     window.dialog_results = [(str(wrong),)]
@@ -355,7 +352,7 @@ def test_search_ocr_rejects_wrong_file(api_obj, monkeypatch, window, tmp_path, s
 
 def test_search_ocr_validates_with_version(api_obj, monkeypatch, window, tmp_path, store):
     """A picked tesseract is accepted only if --version runs and mentions tesseract."""
-    monkeypatch.setattr(tools, "find_tesseract", lambda configured=None: None)
+    monkeypatch.setattr(service, "find_tesseract", lambda configured=None: None)
     exe = tmp_path / "tesseract.exe"
     exe.write_bytes(b"sample")
     outputs = iter(
@@ -364,7 +361,7 @@ def test_search_ocr_validates_with_version(api_obj, monkeypatch, window, tmp_pat
             subprocess.CompletedProcess([], 0, "tesseract 5.4.0\n leptonica-1.84", ""),
         ]
     )
-    monkeypatch.setattr(tools, "run_command", lambda cmd, timeout=0, cancel=None: next(outputs))
+    monkeypatch.setattr(service, "run_command", lambda cmd, timeout=0, cancel=None: next(outputs))
     window.dialog_results = [(str(exe),), (str(exe),)]
     failed = api_obj.search_ocr()
     assert failed["found"] is False and "exited with 1" in failed["issue"]["details"]
@@ -393,8 +390,8 @@ def test_install_ocr_with_winget(api_obj, monkeypatch, window, store):
         return subprocess.CompletedProcess(cmd, 0, "Successfully installed", "")
 
     found = Path("C:/Users/Example/AppData/Local/Programs/Tesseract-OCR/tesseract.exe")
-    monkeypatch.setattr(tools, "run_command", fake_run)
-    monkeypatch.setattr(tools, "find_tesseract", lambda configured=None: found)
+    monkeypatch.setattr(service, "run_command", fake_run)
+    monkeypatch.setattr(service, "find_tesseract", lambda configured=None: found)
     api_obj.install_ocr()
     assert wait_for(lambda: window.events_named("ocrInstallFinished"))
     assert window.events_named("ocrInstallFinished") == [{"ok": True, "issue": None}]
@@ -409,11 +406,11 @@ def test_install_ocr_failure_reports_winget_output(api_obj, monkeypatch, window)
     monkeypatch.setattr(paths, "on_windows", lambda: True)
     monkeypatch.setattr(bridge.shutil, "which", lambda name: "C:\\winget.exe")
     monkeypatch.setattr(
-        tools,
+        service,
         "run_command",
         lambda cmd, timeout=0, cancel=None: subprocess.CompletedProcess(cmd, 5, "", "No network"),
     )
-    monkeypatch.setattr(tools, "find_tesseract", lambda configured=None: None)
+    monkeypatch.setattr(service, "find_tesseract", lambda configured=None: None)
     api_obj.install_ocr()
     assert wait_for(lambda: window.events_named("ocrInstallFinished"))
     finished = window.events_named("ocrInstallFinished")[0]

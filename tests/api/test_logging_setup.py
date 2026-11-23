@@ -4,7 +4,7 @@ import logging
 import sys
 
 from api import logging_setup, paths
-from converter.issues import powerpoint_fallback, unexpected_error
+from api.service import issues, unexpected_error
 
 
 def test_dev_mode_from_source(monkeypatch):
@@ -79,7 +79,7 @@ def test_log_issue_writes_details_and_traceback(logs):
 
 def test_log_issue_warning_level_and_file(logs):
     """Warnings are logged at WARNING level, with the file they are about."""
-    issue = logging_setup.log_issue(powerpoint_fallback("Slides.pptx", None))
+    issue = logging_setup.log_issue(issues.powerpoint_fallback("Slides.pptx", None))
     text = logs.read_text(encoding="utf-8")
     assert "WARNING" in text and "File: Slides.pptx" in text
     assert issue.log_file == str(logs)

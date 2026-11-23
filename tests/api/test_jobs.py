@@ -9,25 +9,23 @@ from pathlib import Path
 
 import pytest
 
-from api import jobs
+from api import jobs, service
 from api.jobs import JobManager, ProgressThrottle
-from converter import pipeline
-from converter.common import (
+from api.service import (
     Action,
     ActionData,
     ActionSettings,
+    Cancelled,
+    ConversionError,
+    IssueCode,
     JobResult,
     OutputFile,
     ProgressEvent,
     Stage,
 )
-from converter.issues import (
-    Cancelled,
-    ConversionError,
-    IssueCode,
-    empty_pdf,
-    powerpoint_fallback,
-)
+
+empty_pdf = service.issues.empty_pdf
+powerpoint_fallback = service.issues.powerpoint_fallback
 
 
 class Recorder:
@@ -113,8 +111,8 @@ def test_success_emits_progress_and_finished(make_manager, recorder):
 
 
 def test_default_run_action_is_looked_up_at_call_time(monkeypatch, recorder, tmp_path, logs):
-    """Without an injected run_action, converter.pipeline.run_action is used."""
-    monkeypatch.setattr(pipeline, "run_action", succeeding("a.pdf"))
+    """Without an injected run_action, the service run_action is used."""
+    monkeypatch.setattr(service, "run_action", succeeding("a.pdf"))
     manager = JobManager(recorder, temp_dir=tmp_path)
     manager.start(Action.MERGE, ActionSettings(), DATA)
     assert recorder.finish()["status"] == "succeeded"

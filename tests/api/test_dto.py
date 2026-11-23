@@ -6,18 +6,22 @@ from pathlib import Path
 import pytest
 
 from api import dto
-from api.settings_store import DEFAULTS
-from converter.common import (
+from api.service import (
     Action,
     CompressLevel,
+    ConversionError,
+    FileInfo,
+    FileKind,
+    IssueCode,
     OutputFile,
     ProgressEvent,
     SplitMethod,
     Stage,
+    ToolCheck,
+    ToolStatus,
+    ocr_missing,
 )
-from converter.files import FileInfo, FileKind
-from converter.issues import ConversionError, IssueCode, ocr_missing
-from converter.toolcheck import ToolCheck, ToolStatus
+from api.settings_store import DEFAULTS
 
 FRONTEND_SETTINGS = {
     "useOcr": True,

@@ -175,10 +175,11 @@ A short, summarized record of each request made to the coding agent, and what ca
 
     Found while reading: commit `b018810` had deleted decisions F1–F47 and O1–O3 from `docs/DECISIONS.md`; restored (`24c6330`). Decisions C17, P34–P38 recorded; O4 (installer LibreOffice default) and O5 (do downloads count as saved) opened with interim choices. Checklist:
     - [x] Restore the deleted decisions; record the new ones.
-    - [ ] Per-upload UUIDs, with tests.
-    - [ ] Unsaved-result protection (idle shutdown, Quit confirmation), with tests.
-    - [ ] Save recovery after a reload, with tests.
-    - [ ] LibreOffice-only presentation conversion, add-time notice, installer and docs, with tests.
-    - [ ] About links to the build's exact commit; workflow checks the ZIP and the source bundle.
-    - [ ] Fidelity test of representative decks; follow-ups recorded.
-    - [ ] Checks, CI, Windows preview ZIP; PR #2 updated, still a draft.
+    - [x] Per-upload UUIDs, with tests.
+    - [x] Unsaved-result protection (idle shutdown, Quit confirmation), with tests.
+    - [x] Save recovery after a reload, with tests.
+    - [x] LibreOffice-only presentation conversion, add-time notice, installer and docs, with tests.
+    - [x] About links to the build's exact commit; workflow checks the ZIP and the source bundle.
+    - [x] *(Linux only; five of six decks pass; follow-ups in docs/PRESENTATION_FIDELITY.md)* Fidelity test of representative decks; follow-ups recorded.
+    - [x] Checks, CI (45271520135 and 45271531357 green at `d6fe8fd`), Windows build 45271518966 green at `d6fe8fd` (installer, ZIP, sources, same-commit). After this log update, the ZIP was rebuilt from the branch head; PR #2 has the final link and is still a draft.
+    - [ ] Interactive Windows 11 checks (docs/BROWSER_MODE.md) and owner answers to O4 and O5.

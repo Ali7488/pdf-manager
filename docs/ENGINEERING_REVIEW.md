@@ -89,6 +89,11 @@ Owner request: prompts log item 42; decisions C17 and P34–P38. Agent-written, 
 | Commit `b018810` had **deleted decisions F1–F47 and O1–O3**. | `docs/DECISIONS.md` | Restored (`24c6330`). | — |
 | `test_settings_survive_a_restart` (e2e) **failed 3 times in 4** locally: it read a radio button before the settings loaded. | `tests/e2e/` | It now waits (Playwright's `to_be_checked`). | 5 of 5 runs pass. |
 
+Evidence at `d6fe8fd`:
+- **Local (Linux):** Python 631 passed and 5 skipped (Windows-only), including 20 browser tests; frontend 121 passed.
+- **CI:** [45271520135](https://github.com/Ali7488/pdf-manager/actions/runs/45271520135) and 45271531357, all jobs green.
+- **Windows build** [45271518966](https://github.com/Ali7488/pdf-manager/actions/runs/45271518966): installer built, installed and smoke-tested, recording source `d6fe8fd`. The browser ZIP's tests against the packaged exe with Edge: 18 passed, 2 skipped (no Tesseract or LibreOffice on the runner). The same-commit check passed. The first build at `a3a6010` failed only in that new check, from a pipefail quirk; fixed in `d6fe8fd`.
+
 Still open from this round: the fidelity follow-ups in docs/PRESENTATION_FIDELITY.md; owner questions O4 and O5; the interactive Windows 11 checks in docs/BROWSER_MODE.md.
 
 ## Open work

@@ -103,4 +103,10 @@ A short, summarized record of each request made to the coding agent, and what ca
     - [ ] Dead-code review (Python and TypeScript) and pruning, with tests.
     - [ ] Coverage review and new tests where missing.
     - [ ] `docs.local/` review guide, including a CLI test plan for Windows and Linux.
+29. **Go public and pre-release.** Make the repo public; create pre-release v0.5 for testing with a simple README (features, install steps: double-click installer on Windows, a few lines on Linux), explicitly marked as a pre-release. Owner answers: keep commit emails; remove the private-notes reference; use free runners to build/test and fix; v0.5 is Windows only; v0.75 tonight fixes Windows bugs and releases Linux versions; v1.0 after manual verification (P23–P25). Checklist:
+    - [x] Record decisions P23–P25; remove the private-notes reference.
+    - [ ] Merge the pending agent work; make the repo public.
+    - [ ] Build the Windows installer on GitHub runners and fix until it builds.
+    - [ ] v0.5.0 pre-release (Windows) with user-facing README and notes.
+    - [ ] v0.75.0 pre-release: Windows fixes + Linux packages (Ubuntu/Debian `.deb`, Arch `PKGBUILD`).
 

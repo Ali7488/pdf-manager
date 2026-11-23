@@ -11,21 +11,31 @@
  * a pywebview window points at the Vite dev server).
  * Set `VITE_MOCK_SETTINGS_SAVE_FAILS=1` to make the mock's settings saves fail,
  * to try the "not saved" state in Settings.
+ * Set `VITE_MOCK_PLATFORM=linux` (or `mac`) to make the mock act like that
+ * system; on Linux, Install OCR then shows the command to copy and run.
  */
 import { createBridgeApi, isPywebviewPresent, onEvent } from "./bridge";
 import { createMockApi } from "./mock";
-import type { PdfManagerApi } from "./types";
+import type { AppInfo, PdfManagerApi } from "./types";
 
 // Statically false in production builds, so the mock is tree-shaken away.
 const mockAllowed =
   (import.meta.env.DEV || import.meta.env.MODE === "test") && import.meta.env.VITE_API !== "bridge";
+
+/** Reads `VITE_MOCK_PLATFORM`; anything unknown means the default (Windows). */
+function mockPlatform(value: string | undefined): AppInfo["platform"] | undefined {
+  return value === "windows" || value === "linux" || value === "mac" ? value : undefined;
+}
 
 /** True when the in-memory mock is in use. */
 export const usingMock: boolean = mockAllowed && !isPywebviewPresent();
 
 /** The API client for the whole app. */
 export const api: PdfManagerApi = usingMock
-  ? createMockApi({ settingsSaveFails: import.meta.env.VITE_MOCK_SETTINGS_SAVE_FAILS === "1" })
+  ? createMockApi({
+      settingsSaveFails: import.meta.env.VITE_MOCK_SETTINGS_SAVE_FAILS === "1",
+      platform: mockPlatform(import.meta.env.VITE_MOCK_PLATFORM),
+    })
   : createBridgeApi();
 
 export { onEvent };

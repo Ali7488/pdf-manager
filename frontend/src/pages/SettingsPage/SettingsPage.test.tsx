@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { LINUX_OCR_INSTALL_COMMAND } from "../../api/mock";
 import { renderApp } from "../../test/renderApp";
 
 const FOLDER = "D:\\Results";
@@ -105,6 +106,28 @@ describe("SettingsPage", () => {
     const { user } = await renderApp({ state: { page: "settings" }, mock: { ocrInstallFails: true } });
     await user.click(screen.getByRole("button", { name: "Install OCR" }));
     expect(await screen.findByRole("dialog", {}, { timeout: 3000 })).toHaveTextContent("OCR couldn't be installed");
+  });
+
+  it("on Linux, shows the install command to copy instead of installing (C16)", async () => {
+    const { user, mock } = await renderApp({ state: { page: "settings" }, mock: { platform: "linux" } });
+    expect((await mock.getAppInfo()).platform).toBe("linux");
+    await screen.findByText("OCR wasn't found");
+    await user.click(screen.getByRole("button", { name: "Install OCR" }));
+
+    const popup = within(await screen.findByRole("dialog", {}, { timeout: 3000 }));
+    expect(popup.getByText("Install OCR with one command")).toBeInTheDocument();
+    expect(popup.getByText(LINUX_OCR_INSTALL_COMMAND).tagName).toBe("CODE");
+    // The steps still point to Search for OCR for after the command has run.
+    expect(popup.getByText("Then click Search for OCR in Settings.")).toBeInTheDocument();
+
+    await user.click(popup.getByRole("button", { name: "Copy command" }));
+    expect(await popup.findByRole("status")).toHaveTextContent("Copied");
+    expect(await navigator.clipboard.readText()).toBe(LINUX_OCR_INSTALL_COMMAND);
+
+    // Nothing was installed.
+    await user.click(popup.getByRole("button", { name: "OK" }));
+    expect(screen.getByText("OCR wasn't found")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Install OCR" })).toBeEnabled();
   });
 
   it("opens the logs folder and shows the version", async () => {

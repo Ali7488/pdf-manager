@@ -37,6 +37,7 @@ When `window.pywebview` is missing (a normal browser), `npm run dev` uses an in-
 - PowerPoint files produce a "LibreOffice was used" warning.
 - A file whose name contains `fail` makes the job fail, to show the error popup.
 - OCR starts as "not installed", so ticking **Use OCR** shows the missing-tool check. **Install OCR** then "installs" it.
+- Start with `VITE_MOCK_PLATFORM=linux npm run dev` to act like Linux: **Install OCR** installs nothing and instead shows the command to copy and run (`sudo apt install tesseract-ocr tesseract-ocr-eng`, decision C16).
 - Settings save normally. Start with `VITE_MOCK_SETTINGS_SAVE_FAILS=1 npm run dev` to make every settings save fail, which shows the "not saved" warning in Settings.
 
 A production build never includes the mock. To use the real bridge during development (for example a pywebview window pointed at the dev server), start Vite with `VITE_API=bridge npm run dev`.

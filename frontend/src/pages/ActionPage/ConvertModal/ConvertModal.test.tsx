@@ -1,5 +1,6 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { LINUX_OCR_INSTALL_COMMAND } from "../../../api/mock";
 import { Action, type InputFile } from "../../../api/types";
 import { renderApp, SAMPLE_FILES } from "../../../test/renderApp";
 
@@ -141,6 +142,20 @@ describe("ConvertModal", () => {
     expect(startJob).toHaveBeenCalledWith(Action.Merge, expect.objectContaining({ useOcr: true }), {
       files: pdfs.map((file) => file.path),
     });
+  });
+
+  it("on Linux, shows the OCR install command inside the modal (C16)", async () => {
+    const { user } = await renderApp({ state: { page: Action.Merge, files: pdfs }, mock: { platform: "linux" } });
+    await user.click(screen.getByRole("checkbox", { name: "Use OCR" }));
+    await user.click(screen.getByRole("button", { name: "Convert" }));
+    await screen.findByRole("heading", { name: "Something is missing" });
+
+    await user.click(screen.getByRole("button", { name: "Install OCR" }));
+    const issue = await screen.findByRole("region", { name: "Warning: Install OCR with one command" }, { timeout: 3000 });
+    expect(within(issue).getByText(LINUX_OCR_INSTALL_COMMAND)).toBeInTheDocument();
+    expect(within(issue).getByRole("button", { name: "Copy command" })).toBeInTheDocument();
+    // The OCR_MISSING issue above it has no command, so only one Copy button shows.
+    expect(screen.getAllByRole("button", { name: "Copy command" })).toHaveLength(1);
   });
 
   it("explains when PowerPoint files can't be opened at all", async () => {

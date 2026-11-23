@@ -26,6 +26,7 @@ Decisions made by the project owner, in their own direction (summarized, not quo
 | P19 | 2026-11-23 | **Linux Qt backend uses PySide6** (LGPL, via `pywebview[pyside6]`), not PyQt6 (GPL), so no licence is forced on PDF Manager. |
 | P20 | 2026-11-23 | **Licence: MIT.** |
 | P21 | 2026-11-23 | After the Linux work, continue overnight with small open items that need no new decisions (platform-aware troubleshooting text, cleaning up merged agent worktrees and branches). |
+| P22 | 2026-11-23 | **Don't run the manual Windows installer build workflow** (`build-windows.yml`); the owner will trigger it. Keep CI minute use low by pushing in small batches rather than after every commit. |
 
 ## Converter (Python backend)
 

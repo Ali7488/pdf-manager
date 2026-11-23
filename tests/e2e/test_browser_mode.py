@@ -398,7 +398,8 @@ def test_settings_survive_a_restart(browser, server, page):
     tab = browser.new_page()
     tab.goto(server.url)
     tab.get_by_role("navigation", name="Main").get_by_role("button", name="Settings").click()
-    assert tab.get_by_role("radio", name="Dark").is_checked()
+    # The saved settings arrive after the page renders: wait for them (is_checked doesn't).
+    playwright.expect(tab.get_by_role("radio", name="Dark")).to_be_checked()
     tab.close()
 
 

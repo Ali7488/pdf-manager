@@ -656,7 +656,8 @@ PYSIDE_SOURCE = (
 # Packages that publish no source distribution on PyPI: where their source is.
 # The Qt entries are Linux-only (v0.75); they must be revisited with that build.
 NO_SDIST = {
-    "pywin32": "https://github.com/mhammond/pywin32/archive/refs/tags/b{version}.tar.gz",
+    # pywin32 b312: pin the resolved upstream commit, not a mutable tag reference.
+    "pywin32": "https://github.com/mhammond/pywin32/archive/2a277cb5552756c2b4d42b524dc36d25e0bb6354.tar.gz",
     "pyside6": PYSIDE_SOURCE,
     "pyside6-addons": f"{PYSIDE_SOURCE} and {QT_SOURCE}",
     "pyside6-essentials": f"{PYSIDE_SOURCE} and {QT_SOURCE}",

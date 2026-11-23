@@ -54,31 +54,33 @@ def main():
         assert len(each) == 2
         n1, words1, images1 = inspect(each[0][1])
         n2, words2, images2 = inspect(each[1][1])
-        assert n1 == 1 and n2 == 2, (n1, n2)
+        assert n1 == 1 and n2 == 1, (n1, n2)
         assert all(images1) and all(images2)
         assert "Quarterly" in " ".join(words1)
-        assert "Presenter notes" in " ".join(words2), words2
+        assert "overview" in " ".join(words2).lower(), words2
+        assert "Presenter notes" not in " ".join(words2), "Speaker notes must not be added."
 
         combined = process_files([pptx, pdf], FLATTEN_MERGE, root / "work2", report)
         assert len(combined) == 1
         pages, texts, images = inspect(combined[0][1])
-        assert pages == 3 and all(images)
-        assert "Presenter notes" in " ".join(texts)
+        assert pages == 2 and all(images)
+        assert "Presenter notes" not in " ".join(texts)
         assert "Quarterly" in texts[-1]
 
         merged = process_files([pdf, pptx], MERGE, root / "work3", report)
         assert len(merged) == 1
         pages, texts, images = inspect(merged[0][1])
-        assert pages == 3
+        assert pages == 2
         assert not images[0], "Merge should not rasterize the source PDF."
         assert "Quarterly" in texts[0]
-        assert "Presenter notes" in texts[-1]
+        assert "Project overview" in texts[-1]
+        assert "Presenter notes" not in " ".join(texts)
 
         safe1 = safe_destination(root, "Sample.pdf")
         safe1.write_text("existing", encoding="utf-8")
         assert safe_destination(root, "Sample.pdf").name == "Sample (2).pdf"
         assert all(sha(p) == digest for p, digest in originals.items()), "Inputs changed!"
-        print("PASS: flatten (separate), flatten+merge, merge, notes, OCR, order, overwrite safety, source preservation")
+        print("PASS: flatten (separate), flatten+merge, merge, no speaker notes, OCR, order, overwrite safety, source preservation")
 
 
 if __name__ == "__main__":

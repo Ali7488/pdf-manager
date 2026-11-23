@@ -309,8 +309,7 @@ class Dashboard:
 
         tk.Label(
             wrapper,
-            text="Speaker notes are included automatically for PowerPoints. "
-            "Use Move up/down to choose the merge order.",
+            text="Use Move up/down to choose the merge order.",
             bg=BG,
             fg=MUTED,
             font=(FONT, 9),

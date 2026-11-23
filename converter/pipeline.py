@@ -10,33 +10,19 @@ import fitz
 from .common import ALLOWED, FLATTEN, FLATTEN_MERGE, MERGE, MODES, Progress
 from .flatten import flatten_searchable
 from .merge import merge_pdfs
-from .notes import notes_pdf, speaker_notes
 from .powerpoint import powerpoint_to_pdf
 from .tools import require_tesseract
 
 
 def prepare_pdf(source: Path, work: Path, report: Progress) -> Path:
-    """Convert PPT/PPTX and attach notes appendix. Keep PDFs unchanged for merge."""
+    """Render PPT/PPTX to PDF. PDFs are returned unchanged."""
     source = source.expanduser().resolve()
     if not source.is_file() or source.suffix.lower() not in ALLOWED:
         raise ValueError(f"Unsupported input: {source.name}. Choose PDF, PPTX or PPT.")
     work.mkdir(parents=True, exist_ok=True)
     if source.suffix.lower() == ".pdf":
         return source
-    slide_pdf = powerpoint_to_pdf(source, work, report)
-    notes = speaker_notes(source, work, report)
-    if not notes:
-        return slide_pdf
-    report(f"Appending speaker notes from {len(notes)} slides...")
-    appendix = work / "speaker_notes.pdf"
-    notes_pdf(notes, appendix)
-    combined = work / "slides_with_notes.pdf"
-    with fitz.open(str(slide_pdf)) as presentation, fitz.open(str(appendix)) as notes_doc:
-        with fitz.open() as result:
-            result.insert_pdf(presentation, links=True, annots=True)
-            result.insert_pdf(notes_doc, links=True, annots=True)
-            result.save(str(combined), garbage=4, deflate=True)
-    return combined
+    return powerpoint_to_pdf(source, work, report)
 
 
 def check_pdf(source: Path) -> None:

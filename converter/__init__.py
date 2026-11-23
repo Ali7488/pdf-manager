@@ -7,7 +7,6 @@ and only copied to the chosen destination after all requested conversion is done
 from .common import ALLOWED, DPI, FLATTEN, FLATTEN_MERGE, MERGE, MODES, Progress
 from .flatten import flatten_searchable
 from .merge import merge_pdfs
-from .notes import notes_pdf, speaker_notes
 from .output import safe_destination
 from .pipeline import check_pdf, prepare_pdf, process_files
 from .powerpoint import libreoffice_convert, powerpoint_to_pdf
@@ -27,12 +26,10 @@ __all__ = [
     "flatten_searchable",
     "libreoffice_convert",
     "merge_pdfs",
-    "notes_pdf",
     "powerpoint_to_pdf",
     "prepare_pdf",
     "process_files",
     "require_tesseract",
     "run_command",
     "safe_destination",
-    "speaker_notes",
 ]

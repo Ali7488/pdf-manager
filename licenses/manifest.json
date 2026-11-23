@@ -976,8 +976,8 @@
       ]
     },
     {
-      "name": "Feather Icons (design of some icons)",
-      "version": "4.x",
+      "name": "Feather Icons (design of the settings icon)",
+      "version": "v4.29.2",
       "license": "MIT",
       "platforms": [
         "linux",

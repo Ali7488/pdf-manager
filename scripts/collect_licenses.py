@@ -58,6 +58,7 @@ PYINSTALLER_VERSION = "6.22.3"
 # .github/workflows/build-windows.yml; scripts/check_licenses.py fails the build
 # when the bundled interpreter is a different version.
 PYTHON_WINDOWS_VERSION = "3.13.17"
+FEATHER_VERSION = "v4.29.2"
 # The Microsoft.Web.WebView2 NuGet release whose DLLs pywebview ships.
 WEBVIEW2_SDK_VERSION = "1.0.3856.49"
 WEBVIEW2_DLLS = {
@@ -600,21 +601,22 @@ def other_components() -> list[Component]:
         )
     )
     # Icons: drawn inline in frontend/src/components/Icon/Icon.tsx. The settings
-    # gear closely follows Feather Icons' design, so Feather is credited.
+    # gear is Feather's "settings" path with its numbers rounded, so Feather's own
+    # licence file (from the v4.29.2 tag) is shipped.
     target = LICENSES / "other" / "feather-icons"
     target.mkdir(parents=True, exist_ok=True)
-    mit = urllib.request.urlopen(SPDX_TEXT.format("MIT"), timeout=60).read().decode()
-    (target / "LICENSE").write_text(
-        mit.replace("<year>", "2013-2017").replace("<copyright holders>", "Cole Bemis"),
-        encoding="utf-8",
+    feather = _download(
+        f"https://raw.githubusercontent.com/feathericons/feather/{FEATHER_VERSION}/LICENSE",
+        f"feather-{FEATHER_VERSION}-LICENSE",
     )
+    shutil.copyfile(feather, target / "LICENSE")
     out.append(
         Component(
-            "Feather Icons (design of some icons)",
-            "4.x",
+            "Feather Icons (design of the settings icon)",
+            FEATHER_VERSION,
             "MIT",
             {"windows", "linux"},
-            "Some interface icon shapes",
+            "The settings gear icon is derived from Feather's",
             ["other/feather-icons/LICENSE"],
             "other",
         )

@@ -101,6 +101,7 @@ Every problem the user should see is an `Issue`:
 - `troubleshooting`: a few simple steps for the likely cause. Written by the backend so the wording lives in one place.
 - `details`: technical text (raw error output) for an optional "Show details" section.
 - `logFile`: path of the log file holding the full record, if one was written.
+- `command`: a command the user can copy and run themselves, shown with a Copy button (for example installing Tesseract on Linux, decision C16); otherwise null. The app never runs such commands for the user.
 
 Every issue is also written to the logs folder.
 

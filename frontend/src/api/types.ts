@@ -97,6 +97,11 @@ export interface Issue {
   details: string | null;
   /** Log file with the full record, if written. */
   logFile: string | null;
+  /**
+   * A command the user can copy and run themselves (for example the Linux package
+   * install for Tesseract), shown with a Copy button; null when there is none.
+   */
+  command: string | null;
   /** The input file this is about, if any. */
   file: string | null;
 }

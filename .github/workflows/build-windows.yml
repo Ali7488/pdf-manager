@@ -53,6 +53,9 @@ jobs:
           $appDir = Join-Path $env:LOCALAPPDATA 'Programs\PDF Manager'
           $app = Join-Path $appDir 'PDF Manager.exe'
           if (-not (Test-Path $app)) { throw "The app wasn't installed at $app" }
+          foreach ($name in 'LICENSE.txt', 'THIRD_PARTY_NOTICES.md', 'licenses\python') {
+            if (-not (Test-Path (Join-Path $appDir $name))) { throw "Missing licence file: $name" }
+          }
           $env:PDF_MANAGER_SMOKE_TEST = '1'
           $run = Start-Process $app -Wait -PassThru
           $log = Join-Path $appDir 'logs\pdf-manager.log'

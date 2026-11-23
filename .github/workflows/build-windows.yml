@@ -56,6 +56,9 @@ jobs:
           $env:PDF_MANAGER_SMOKE_TEST = '1'
           $run = Start-Process $app -Wait -PassThru
           $log = Join-Path $appDir 'logs\pdf-manager.log'
+          # Copy the app's logs into the workspace so they can be uploaded on failure.
+          New-Item -ItemType Directory -Force app-logs | Out-Null
+          if (Test-Path (Join-Path $appDir 'logs')) { Copy-Item (Join-Path $appDir 'logs\*') app-logs }
           if (Test-Path $log) { Get-Content $log -Tail 60 } else { Write-Host "No log at $log" }
           if ($run.ExitCode -ne 0) { throw "Smoke test failed (exit code $($run.ExitCode))" }
           if (-not (Select-String -Path $log -Pattern 'SMOKE TEST PASSED' -Quiet)) {
@@ -69,7 +72,7 @@ jobs:
           name: windows-install-logs
           path: |
             install.log
-            ~/AppData/Local/Programs/PDF Manager/logs/
+            app-logs/
           if-no-files-found: ignore
           retention-days: 7
 

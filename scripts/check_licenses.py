@@ -17,6 +17,13 @@ the bundled Python must be the version whose licence we ship; every bundled Pyth
 package must be in the manifest; and, with ``--installed``, the licence files next to the
 app must be byte-identical to the repository's.
 
+``bundle`` also keeps the Microsoft Visual C++ runtime out of the app (decision P32): no
+Visual C++ runtime DLL may be bundled anywhere in it. The app relies on the separately
+installed Microsoft Visual C++ Redistributable instead, so the check reads every bundled
+binary's import table and fails unless ``packaging/installer.iss`` checks for each runtime
+DLL they import (``VCRuntimeFiles``) and requires a redistributable at least as new as the
+newest MSVC toolset that linked them (``VCRuntimeMinMajor``/``VCRuntimeMinMinor``).
+
 Exit code 0 means every check passed; 1 lists the failures. It doesn't decide legal
 questions: see LICENSING.md and docs/LICENSING_AUDIT_2026-11-23.md for those.
 """
@@ -28,6 +35,7 @@ import fnmatch
 import hashlib
 import json
 import re
+import struct
 import subprocess
 import sys
 from pathlib import Path
@@ -56,8 +64,6 @@ BINARY_RULES = [
     ("unins*.exe", "INNO SETUP"),
     ("_internal/pymupdf/*", "pymupdf"),
     ("_internal/mupdfcpp64.dll", "pymupdf"),
-    ("_internal/vcruntime140*.dll", "MSVC RUNTIME"),
-    ("_internal/msvcp140*.dll", "MSVC RUNTIME"),
     ("_internal/webview/lib/microsoft.web.webview2.*.dll", "WEBVIEW2"),
     ("_internal/webview/lib/runtimes/*/native/webview2loader.dll", "WEBVIEW2"),
     ("_internal/webview/lib/webbrowserinterop.*.dll", "pywebview"),
@@ -93,10 +99,17 @@ NATIVE = {".dll", ".pyd", ".exe", ".so"}
 NON_PACKAGE = {
     "WEBVIEW2": "WebView2",
     "PYTHON RUNTIME": "python.org Windows",
-    "MSVC RUNTIME": "Visual C++ runtime",
     "PyInstaller bootloader": "PyInstaller bootloader",
     "INNO SETUP": "Inno Setup",
 }
+# DLLs of the Microsoft Visual C++ Redistributable (v14: Visual Studio 2015-2026):
+# the C/C++ runtime, OpenMP, C++ AMP, ConcRT and MFC. None of them may be bundled
+# (decision P32); the installer checks that the redistributable provides them.
+VC_RUNTIME_DLL = re.compile(
+    r"(vcruntime|msvcp|concrt|vccorlib|vcomp|vcamp|mfcm?)14\d\w*\.dll$", re.I
+)
+# Windows provides the Universal C Runtime itself (Windows 10 and later).
+WINDOWS_PROVIDED_DLL = re.compile(r"(ucrtbase|api-ms-win-.*)\.dll$", re.I)
 
 
 class Report:
@@ -286,6 +299,30 @@ def check_repo(report: Report) -> None:
         '{#RepoRoot}\\licenses\\*"' in iss and "recursesubdirs" in iss,
         "installer.iss doesn't install the whole licenses folder",
     )
+    # The Visual C++ runtime isn't bundled (decision P32): the installer must check for
+    # the redistributable, and must not offer to start the app without it.
+    vc_runtime = installer_vc_runtime()
+    report.check(
+        vc_runtime is not None and {"vcruntime140.dll", "msvcp140.dll"} <= vc_runtime[0],
+        "installer.iss doesn't check for the Microsoft Visual C++ Redistributable",
+    )
+    report.check(
+        bool(re.search(r"^Filename: .*AppExeName.*Check: CanStartApp", iss, re.M))
+        and "IsVCRuntimeInstalled" in iss.split("function CanStartApp", 1)[-1][:400],
+        "installer.iss offers to start the app without checking for the Visual C++ runtime",
+    )
+    report.check(
+        "Visual C++ Redistributable" in notices.split("## Not included", 1)[-1],
+        "THIRD_PARTY_NOTICES.md doesn't list the Visual C++ Redistributable as not included",
+    )
+    if vc_runtime:
+        minimum = f"{vc_runtime[1][0]}.{vc_runtime[1][1]}"
+        for doc in ("THIRD_PARTY_NOTICES.md", "README.md", "packaging/README.md"):
+            report.check(
+                f"version {minimum} or newer" in (ROOT / doc).read_text(encoding="utf-8"),
+                f"{doc} doesn't give the Visual C++ Redistributable version the installer "
+                f"requires ({minimum} or newer)",
+            )
     for doc in ("README.md", "LICENSING.md", "docs/releases/v0.5.0.md"):
         text = (ROOT / doc).read_text(encoding="utf-8")
         report.check("AGPL-3.0" in text, f"{doc} doesn't say the distributed app is AGPL-3.0")
@@ -297,6 +334,78 @@ def check_repo(report: Report) -> None:
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def pe_imports(path: Path) -> tuple[list[str], tuple[int, int]] | None:
+    """Read the DLLs a Windows binary imports, and the linker version that built it.
+
+    Covers normal and delay-loaded imports. Pure Python, so it also runs on Linux.
+
+    Args:
+        path: A ``.dll``, ``.pyd`` or ``.exe`` file.
+
+    Returns:
+        ``(lower-case DLL names, (linker major, linker minor))``, or None when the file
+        isn't a readable PE image.
+    """
+    data = path.read_bytes()
+    try:
+        if data[:2] != b"MZ":
+            return None
+        pe = struct.unpack_from("<I", data, 0x3C)[0]
+        if data[pe : pe + 4] != b"PE\0\0":
+            return None
+        sections, optional_size = struct.unpack_from("<H12xH", data, pe + 6)
+        optional = pe + 24
+        magic, major, minor = struct.unpack_from("<HBB", data, optional)
+        directories = optional + (112 if magic == 0x20B else 96)
+        table = []
+        for i in range(sections):
+            size, address, raw_size, raw = struct.unpack_from(
+                "<IIII", data, optional + optional_size + 40 * i + 8
+            )
+            table.append((address, max(size, raw_size), raw))
+
+        def offset(rva: int) -> int | None:
+            for address, size, raw in table:
+                if address <= rva < address + size:
+                    return rva - address + raw
+            return None
+
+        names = []
+        # Data directory 1: imports (20-byte entries, name at 12); 13: delay-load
+        # imports (32-byte entries, name at 4).
+        for index, entry_size, name_at in ((1, 20, 12), (13, 32, 4)):
+            rva = struct.unpack_from("<I", data, directories + 8 * index)[0]
+            at = offset(rva) if rva else None
+            while at is not None and at + entry_size <= len(data):
+                entry = data[at : at + entry_size]
+                if not any(entry):
+                    break
+                name = offset(struct.unpack_from("<I", entry, name_at)[0])
+                if name is not None:
+                    names.append(data[name : data.index(b"\0", name)].decode("latin-1").lower())
+                at += entry_size
+        return names, (major, minor)
+    except (struct.error, ValueError):
+        return None
+
+
+def installer_vc_runtime() -> tuple[set[str], tuple[int, int]] | None:
+    """What ``packaging/installer.iss`` checks for before it lets the app start.
+
+    Returns:
+        ``(DLL names it looks for in System32, (minimum major, minor version))``, or
+        None when the installer has no Visual C++ Redistributable check.
+    """
+    iss = (ROOT / "packaging" / "installer.iss").read_text(encoding="utf-8")
+    files = re.search(r"VCRuntimeFiles\s*=\s*'([^']+)'", iss)
+    major = re.search(r"VCRuntimeMinMajor\s*=\s*(\d+)", iss)
+    minor = re.search(r"VCRuntimeMinMinor\s*=\s*(\d+)", iss)
+    if not (files and major and minor):
+        return None
+    names = {name.strip().lower() for name in files.group(1).split(",") if name.strip()}
+    return names, (int(major.group(1)), int(minor.group(1)))
 
 
 def classify(relative: str) -> str | None:
@@ -322,10 +431,20 @@ def check_bundle(report: Report, app: Path, installed: bool) -> None:
     # Every native file belongs to a listed component.
     unknown = []
     counts: dict[str, int] = {}
+    # Visual C++ runtime DLLs the bundled binaries import, and who imports them.
+    needed: dict[str, str] = {}
+    newest: tuple[tuple[int, int], str] = ((0, 0), "")
     for path in sorted(app.rglob("*")):
         if not path.is_file() or path.suffix.lower() not in NATIVE:
             continue
         relative = path.relative_to(app).as_posix()
+        info = pe_imports(path) if not VC_RUNTIME_DLL.match(path.name) else None
+        if info:
+            runtime = [name for name in info[0] if VC_RUNTIME_DLL.match(name)]
+            for name in runtime:
+                needed.setdefault(name, relative)
+            if runtime and info[1] > newest[0]:
+                newest = (info[1], relative)
         component = classify(relative)
         if component is None:
             unknown.append(relative)
@@ -342,10 +461,44 @@ def check_bundle(report: Report, app: Path, installed: bool) -> None:
             report.check(words in listed, f"The notices don't list the {component.lower()}")
     print("Native files by component:", json.dumps(counts, sort_keys=True))
 
-    # Microsoft files Windows provides itself must not be shipped (see pdf-manager.spec).
-    for path in app.rglob("*"):
-        if re.match(r"(ucrtbase|api-ms-win-.*|mfc140u)\.dll$", path.name, re.I):
-            report.fail(f"{path.relative_to(app).as_posix()} shouldn't be bundled")
+    # Microsoft runtime files must not be shipped (see pdf-manager.spec): Windows
+    # provides the Universal C Runtime, and the separately installed Microsoft Visual C++
+    # Redistributable provides the Visual C++ runtime (decision P32).
+    for path in sorted(app.rglob("*")):
+        relative = path.relative_to(app).as_posix()
+        if WINDOWS_PROVIDED_DLL.match(path.name):
+            report.fail(f"{relative} shouldn't be bundled: Windows provides it")
+        elif VC_RUNTIME_DLL.match(path.name):
+            report.fail(
+                f"{relative} shouldn't be bundled: the Microsoft Visual C++ "
+                "Redistributable provides it (exclude it in pdf-manager.spec)"
+            )
+
+    # What the app needs from the redistributable is what the installer checks for.
+    vc_runtime = installer_vc_runtime()
+    if vc_runtime is None:
+        report.fail("installer.iss doesn't check for the Microsoft Visual C++ Redistributable")
+    else:
+        checked, minimum = vc_runtime
+        for name, importer in sorted(needed.items()):
+            report.check(
+                name in checked,
+                f"{importer} needs {name} from the Visual C++ Redistributable, but "
+                "installer.iss doesn't check for it (VCRuntimeFiles)",
+            )
+        (major, minor), importer = newest
+        report.check(
+            (major, minor) <= minimum,
+            f"{importer} was linked by MSVC {major}.{minor}, newer than the Visual C++ "
+            f"Redistributable installer.iss requires ({minimum[0]}.{minimum[1]}); raise "
+            "VCRuntimeMinMajor/VCRuntimeMinMinor",
+        )
+        print(
+            "Needs from the Microsoft Visual C++ Redistributable:",
+            ", ".join(sorted(needed)) or "nothing",
+            f"(newest MSVC linker {major}.{minor}, in {importer or '-'}; the installer "
+            f"requires {minimum[0]}.{minimum[1]} or newer)",
+        )
 
     # Qt is Linux-only (decision P19).
     qt = [

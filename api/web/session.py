@@ -157,6 +157,16 @@ class Session:
         folder = self.staging / "uploads" / digest
         folder.mkdir(parents=True, exist_ok=True)
         target = folder / safe
+        if target.is_file():
+            # Already staged (same name, size and time): keep that copy, which a job may
+            # be reading, and read this body only to the end.
+            remaining = size
+            while remaining > 0:
+                chunk = read(min(CHUNK, remaining))
+                if not chunk:
+                    raise UploadError("The upload ended early")
+                remaining -= len(chunk)
+            return target
         partial = folder / f".{safe}.part"
         remaining = size
         try:

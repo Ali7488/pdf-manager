@@ -394,6 +394,22 @@ def test_upload_names_are_made_safe():
         safe_upload_name("..")
 
 
+def test_the_same_upload_again_keeps_the_staged_copy(tmp_path):
+    """A repeated upload never replaces a copy a job may be reading (and Windows refuses)."""
+    session = Session(tmp_path)
+    body = b"%PDF-1.4 first"
+
+    def reader():
+        chunks = iter([body])
+        return lambda size: next(chunks, b"")
+
+    first = session.stage_upload("a.pdf", len(body), "1", reader())
+    first.write_bytes(b"in use")  # Stands for a copy a job has open.
+    again = session.stage_upload("a.pdf", len(body), "1", reader())
+    assert again == first and first.read_bytes() == b"in use"
+    session.close()
+
+
 def test_an_upload_that_ends_early_leaves_nothing(tmp_path):
     session = Session(tmp_path)
     chunks = iter([b"%PDF-1.4 part", b""])

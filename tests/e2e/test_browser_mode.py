@@ -374,10 +374,20 @@ def test_a_reload_during_a_job_shows_it_again(page, tmp_path):
     assert pages(result) == 240
 
 
+def _text(path: Path) -> str:
+    return path.read_text(encoding="utf-8") if path.is_file() else ""
+
+
 def test_settings_survive_a_restart(browser, server, page):
     go(page, "Settings")
     page.get_by_text("Dark", exact=True).click()
-    page.wait_for_timeout(500)
+    settings = server.home / "pdf-manager" / "settings.json"
+    if not settings.parent.is_dir():  # Windows: %LOCALAPPDATA%\PDFManager.
+        settings = server.home / "PDFManager" / "settings.json"
+    deadline = time.monotonic() + 15
+    while time.monotonic() < deadline and '"dark"' not in _text(settings):
+        page.wait_for_timeout(100)
+    assert '"dark"' in _text(settings), "the setting wasn't saved"
     server.stop()
     server.start()
     tab = browser.new_page()

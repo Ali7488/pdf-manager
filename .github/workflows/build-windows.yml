@@ -1,0 +1,48 @@
+# Builds the PDF Manager Windows installer and uploads it as an artifact.
+#
+# Manual trigger only (Actions > "Build Windows installer" > Run workflow):
+# the repository is private and Actions minutes cost money, so there are
+# deliberately no push or pull_request triggers.
+name: Build Windows installer
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v5
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: Install Inno Setup 6
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+
+      - name: Build the installer
+        shell: pwsh
+        run: ./packaging/build.ps1
+
+      - name: Upload the installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: PDF-Manager-Setup
+          path: dist/installer/*.exe
+          if-no-files-found: error
+          # Artifacts count against private-repo storage; keep them briefly.
+          retention-days: 14

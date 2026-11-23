@@ -19,7 +19,7 @@ A short, summarized record of each request made to the coding agent, and what ca
     - [x] Add `AGENTS.md`, `CLAUDE.md` and this prompts log.
     - [x] *(service done; not yet run on Windows)* **PowerPoint quitting:** only close PowerPoint if the converter started it, so the user's open PowerPoint and presentations are never closed.
     - [x] *(service done: warning or error issue with the real PowerPoint error; the popup is the frontend's job)* **PowerPoint errors:** keep the real PowerPoint error. If conversion fails completely, show it in a popup; if LibreOffice rescued it, return it as a structured warning instead.
-    - [ ] *(API layer, in progress)* **Error logs:** write errors and warnings to a logs folder next to the installed app, and add a button that opens that folder in File Explorer.
+    - [x] *(API layer: rotating logs next to the app, `openLogsFolder`; button in Settings and issue popups; not yet run on Windows)* **Error logs:** write errors and warnings to a logs folder next to the installed app, and add a button that opens that folder in File Explorer.
     - [x] *(service done: cancel stops between pages and kills Tesseract/LibreOffice/PowerPoint we started; the button is the frontend's job)* **Cancel:** a manual Cancel button that stops a running job, including killing Tesseract or LibreOffice mid-run.
     - [x] *(done: 2 minutes per OCR page by default, 5 minutes per PowerPoint/LibreOffice export)* **Automatic timeouts:** give up on a page that takes too long to OCR (default to be chosen, likely about 2 minutes, configurable), and on a PowerPoint export that hangs.
     - [x] **Keep bookmarks** when merging (and when flattening), with one top-level bookmark per input file.

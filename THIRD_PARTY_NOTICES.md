@@ -89,7 +89,6 @@ files come from the MuPDF 1.28.2 source release.
 | Python runtime (python.org Windows build) | 3.13.17 | PSF-2.0 (and the bundled libraries' licences inside) | Windows | Runs the app (bundled by PyInstaller) | [`python-runtime-windows-3.13.17/LICENSE.txt`](licenses/other/python-runtime-windows-3.13.17/LICENSE.txt), [`python-runtime-windows-3.13.17/license.rst`](licenses/other/python-runtime-windows-3.13.17/license.rst) |
 | Python runtime (Linux packages; confirm with the v0.75 build) | 3.13.18 | PSF-2.0 | Linux | Runs the app (bundled by PyInstaller) | [`python-runtime-linux/LICENSE.txt`](licenses/other/python-runtime-linux/LICENSE.txt) |
 | PyInstaller bootloader | 6.22.3 | GPL-2.0-or-later WITH Bootloader-exception | Linux, Windows | Starts the app; the exception allows any licence for the app | [`pyinstaller-6.22.3/COPYING.txt`](licenses/other/pyinstaller-6.22.3/COPYING.txt) |
-| Microsoft Visual C++ runtime (vcruntime140.dll, vcruntime140_1.dll, msvcp140*.dll) | 14.x | Microsoft Visual Studio "Distributable Code" terms (proprietary; see note) | Windows | Needed by the Python runtime and PyMuPDF | [`microsoft-vc-runtime/README.txt`](licenses/other/microsoft-vc-runtime/README.txt) |
 | Inno Setup (the installer and unins000.exe) | 6.7.1 | Inno Setup License (permissive) | Windows | Installs and uninstalls the app | [`inno-setup/license.txt`](licenses/other/inno-setup/license.txt) |
 | Feather Icons (design of the settings icon) | v4.29.2 | MIT | Linux, Windows | The settings gear icon is derived from Feather's | [`feather-icons/LICENSE`](licenses/other/feather-icons/LICENSE) |
 | Microsoft WebView2 SDK files (Microsoft.Web.WebView2.Core.dll, Microsoft.Web.WebView2.WinForms.dll, WebView2Loader.dll), inside pywebview | 1.0.3856.49 | BSD-3-Clause-style Microsoft licence (no source published; see note) | Windows | Connects the window to the Edge WebView2 Runtime on Windows | [`microsoft-webview2-sdk-1.0.3856.49/LICENSE.txt`](licenses/other/microsoft-webview2-sdk-1.0.3856.49/LICENSE.txt), [`microsoft-webview2-sdk-1.0.3856.49/NOTICE.txt`](licenses/other/microsoft-webview2-sdk-1.0.3856.49/NOTICE.txt) |
@@ -101,12 +100,10 @@ byte-for-byte as they are in Microsoft's `Microsoft.Web.WebView2` NuGet package
 code for them. Whether the AGPL-3.0 requires it is an open question; see
 [LICENSING.md](LICENSING.md).
 
-**Note on the Microsoft Visual C++ runtime:** the Windows app carries Microsoft's C++
-runtime DLLs, which the Python runtime and PyMuPDF need. They are proprietary Microsoft
-files, redistributed under Visual Studio's "Distributable Code" terms
-(`licenses/other/microsoft-vc-runtime/README.txt`). How they fit the AGPL-3.0's "System
-Libraries" rule is an open question; see [LICENSING.md](LICENSING.md). The Universal C
-Runtime is part of Windows 10 and 11 and is not shipped.
+**Note on the Microsoft C and C++ runtimes:** the Windows app doesn't ship them. The
+Python runtime, PyMuPDF and pywin32 need Microsoft's Visual C++ runtime, which comes from
+the separately installed Microsoft Visual C++ Redistributable (see below); the installer
+checks for it. The Universal C Runtime is part of Windows 10 and 11.
 
 ## Not included (installed separately, by the user or the installer wizard)
 
@@ -116,7 +113,11 @@ Runtime is part of Windows 10 and 11 and is not shipped.
 | LibreOffice | MPL-2.0 | Optional; installed separately. |
 | Microsoft PowerPoint | Proprietary | Optional; used only if already installed. |
 | Microsoft Edge WebView2 Runtime | Microsoft software licence | Part of Windows 11; not shipped. |
+| Microsoft Visual C++ Redistributable (x64) | Microsoft software licence | Required; see note. |
 | Segoe UI font | Proprietary | Used only if Windows provides it; never bundled. |
+
+The Microsoft Visual C++ Redistributable (x64, version 14.44 or newer) is installed from
+Microsoft (the installer offers the download); it is never shipped with the app.
 
 The app runs the separately installed Tesseract program for OCR. MuPDF also compiles a
 copy of the Tesseract library into PyMuPDF (listed above), which PDF Manager doesn't use.

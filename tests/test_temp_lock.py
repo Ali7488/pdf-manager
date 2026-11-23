@@ -1,53 +1,48 @@
-"""Regression tests for OCR PDF temporary-file WinError 32 cleanup bug.
+"""Regression test for the Windows "file in use" (WinError 32) bug during OCR.
 
-Before the fix, `flatten_searchable()` unlinked the page_*.png and ocr_*.pdf
-while the Windows PDF/file scan stack could still hold those outputs open.
-This test simulates the Windows behavior by raising PermissionError if the
-converter tries to unlink those temporary files inside the worker.
+An early version deleted each page image and OCR PDF right after using it,
+while Windows (a PDF renderer or real-time virus scanner) could still hold them
+open, which crashed the conversion. Temporary files are now kept until the
+whole job is done. This simulates the Windows behaviour by making any attempt
+to delete those files raise PermissionError.
 """
+
 from __future__ import annotations
+
 import hashlib
-import tempfile
+import shutil
 from pathlib import Path
 from unittest.mock import patch
+
 import fitz
-import sys
-sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-from converter import FLATTEN, FLATTEN_MERGE, process_files, find_tesseract
+import pytest
+
+from converter import Action, ActionData, ActionSettings, run_action
+from tests.helpers import text_pdf
+
+pytestmark = pytest.mark.skipif(not shutil.which("tesseract"), reason="Tesseract not installed")
+REAL_UNLINK = Path.unlink
 
 
-def checksum(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+def refuse_temp_unlink(self: Path, *args, **kwargs):
+    if self.name.startswith(("ocr_", "page_")):
+        raise PermissionError(
+            32, "The process cannot access the file because it is being used", str(self)
+        )
+    return REAL_UNLINK(self, *args, **kwargs)
 
 
-def main() -> None:
-    assert find_tesseract(), 'Tesseract OCR must be available for this test'
-    with tempfile.TemporaryDirectory() as d:
-        work = Path(d)
-        src = work / 'source.pdf'
-        with fitz.open() as pdf:
-            page = pdf.new_page(width=420, height=280)
-            page.insert_text((20, 80), 'Sample document: searchable text check', fontsize=18)
-            pdf.save(str(src))
-        original_checksum = checksum(src)
-        real_unlink = Path.unlink
-        def refuse_ocr_temp_unlink(self: Path, *args, **kwargs):
-            if self.name.startswith(('ocr_', 'page_')):
-                raise PermissionError(32, 'The process cannot access the file because it is being used by another process', str(self))
-            return real_unlink(self, *args, **kwargs)
-
-        with patch.object(Path, 'unlink', refuse_ocr_temp_unlink):
-            for mode in (FLATTEN, FLATTEN_MERGE):
-                results = process_files([src], mode, work / mode, lambda _: None)
-                assert len(results) == 1
-                output = results[0][1]
-                assert output.is_file()
-                with fitz.open(str(output)) as doc:
-                    assert len(doc) == 1
-                    assert 'searchable' in doc[0].get_text().lower()
-                    assert len(doc[0].get_images()) > 0
-                assert checksum(src) == original_checksum, 'Source was modified!'
-        print('PASS: WinError 32 simulated OCR temp lock, OCR text, original preservation')
-
-if __name__ == '__main__':
-    main()
+@pytest.mark.parametrize("action", [Action.FLATTEN, Action.FLATTEN_MERGE])
+def test_locked_temp_files_do_not_break_flattening(tmp_path, action):
+    src = text_pdf(tmp_path / "source.pdf", ["Sample document searchable text check"], (420, 280))
+    before = hashlib.sha256(src.read_bytes()).hexdigest()
+    with patch.object(Path, "unlink", refuse_temp_unlink):
+        result = run_action(
+            action, ActionSettings(use_ocr=True), ActionData([src]), scratch=tmp_path / "w"
+        )
+    [output] = result.outputs
+    with fitz.open(str(output.path)) as doc:
+        assert len(doc) == 1
+        assert "searchable" in doc[0].get_text().lower()
+        assert doc[0].get_images()
+    assert hashlib.sha256(src.read_bytes()).hexdigest() == before

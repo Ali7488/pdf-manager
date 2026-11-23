@@ -12,7 +12,7 @@ from pathlib import Path
 import fitz
 import pytest
 
-from api import bridge, platforms, service
+from api import logging_setup, platforms, service
 from api.bridge import Api, event_script
 from api.jobs import JobManager
 from api.platforms import linux, windows
@@ -110,7 +110,7 @@ def store(tmp_path):
 def api_obj(window, store, run, tmp_path, logs):
     """An Api bound to the fake window, with a fake run_action."""
     api = Api(store)
-    api._jobs = JobManager(api._emit, run_action=run, temp_dir=tmp_path)
+    api._workflow.jobs = JobManager(api._emit, run_action=run, temp_dir=tmp_path)
     api._bind_window(window)
     yield api
     api._shutdown()
@@ -672,7 +672,7 @@ def test_open_logs_folder_creates_it(api_obj, monkeypatch, logs):
     """open_logs_folder creates the logs folder if needed, then opens it."""
     opened = []
     monkeypatch.setattr(platforms, "open_folder", opened.append)
-    for handler in list(bridge.logging_setup._handlers):
+    for handler in list(logging_setup._handlers):
         handler.close()
     logs.unlink()
     logs.parent.rmdir()

@@ -1,46 +1,47 @@
 /*
- * Every colour the components use, derived from each theme's three tones
- * (themes/*.css): --base (background), --text and --accent. Hovers and
- * selections are light tints of those tones, never new colours. Components
- * only use these --color-* names.
+ * Every colour the components use, derived from each theme's four colours
+ * (themes/*.css): --bg (page), --fg (side pane, panels, tiles, controls),
+ * --text and --accent (main buttons, current item, links, focus). Lines and
+ * hovers are blends of those colours, never new ones. Components only use
+ * these --color-* names.
  */
 :root,
 [data-theme] {
-  /* Surfaces: one background everywhere. */
-  --color-workspace: var(--base);
-  --color-background: var(--base);
-  --color-surface: var(--base);
-  --color-surface-muted: color-mix(in srgb, var(--accent) 12%, var(--base));
-  --color-overlay: color-mix(in srgb, var(--base) 70%, transparent);
+  /* Surfaces */
+  --color-workspace: var(--bg);
+  --color-background: var(--bg);
+  --color-surface: var(--fg);
+  --color-surface-muted: var(--fg);
+  --color-overlay: color-mix(in srgb, var(--bg) 70%, transparent);
 
   /* Text */
   --color-text: var(--text);
-  --color-text-muted: color-mix(in srgb, var(--text) 82%, var(--base));
-  --color-text-inverse: var(--base);
+  --color-text-muted: color-mix(in srgb, var(--text) 75%, var(--bg));
+  --color-text-inverse: var(--bg);
 
-  /* Lines are the accent, so the scheme stays three-toned and high-contrast. */
-  --color-border: color-mix(in srgb, var(--accent) 55%, var(--base));
-  --color-border-strong: var(--accent);
+  /* Lines: a text/background blend, clearly visible but not harsh. */
+  --color-border: color-mix(in srgb, var(--text) 24%, var(--bg));
+  --color-border-strong: color-mix(in srgb, var(--text) 40%, var(--bg));
 
-  /* Side pane and main buttons: the accent, with background-coloured text. */
-  --color-band: var(--accent);
-  --color-band-hover: color-mix(in srgb, var(--text) 18%, var(--accent));
-  --color-band-active: color-mix(in srgb, var(--base) 22%, var(--accent));
-  --color-on-band: var(--base);
+  /* Side pane: the foreground colour; the current item is marked with the accent. */
+  --color-band: var(--fg);
+  --color-band-hover: color-mix(in srgb, var(--text) 8%, var(--fg));
+  --color-band-active: color-mix(in srgb, var(--accent) 22%, var(--fg));
+  --color-on-band: var(--text);
 
-  /* Accent: links, focus, selection, checkboxes, progress */
+  /* Accent */
   --color-primary: var(--accent);
   --color-primary-hover: var(--accent);
-  --color-primary-soft: color-mix(in srgb, var(--accent) 18%, var(--base));
-  --color-on-primary: var(--base);
+  --color-primary-soft: color-mix(in srgb, var(--accent) 18%, var(--bg));
+  --color-on-primary: var(--bg);
   --color-link: var(--accent);
   --color-link-hover: var(--accent);
 
-  /* Status uses the accent too; issues carry an icon and a title. */
+  /* Status uses the accent; issues carry an icon and a title. */
   --color-success: var(--accent);
   --color-warning: var(--accent);
   --color-danger: var(--accent);
 
   --shadow-sm: none;
-  --shadow-lg: 0 2px 12px color-mix(in srgb, var(--base) 60%, black);
+  --shadow-lg: 0 2px 12px color-mix(in srgb, var(--bg) 60%, black);
 }

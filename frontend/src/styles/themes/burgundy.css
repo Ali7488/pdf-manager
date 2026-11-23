@@ -1,11 +1,13 @@
 /*
- * Burgundy: burgundy and bright pink, white text.
- * Exactly three tones: base (background), text, accent. Everything else in
- * ../palette.css is derived from these three.
+ * Burgundy: muted burgundy with pink.
+ * Muted, with neighbouring colours easy to tell apart. Four colours only:
+ * background, foreground (side pane, panels, controls), text, and one accent.
+ * Everything else in ../palette.css is derived from these.
  */
 [data-theme="burgundy"] {
   color-scheme: dark;
-  --base: #4a0f26;
-  --text: #ffffff;
-  --accent: #ff8fbd;
+  --bg: #3b1f2c;
+  --fg: #53293c;
+  --text: #f3e1e8;
+  --accent: #d98aa8;
 }

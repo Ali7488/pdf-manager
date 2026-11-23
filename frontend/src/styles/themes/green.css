@@ -1,11 +1,13 @@
 /*
- * Green: forest green and coral, cream text.
- * Exactly three tones: base (background), text, accent. Everything else in
- * ../palette.css is derived from these three.
+ * Green: muted forest green with coral.
+ * Muted, with neighbouring colours easy to tell apart. Four colours only:
+ * background, foreground (side pane, panels, controls), text, and one accent.
+ * Everything else in ../palette.css is derived from these.
  */
 [data-theme="green"] {
   color-scheme: dark;
-  --base: #123222;
-  --text: #f7efd8;
-  --accent: #ff8a65;
+  --bg: #1f3429;
+  --fg: #2b473a;
+  --text: #ece4cf;
+  --accent: #df8f72;
 }

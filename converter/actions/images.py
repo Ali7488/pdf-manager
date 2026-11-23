@@ -184,7 +184,7 @@ def images_to_pdf(
         """
         ctx.check_cancel()
         ctx.report(
-            Stage.PREPARING,
+            Stage.CONVERTING_IMAGES,
             f"Adding image {index} of {total}: {image.name}",
             within_file=(index - 1) / total,
         )
@@ -206,7 +206,7 @@ def images_to_pdf(
                 _add_image_page(output, image)
                 size = _save(output, target)
             outputs.append(OutputFile(f"{image.stem}.pdf", target, 1, size))
-    ctx.report(Stage.PREPARING, "Images converted", within_file=1.0)
+    ctx.report(Stage.CONVERTING_IMAGES, "Images converted", within_file=1.0)
     log.debug(
         "Images to PDF done in %.2f s: %s",
         time.perf_counter() - started,

@@ -114,6 +114,7 @@ class Stage(StrEnum):
     MERGING = "merging"
     SPLITTING = "splitting"
     COMPRESSING = "compressing"
+    CONVERTING_IMAGES = "converting_images"
     FINISHING = "finishing"
 
 

@@ -46,6 +46,7 @@ ocr_work/
 build/
 dist/
 *.spec
+!packaging/*.spec
 *.zip
 *.7z
 *.log

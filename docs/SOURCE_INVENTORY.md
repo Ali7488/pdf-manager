@@ -14,7 +14,7 @@ These hashes describe the baseline at import time. Files have changed since.
 - `INSTALL.bat`: `f16761a172a915a1748a173e710da2946b0bd73d6a177e942dd1191fcc7209d0`
 - `OPEN.bat`: `4beb9dcc5e98e9ca76d858fc8433ce0ac6e28ff9f594fe1161f7cb6e7fbff047`
 - `install_windows.ps1`: `879d25102cc9e52030732d6615f502823ed525dc3dd93a414390b9da08c70f4a`
-- `SlideStitch.ico`: `4eec9db34cae0ac16d4d427f815bd0bcb30f5933d8fff90bf535b327ba0f1ba1`
+- `PDF Manager.ico`: `4eec9db34cae0ac16d4d427f815bd0bcb30f5933d8fff90bf535b327ba0f1ba1`
 - `tests/smoke_test.py`: `41d0ca185999d7cf727ebf45fb3a2de8dffbd7941d9291384f8b8fe2deb71b94`
 - `tests/test_temp_lock.py`: `be364f835ca8987adb714b4006b57551a062df2b875380df1eaa778bc1c0fcbd`
 - `assets/icon-preview.png`: `e427abcae48d1314210741c36ea148464fc329a22b72e9e3ca846bfe6c472b04`

@@ -1,6 +1,6 @@
 $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
-Write-Host '=== SlideStitch - Windows setup ===' -ForegroundColor Magenta
+Write-Host '=== PDF Manager - Windows setup ===' -ForegroundColor Magenta
 
 $python = $null
 $prefix = @()

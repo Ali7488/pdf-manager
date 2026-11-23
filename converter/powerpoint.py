@@ -14,7 +14,7 @@ def libreoffice_convert(source: Path, dest_dir: Path, filter_spec: str, extensio
     office = find_libreoffice()
     if office is None:
         raise RuntimeError("PowerPoint conversion requires Microsoft PowerPoint or LibreOffice.")
-    with tempfile.TemporaryDirectory(prefix="slidestitch-lo-") as profile:
+    with tempfile.TemporaryDirectory(prefix="pdf-manager-lo-") as profile:
         proc = run_command(
             [
                 str(office),

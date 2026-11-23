@@ -1,4 +1,4 @@
-# SlideStitch
+# PDF Manager
 
 A lightweight desktop tool for converting PowerPoint presentations and PDFs into flattened, searchable documents, with OCR and merging. It targets Windows.
 
@@ -64,7 +64,7 @@ Development only (`requirements-dev.txt`): python-pptx, which the tests use to b
   - `merge.py`: combining PDFs in order.
   - `pipeline.py`: preparing and validating each input, then running the chosen mode.
   - `output.py`: collision-safe output filenames.
-- `SlideStitch.ico`: application icon (`app.py` loads it from the repository root).
+- `PDF Manager.ico`: application icon (`app.py` loads it from the repository root).
 - `assets/`: preview images (not needed at runtime).
 - `tests/`: integration test and Windows file-lock regression test.
 - `docs/`: import provenance and review checklist.

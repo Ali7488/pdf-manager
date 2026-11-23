@@ -1,4 +1,4 @@
-"""SlideStitch: local PDF/PPT/PPTX conversion, image flattening, OCR and merge.
+"""PDF Manager: local PDF/PPT/PPTX conversion, image flattening, OCR and merge.
 
 The original inputs are never modified.  Results are staged in a temporary folder
 and only copied to the chosen destination after all requested conversion is done.

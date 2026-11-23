@@ -1,4 +1,4 @@
-"""SlideStitch: desktop dashboard to flatten, OCR and merge PDF/PowerPoint files."""
+"""PDF Manager: desktop dashboard to flatten, OCR and merge PDF/PowerPoint files."""
 
 from __future__ import annotations
 
@@ -39,10 +39,10 @@ LOW = "#a58b9a"
 SUCCESS = "#95d3b4"
 WARNING = "#f1c381"
 FONT = "Segoe UI"
-APP_NAME = "SlideStitch"
+APP_NAME = "PDF Manager"
 APP_DIR = Path(__file__).resolve().parent
 ICON_PATH = APP_DIR / f"{APP_NAME}.ico"
-CONF_DIR = Path(os.getenv("LOCALAPPDATA", Path.home())) / "SlideStitch"
+CONF_DIR = Path(os.getenv("LOCALAPPDATA", Path.home())) / "PDFManager"
 CONF_PATH = CONF_DIR / "settings.json"
 
 
@@ -569,7 +569,7 @@ class Dashboard:
         # Antivirus/PDF renderer locks can linger briefly on Windows.
         # Cleanup is best effort: never turn a successful conversion into a
         # failure just because one scratch file is temporarily locked.
-        self.temp = tempfile.TemporaryDirectory(prefix="slidestitch-", ignore_cleanup_errors=True)
+        self.temp = tempfile.TemporaryDirectory(prefix="pdf-manager-", ignore_cleanup_errors=True)
         self.set_busy(True)
         self.status.set("Converting files. Keep this window open...")
         threading.Thread(

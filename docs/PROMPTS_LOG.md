@@ -69,4 +69,7 @@ A short, summarized record of each request made to the coding agent, and what ca
     - [x] Record decision P16 and add the rule to `AGENTS.md`.
     - [ ] Write `docs/ARCHITECTURE.md` once `run_action` is implemented.
     - [ ] Update `docs/ENGINEERING_REVIEW.md` with the bugs found and their status, plus a review-status section.
+22. **Split the converter into folders by responsibility.** Checklist:
+    - [x] Record decision F36.
+    - [ ] Restructure `converter/` into subpackages once `run_action` lands (and update imports in merged agent branches).
 

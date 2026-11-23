@@ -80,6 +80,7 @@ Decisions made by the project owner, in their own direction (summarized, not quo
 | F33 | 2026-11-22 | **No separate first-time OCR check**; the Convert modal's check is enough. |
 | F34 | 2026-11-22 | **Function-based API:** every conversion action (Flatten, Merge, Split and so on) goes through **one function** that takes an **action enum**, a **settings object** and the **data** (the files): `startJob(action, settings, data)` in the UI, `run_action(action, settings, data)` in Python. |
 | F35 | 2026-11-22 | **Three separate layers:** the **frontend** (`frontend/`, React UI), the **API layer** (`api/`, the Python pywebview bridge: calls, events, job state, settings, saving) and the **service layer** (`converter/`, pure conversion logic with no UI or bridge code). |
+| F36 | 2026-11-22 | **`converter/` is split into subfolders by responsibility** (shared core types, actions, OCR, slides, tools, PDF helpers, files, platforms) instead of one flat folder. |
 
 ## Open questions
 

@@ -312,5 +312,7 @@ jobs:
           echo "ZIP: $zip_revision; source bundle: $source_revision; run: ${{ github.sha }}"
           test "$zip_revision" = "${{ github.sha }}"
           test "$source_revision" = "${{ github.sha }}"
-          tar -tzf "artifacts/PDF-Manager-browser-third-party-sources/app/pdf-manager-${{ github.sha }}-source.tar.gz" \
-            | grep -qx "pdf-manager-${{ github.sha }}/api/build_info.py"
+          # List to a file first: "tar | grep -q" fails under pipefail when grep stops early.
+          tar -tzf "artifacts/PDF-Manager-browser-third-party-sources/app/pdf-manager-${{ github.sha }}-source.tar.gz" > app-source-files.txt
+          grep -qx "pdf-manager-${{ github.sha }}/api/build_info.py" app-source-files.txt
+          echo "The app's source archive holds $(wc -l < app-source-files.txt) entries at ${{ github.sha }}"

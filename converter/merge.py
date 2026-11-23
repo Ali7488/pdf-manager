@@ -189,9 +189,3 @@ def _set_page_labels(doc: fitz.Document, lead: int) -> None:
         doc.set_page_labels(labels)
     except Exception:
         log.warning("Couldn't set page labels; viewers will number pages from 1.", exc_info=True)
-
-
-def merge_pdfs(sources: Sequence[Path], target: Path, report=None) -> None:
-    """Legacy wrapper for the old pipeline and Tkinter app; removed once they're migrated."""
-    parts = [Part(Path(source).stem, Path(source)) for source in sources]
-    merge_documents(parts, target, JobContext())

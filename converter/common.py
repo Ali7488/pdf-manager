@@ -150,11 +150,3 @@ class JobResult:
 
     outputs: list[OutputFile]
     warnings: list = field(default_factory=list)  # list[converter.issues.Issue]
-
-
-# --- Legacy names, kept only until the old pipeline and the Tkinter app are migrated. ---
-ALLOWED = DOCUMENT_EXTENSIONS
-FLATTEN = Action.FLATTEN
-FLATTEN_MERGE = Action.FLATTEN_MERGE
-MERGE = Action.MERGE
-MODES = {FLATTEN, FLATTEN_MERGE, MERGE}

@@ -181,8 +181,3 @@ def render_slides(source: Path, dest_dir: Path, ctx: JobContext, file_label: str
     if powerpoint_error is not None:
         ctx.warn(powerpoint_fallback(file_label, powerpoint_error))
     return result
-
-
-def powerpoint_to_pdf(source: Path, dest_dir: Path, report) -> Path:
-    """Legacy wrapper for the old pipeline and Tkinter app; removed once they're migrated."""
-    return render_slides(source, dest_dir, JobContext(), source.name)

@@ -117,13 +117,3 @@ def verify_flattened(path: Path, expected_pages: int, file_label: str) -> None:
             details = "Pages without an image: " + ", ".join(map(str, missing[:20]))
             raise ConversionError(flatten_check_failed(file_label, details))
     log.debug("Flatten check passed for %s (%d pages)", file_label, expected_pages)
-
-
-def flatten_searchable(source, target, work, report, engine=None, dpi=None) -> None:
-    """Legacy wrapper for the old pipeline and Tkinter app; removed once they're migrated."""
-    from .common import ActionSettings
-
-    settings = ActionSettings(use_ocr=True, tesseract_path=engine)
-    if dpi:
-        settings.dpi = dpi
-    flatten_pdf(Path(source), Path(target), Path(work), JobContext(settings), Path(source).name)

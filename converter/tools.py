@@ -135,18 +135,6 @@ def find_tesseract(configured: str | Path | None = None) -> Path | None:
     return _first_existing(candidates)
 
 
-def require_tesseract(configured: str | Path | None = None) -> Path:
-    """Legacy helper for the old pipeline: like :func:`find_tesseract`, but raises if missing.
-
-    Raises:
-        RuntimeError: Tesseract could not be found.
-    """
-    engine = find_tesseract(configured)
-    if engine is None:
-        raise RuntimeError("OCR engine missing. Install OCR or search for it in Settings.")
-    return engine
-
-
 def find_libreoffice() -> Path | None:
     """Find the LibreOffice executable (``soffice``), or return ``None``.
 

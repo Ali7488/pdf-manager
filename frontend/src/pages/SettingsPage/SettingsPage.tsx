@@ -13,7 +13,7 @@ import { NumberSetting } from "./NumberSetting";
 import { OcrSection } from "./OcrSection";
 import styles from "./SettingsPage.module.css";
 import { ThemePicker } from "./ThemePicker";
-import { COPYRIGHT, SOURCE_URL } from "../../lib/about";
+import { APP_LICENSE, COPYRIGHT, SOURCE_URL } from "../../lib/about";
 
 /** The Settings page. */
 export function SettingsPage() {
@@ -111,13 +111,28 @@ export function SettingsPage() {
       </Section>
 
       <Section title="About">
-        <p>PDF Manager {appInfo ? `version ${appInfo.version}` : ""}</p>
-        <p>{COPYRIGHT}. Released under the MIT License.</p>
         <p>
-          PDF Manager includes open-source software, including PyMuPDF (GNU AGPL-3.0). Their licences are in the
-          THIRD_PARTY_NOTICES file and the licenses folder where PDF Manager is installed. The complete source code is
-          available at {SOURCE_URL}.
+          PDF Manager {appInfo ? `version ${appInfo.version}` : ""} · {COPYRIGHT}
         </p>
+        <p>
+          PDF Manager is free software: you can redistribute it and/or change it under the terms of the{" "}
+          {APP_LICENSE} (GNU Affero General Public License, version 3). It comes with ABSOLUTELY NO WARRANTY.
+        </p>
+        <p>
+          It includes open-source components, including PyMuPDF ({APP_LICENSE}), each under its own licence. The
+          author's own source code is also available under the MIT License. The full licence texts, the
+          third-party notices and the build instructions come with the app and are in the repository.
+        </p>
+        <p>Complete source code: {SOURCE_URL}</p>
+        <div>
+          <Button
+            icon="folder"
+            disabled={!appInfo?.licensesDir}
+            onClick={() => appInfo && void api.openFolder(appInfo.licensesDir)}
+          >
+            Open licences folder
+          </Button>
+        </div>
       </Section>
     </>
   );

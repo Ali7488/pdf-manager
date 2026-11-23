@@ -6,7 +6,7 @@ import { useApp } from "../../state/AppContext";
 import type { Page } from "../../state/appReducer";
 import { Icon, type IconName } from "../Icon/Icon";
 import styles from "./Sidebar.module.css";
-import { COPYRIGHT } from "../../lib/about";
+import { APP_LICENSE, COPYRIGHT } from "../../lib/about";
 
 /** Sidebar navigation. The current tab is marked with `aria-current="page"`. */
 export function Sidebar() {
@@ -45,7 +45,11 @@ export function Sidebar() {
         {ACTIONS.map((info) => item(info.action, info.label, info.icon))}
       </ul>
       <ul className={`${styles.list} ${styles.bottom}`}>{item("settings", "Settings", "settings")}</ul>
-      <p className={styles.copyright}>{COPYRIGHT} · MIT License</p>
+      <p className={styles.copyright}>
+        {COPYRIGHT}
+        <br />
+        Free software ({APP_LICENSE})
+      </p>
     </nav>
   );
 }

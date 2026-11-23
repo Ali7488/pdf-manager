@@ -188,4 +188,33 @@ describe("SettingsPage", () => {
       expect(screen.getByRole("radio", { name: /^Dark/ })).toBeChecked();
     });
   });
+
+  describe("About and licensing (AGPL-3.0 appropriate legal notices)", () => {
+    it("shows the copyright, licence terms, no-warranty notice and source location", async () => {
+      await renderApp({ state: { page: "settings" } });
+      const about = within(screen.getByRole("region", { name: "About" }));
+      expect(about.getByText(/© 2026 Mohannad Ali/)).toBeInTheDocument();
+      expect(about.getByText(/GNU Affero General Public License, version 3/)).toBeInTheDocument();
+      expect(about.getByText(/ABSOLUTELY NO WARRANTY/)).toBeInTheDocument();
+      expect(about.getByText(/PyMuPDF/)).toBeInTheDocument();
+      expect(about.getByText(/github\.com\/Ali7488\/pdf-manager/)).toBeInTheDocument();
+    });
+
+    it("opens the licences folder", async () => {
+      const { user, mock } = await renderApp({ state: { page: "settings" } });
+      const openFolder = vi.spyOn(mock, "openFolder");
+      const button = await screen.findByRole("button", { name: "Open licences folder" });
+      await waitFor(() => expect(button).toBeEnabled());
+      await user.click(button);
+      const info = await mock.getAppInfo();
+      expect(openFolder).toHaveBeenCalledWith(info.licensesDir);
+    });
+
+    it("never describes the app as MIT-only in the side pane", async () => {
+      await renderApp();
+      const footer = screen.getByText(/© 2026 Mohannad Ali/);
+      expect(footer).toHaveTextContent("GNU AGPL-3.0");
+      expect(footer).not.toHaveTextContent("MIT");
+    });
+  });
 });

@@ -40,6 +40,7 @@ Decisions made by the project owner, in their own direction (summarized, not quo
 | C12 | 2026-11-22 | Investigate PowerPoint conversion falling back to **LibreOffice** too often. |
 | P13 | 2026-11-22 | Push small commits as you go, and use as many parallel subagents as needed. |
 | C13 | 2026-11-22 | **Logging levels:** verbose logs in **development mode** (running from source, for the owner's testing). **Production** (the installed app) logs more concisely, but still keeps verbose records for errors. |
+| C14 | 2026-11-23 | **Untrusted presentations (audit R1):** never strip Windows Mark-of-the-Web. Presentations that came from the internet or email are rendered with **LibreOffice** (headless, macros not run), not PowerPoint automation, with a warning explaining why the slides may look slightly different. Trusted local files still use PowerPoint. |
 
 ## Frontend and packaging
 
@@ -81,6 +82,7 @@ Decisions made by the project owner, in their own direction (summarized, not quo
 | F34 | 2026-11-22 | **Function-based API:** every conversion action (Flatten, Merge, Split and so on) goes through **one function** that takes an **action enum**, a **settings object** and the **data** (the files): `startJob(action, settings, data)` in the UI, `run_action(action, settings, data)` in Python. |
 | F35 | 2026-11-22 | **Three separate layers:** the **frontend** (`frontend/`, React UI), the **API layer** (`api/`, the Python pywebview bridge: calls, events, job state, settings, saving) and the **service layer** (`converter/`, pure conversion logic with no UI or bridge code). |
 | F36 | 2026-11-22 | **`converter/` is split into subfolders by responsibility** (shared core types, actions, OCR, slides, tools, PDF helpers, files, platforms) instead of one flat folder. |
+| F37 | 2026-11-23 | **Automatic CI (audit R7):** on every push and pull request, run Python lint and the full tests on Linux (with Tesseract and LibreOffice installed) and on Windows, plus the frontend typecheck, lint, tests and build. Windows packaging stays a separate manual job. |
 
 ## Open questions
 

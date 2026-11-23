@@ -9,6 +9,9 @@ requires-python = ">=3.11"
 dependencies = [
     "PyMuPDF>=1.25,<2",
     "pywebview>=6.2.1,<7",
+    # Linux window backend: Qt WebEngine through PySide6 (LGPL), never PyQt6 (GPL)
+    # (decisions P18, P19). Windows uses Edge WebView2 and doesn't install it.
+    "pywebview[pyside6]>=6.2.1,<7; sys_platform == 'linux'",
     "pywin32>=308; sys_platform == 'win32'",
 ]
 

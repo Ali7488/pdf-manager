@@ -26,6 +26,7 @@ CONTRACT = {
     "pick_files": ["kind"],
     "pick_folder": [],
     "check_tools": ["action", "settings", "data"],
+    "get_ocr_status": [],
     "get_ocr_languages": [],
     "search_ocr": [],
     "install_ocr": [],
@@ -269,6 +270,19 @@ def test_pick_files_images_filter_and_cancel(api_obj, window):
     assert window.dialog_calls[0]["file_types"] == ("Images (*.png;*.jpg;*.jpeg)",)
 
 
+def test_pick_files_all_kinds(api_obj, window, tmp_path):
+    """ "all" offers every supported type in one filter and returns documents and images."""
+    pdf = make_pdf(tmp_path / "Report.pdf", 1)
+    image = tmp_path / "Scan.jpg"
+    image.write_bytes(b"\xff\xd8 sample")
+    window.dialog_results = [(str(pdf), str(image))]
+    files = api_obj.pick_files("all")
+    assert [(f["name"], f["kind"]) for f in files] == [("Report.pdf", "pdf"), ("Scan.jpg", "image")]
+    filters = window.dialog_calls[0]["file_types"]
+    assert len(filters) == 1
+    assert all(ext in filters[0] for ext in ("*.pdf", "*.pptx", "*.ppt", "*.png", "*.jpg"))
+
+
 def test_pick_files_rejects_unknown_kind(api_obj, window):
     """An unknown kind opens no dialog."""
     assert api_obj.pick_files("videos") == []
@@ -308,6 +322,32 @@ def test_check_tools_shape_and_logged_issues(api_obj, monkeypatch, logs):
     assert result["ocr"] == {"required": True, "present": False, "path": None}
     assert_issue(result["issues"][0], "OCR_MISSING")
     assert result["issues"][0]["logFile"] == str(logs)
+
+
+def test_get_ocr_status(api_obj, monkeypatch, store, window):
+    """OcrStatus reports presence and path, using the saved path, without saving or asking."""
+    seen = []
+
+    def fake_find(configured=None):
+        seen.append(configured)
+        return Path("/apps/tesseract") if configured else None
+
+    monkeypatch.setattr(service, "find_tesseract", fake_find)
+    assert api_obj.get_ocr_status() == {"present": False, "path": None}
+    store.update({"tesseractPath": "/apps/tesseract"})
+    assert api_obj.get_ocr_status() == {"present": True, "path": str(Path("/apps/tesseract"))}
+    assert seen == [None, "/apps/tesseract"]
+    assert window.dialog_calls == []
+
+
+def test_get_ocr_status_never_raises(api_obj, monkeypatch):
+    """A failing search reports OCR as not present."""
+
+    def broken(configured=None):
+        raise OSError("registry unavailable")
+
+    monkeypatch.setattr(service, "find_tesseract", broken)
+    assert api_obj.get_ocr_status() == {"present": False, "path": None}
 
 
 def test_get_ocr_languages(api_obj, monkeypatch):
@@ -496,6 +536,17 @@ def test_cancel_and_discard(api_obj, window, run, tmp_path):
     finished_events(window)
     assert api_obj.discard_results(job_id) is None
     assert not list(tmp_path.glob("pdf-manager-*"))
+
+
+def test_discard_results_repeated_and_after_save(api_obj, window, tmp_path):
+    """discard_results is safe twice, after saving, and for unknown ids."""
+    job_id = api_obj.start_job("merge", SETTINGS, {"files": ["/in/a.pdf"]})["jobId"]
+    finished_events(window)
+    assert api_obj.save_results(job_id, {"folder": str(tmp_path), "asZip": False})["savedPaths"]
+    assert api_obj.discard_results(job_id) is None
+    assert api_obj.discard_results(job_id) is None
+    assert api_obj.discard_results("never-existed") is None
+    assert (tmp_path / "Sample - Merged.pdf").is_file()
 
 
 # ----- Folders -----

@@ -49,6 +49,7 @@ _EVENT_NAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9]*$")
 
 # Native picker filters, in pywebview's "Description (*.ext;*.ext)" format.
 FILE_FILTERS = {
+    "all": ("Supported files (*.pdf;*.pptx;*.ppt;*.png;*.jpg;*.jpeg)",),
     "documents": ("PDF and PowerPoint files (*.pdf;*.pptx;*.ppt)",),
     "images": ("Images (*.png;*.jpg;*.jpeg)",),
 }
@@ -366,7 +367,8 @@ class Api:
         """Open the native file picker (multiple selection) and return ``InputFile[]``.
 
         Args:
-            kind: ``"documents"`` (PDF/PPTX/PPT) or ``"images"`` (PNG/JPG).
+            kind: ``"all"`` (every supported type), ``"documents"`` (PDF/PPTX/PPT)
+                or ``"images"`` (PNG/JPG).
 
         Returns:
             The chosen usable files; empty if cancelled.
@@ -374,7 +376,7 @@ class Api:
 
         def body() -> list[dict[str, Any]]:
             if kind not in FILE_FILTERS:
-                raise dto.invalid_request(f"kind must be documents or images; got {kind!r}")
+                raise dto.invalid_request(f"kind must be all, documents or images; got {kind!r}")
             picked = self._window.create_file_dialog(
                 webview.FileDialog.OPEN, allow_multiple=True, file_types=FILE_FILTERS[kind]
             )
@@ -410,6 +412,19 @@ class Api:
             return dto.tool_check_to_json(check)
 
         return self._guard("check_tools", dto.failed_tool_check_json, body)
+
+    def get_ocr_status(self) -> dict[str, Any]:
+        """Whether Tesseract OCR is installed, and where (``OcrStatus``, for Settings).
+
+        Uses the saved ``tesseractPath`` first, then the usual places. Nothing
+        is saved and no picker opens (that is ``search_ocr``).
+        """
+
+        def body() -> dict[str, Any]:
+            found = service.find_tesseract(self._settings.get().get("tesseractPath"))
+            return {"present": found is not None, "path": str(found) if found else None}
+
+        return self._guard("get_ocr_status", lambda issue: {"present": False, "path": None}, body)
 
     def get_ocr_languages(self) -> list[str]:
         """Return the installed Tesseract languages, e.g. ``["eng", "deu"]``; empty if no OCR."""
@@ -583,7 +598,7 @@ class Api:
         return self._guard("save_results", lambda issue: dto.save_outcome_json(issue=issue), body)
 
     def discard_results(self, job_id: str) -> None:
-        """Delete a finished job's scratch folder."""
+        """Delete a finished job's scratch folder. Safe to repeat, and after saving."""
         self._guard(
             "discard_results",
             lambda issue: None,

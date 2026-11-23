@@ -8,16 +8,22 @@ readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.11"
+# What browser mode needs (uv run main.py --browser). pywin32 provides the Windows
+# file pickers there, and PowerPoint automation in both modes.
 dependencies = [
     "PyMuPDF>=1.25,<2",
-    "pywebview>=6.2.1,<7",
-    # Linux window backend: Qt WebEngine through PySide6 (LGPL), never PyQt6 (GPL)
-    # (decisions P18, P19). Windows uses Edge WebView2 and doesn't install it.
-    "pywebview[pyside6]>=6.2.1,<7; sys_platform == 'linux'",
     "pywin32>=308; sys_platform == 'win32'",
 ]
 
 [dependency-groups]
+# The desktop window (uv run main.py). Installed by default (see default-groups);
+# a browser-only environment leaves it out: uv sync --no-group desktop.
+desktop = [
+    "pywebview>=6.2.1,<7",
+    # Linux window backend: Qt WebEngine through PySide6 (LGPL), never PyQt6 (GPL)
+    # (decisions P18, P19). Windows uses Edge WebView2 and doesn't install it.
+    "pywebview[pyside6]>=6.2.1,<7; sys_platform == 'linux'",
+]
 # Test-only: python-pptx builds sample PPTX files (tests and scripts/make_samples.py).
 dev = [
     "pytest>=8",
@@ -27,3 +33,5 @@ dev = [
 [tool.uv]
 # A desktop app run from source, not an installable library.
 package = false
+# Plain "uv sync" / "uv run" keep installing the desktop window, as before.
+default-groups = ["dev", "desktop"]

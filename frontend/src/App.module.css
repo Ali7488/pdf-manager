@@ -16,6 +16,7 @@
 
 /* Left-aligned next to the side pane (no centred margins); a cap keeps long lines readable. */
 .page {
+  container: page / inline-size;
   max-width: var(--content-max-width);
   padding: var(--space-5) var(--space-6) 0;
 }

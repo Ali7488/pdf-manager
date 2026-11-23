@@ -36,20 +36,28 @@ export function ActionPage({ action }: ActionPageProps) {
   const { state, dispatch } = useApp();
   const info = getActionInfo(action);
   const settings = state.actionSettings[action];
-  const usedFiles = state.files.filter((file) => actionAcceptsFile(action, file));
+  const usedFiles = state.files.filter((file) =>
+    actionAcceptsFile(action, file),
+  );
   const [request, setRequest] = useState<ConvertRequest | null>(null);
 
   const problem = action === Action.Split ? splitProblem(settings.split) : null;
   const canConvert = usedFiles.length > 0 && problem === null;
-  const kindsText = info.accepts.includes("image") ? "an image (PNG or JPG)" : info.accepts.includes("pptx") ? "a PDF or PowerPoint file" : "a PDF";
+  const kindsText = info.accepts.includes("image")
+    ? "an image (PNG or JPG)"
+    : info.accepts.includes("pptx")
+      ? "a PDF or PowerPoint file"
+      : "a PDF";
 
-  const onChange = (patch: Partial<ActionSettings>) => dispatch({ type: "actionSettingsChanged", action, patch });
+  const onChange = (patch: Partial<ActionSettings>) =>
+    dispatch({ type: "actionSettingsChanged", action, patch });
 
   const startConvert = () => {
     const folder = state.settings.defaultSaveFolder;
     setRequest({
       // Compress never uses OCR, whatever the stored value.
-      settings: action === Action.Compress ? { ...settings, useOcr: false } : settings,
+      settings:
+        action === Action.Compress ? { ...settings, useOcr: false } : settings,
       autoSaveFolder: folder && state.saveToDefault[action] ? folder : null,
     });
   };
@@ -61,15 +69,27 @@ export function ActionPage({ action }: ActionPageProps) {
         description={`${info.description} Add your files, choose options, then click Convert. Your original files are never changed.`}
       />
 
-      <FileList action={action} headerActions={<AddFilesButton kind={info.pickKind} size="sm" />} />
-
-      <div className={styles.sections}>
-        <Section title="Options">
-          <ActionOptions action={action} settings={settings} onChange={onChange} usedFiles={usedFiles} />
-        </Section>
-        <Section title="Saving">
-          <SaveDestination action={action} />
-        </Section>
+      {/* Two columns on wide windows: files left, options right; one column when narrow. */}
+      <div className={styles.columns}>
+        <div className={styles.filesColumn}>
+          <FileList
+            action={action}
+            headerActions={<AddFilesButton kind={info.pickKind} size="sm" />}
+          />
+        </div>
+        <div className={styles.sections}>
+          <Section title="Options">
+            <ActionOptions
+              action={action}
+              settings={settings}
+              onChange={onChange}
+              usedFiles={usedFiles}
+            />
+          </Section>
+          <Section title="Saving">
+            <SaveDestination action={action} />
+          </Section>
+        </div>
       </div>
 
       <div className={styles.convertBar}>
@@ -77,14 +97,20 @@ export function ActionPage({ action }: ActionPageProps) {
           {usedFiles.length === 0
             ? `Add ${kindsText} to start.`
             : problem
-              ? settings.split.method === "ranges" && settings.split.ranges.trim() === ""
+              ? settings.split.method === "ranges" &&
+                settings.split.ranges.trim() === ""
                 ? "Type the pages to split above."
                 : "Fix the options above to start."
               : usedFiles.length === 1
                 ? "Ready: 1 file."
                 : `Ready: ${usedFiles.length} files.`}
         </p>
-        <Button variant="primary" size="lg" disabled={!canConvert} onClick={startConvert}>
+        <Button
+          variant="primary"
+          size="lg"
+          disabled={!canConvert}
+          onClick={startConvert}
+        >
           Convert
         </Button>
       </div>

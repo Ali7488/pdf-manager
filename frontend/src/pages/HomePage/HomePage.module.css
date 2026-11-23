@@ -1,3 +1,30 @@
+/* Drop area and files left, tools right when there's room (container query on the page). */
+.columns {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+}
+
+@container page (min-width: 46rem) {
+  .columns {
+    grid-template-columns: minmax(0, 1fr) minmax(14rem, 17rem);
+    align-items: start;
+    gap: var(--space-6);
+  }
+
+  .columns .actions {
+    margin-top: 0;
+  }
+
+  .columns .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.mainColumn {
+  min-width: 0;
+}
+
 .dropZone {
   display: flex;
   flex-direction: column;

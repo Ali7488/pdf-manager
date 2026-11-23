@@ -1,5 +1,24 @@
+/* Files left, options right when there's room (container query on the page). */
+.columns {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+}
+
+@container page (min-width: 46rem) {
+  .columns {
+    grid-template-columns: minmax(0, 1fr) minmax(16rem, 20rem);
+    align-items: start;
+    gap: var(--space-6);
+  }
+}
+
+.filesColumn {
+  min-width: 0;
+}
+
 .sections {
-  margin-top: var(--space-4);
+  min-width: 0;
 }
 
 .splitInput:not(:empty) {

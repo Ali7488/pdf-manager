@@ -18,39 +18,47 @@ export function HomePage() {
     <>
       <PageHeader title="Welcome to PDF Manager" />
 
-      <div className={styles.dropZone}>
-        <Icon name="upload" size={28} className={styles.dropIcon} />
-        <p className={styles.dropTitle}>Drop files here, or click Add files</p>
-        <div className={styles.dropButtons}>
-          <AddFilesButton kind="all" variant="primary" />
-        </div>
-      </div>
+      <div className={styles.columns}>
+        <div className={styles.mainColumn}>
+          <div className={styles.dropZone}>
+            <Icon name="upload" size={28} className={styles.dropIcon} />
+            <p className={styles.dropTitle}>
+              Drop files here, or click Add files
+            </p>
+            <div className={styles.dropButtons}>
+              <AddFilesButton kind="all" variant="primary" />
+            </div>
+          </div>
 
-      <div className={styles.files}>
-        <FileList />
-      </div>
-
-      <section aria-labelledby="home-actions" className={styles.actions}>
-        <h2 id="home-actions" className={styles.actionsTitle}>
-          Then choose a tool
-        </h2>
-        <div className={styles.grid}>
-          {ACTIONS.map((info) => (
-            <button
-              key={info.action}
-              type="button"
-              className={styles.card}
-              aria-label={`Open ${info.label}`}
-              onClick={() => dispatch({ type: "navigate", page: info.action })}
-            >
-              <span className={styles.cardIcon} aria-hidden="true">
-                <Icon name={info.icon} size={22} />
-              </span>
-              <span className={styles.cardLabel}>{info.label}</span>
-            </button>
-          ))}
+          <div className={styles.files}>
+            <FileList />
+          </div>
         </div>
-      </section>
+
+        <section aria-labelledby="home-actions" className={styles.actions}>
+          <h2 id="home-actions" className={styles.actionsTitle}>
+            Then choose a tool
+          </h2>
+          <div className={styles.grid}>
+            {ACTIONS.map((info) => (
+              <button
+                key={info.action}
+                type="button"
+                className={styles.card}
+                aria-label={`Open ${info.label}`}
+                onClick={() =>
+                  dispatch({ type: "navigate", page: info.action })
+                }
+              >
+                <span className={styles.cardIcon} aria-hidden="true">
+                  <Icon name={info.icon} size={22} />
+                </span>
+                <span className={styles.cardLabel}>{info.label}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      </div>
     </>
   );
 }

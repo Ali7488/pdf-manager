@@ -183,3 +183,18 @@ A short, summarized record of each request made to the coding agent, and what ca
     - [x] *(Linux only; five of six decks pass; follow-ups in docs/PRESENTATION_FIDELITY.md)* Fidelity test of representative decks; follow-ups recorded.
     - [x] Checks, CI (45271520135 and 45271531357 green at `d6fe8fd`), Windows build 45271518966 green at `d6fe8fd` (installer, ZIP, sources, same-commit). After this log update, the ZIP was rebuilt from the branch head; PR #2 has the final link and is still a draft.
     - [ ] Interactive Windows 11 checks (docs/BROWSER_MODE.md) and owner answers to O4 and O5.
+43. **Prerelease audit.** Fetch `main` and PR #2, record base `9f58e64` and head `fbf3c7d`, and audit licences, dependencies and the real artifacts, then the whole codebase, then decide on a prerelease. Audit only. → Report in `docs.local/PRERELEASE_AUDIT_2026-11-23.md` (local). HOLD for both artifacts: B1 (downloads counted as delivered before fetching), B2 (unreachable unsaved jobs), B3 (simultaneous launches start two servers), S1 (desktop close deletes unsaved results) and the ZIP readme.
+44. **Fix the audit blockers, rebuild, and publish a testing prerelease.** Approved: B1, B2, B3, desktop close and the ZIP readme, in small commits on draft PR #2. Owner answers: O5 → downloads stay unsaved until Done (P39); one recoverable result at a time, enforced by the backend and explained in the UI (P40); one instance per profile and a confirmed desktop close (P41); O3 closed by the owner's pixel comparison. Fold in the owner's independent artifact findings:
+    - Setuptools and its vendored modules are in the desktop exe but not in the notices.
+    - packaging 26.3 is missing from the desktop source archive.
+    - OpenSSL and libffi DLLs ship without their source.
+
+    WebView2 and the static CRT stay open for evidence-based review. Afterwards, publish the rebuilt artifacts as a GitHub prerelease for the owner's VM test (P42); no merge, no final release. Leave the CLI race, mock cleanup and duplicate CI triggers as follow-ups. Checklist:
+    - [x] Record decisions P39–P42; close O3 and O5.
+    - [ ] B1: downloads unsaved until Done; download copies deleted on Done or discard.
+    - [ ] B2: one recoverable result at a time (backend rule, UI explanation, reload).
+    - [ ] B3: one server per profile (simultaneous launches, killed owner).
+    - [ ] Desktop close confirmation.
+    - [ ] ZIP readme.
+    - [ ] Artifact licensing: setuptools, packaging source, OpenSSL and libffi source.
+    - [ ] CI, Windows build, artifact verification, prerelease.

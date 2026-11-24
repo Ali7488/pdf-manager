@@ -63,6 +63,72 @@ PYINSTALLER_VERSION = "6.22.3"
 # when the bundled interpreter is a different version.
 PYTHON_WINDOWS_VERSION = "3.13.17"
 FEATHER_VERSION = "v4.29.2"
+
+# Libraries the python.org Windows build of PYTHON_WINDOWS_VERSION compiles in or ships
+# as DLLs, from source that isn't in CPython's tarball: CPython fetches it from
+# python/cpython-source-deps at these tags (PCbuild/get_externals.bat). The corresponding
+# source bundle includes them (decision P42 follow-up; the owner's artifact review).
+# (name, version, cpython-source-deps tag, SHA-256 of GitHub's tag archive, shipped in)
+RUNTIME_EXTERNALS = [
+    (
+        "OpenSSL",
+        "3.5.9",
+        "openssl-3.5.9",
+        "d6cf0d9a651f25fe506f6b3dc133a80b9b79a0bc565f570dcf8fdbd597551485",
+        "libssl-3.dll, libcrypto-3.dll",
+    ),
+    (
+        "libffi",
+        "3.4.4",
+        "libffi-3.4.4",
+        "9d802681adfea27d84cae0487a785fb9caa925bdad44c401b364c59ab2b8edda",
+        "libffi-8.dll",
+    ),
+    (
+        "bzip2",
+        "1.0.8",
+        "bzip2-1.0.8",
+        "ab8d1b0cc087c20d4c32c0e4fcf7d0c733a95da12cedc6d63b3f0a9af07427e2",
+        "_bz2.pyd",
+    ),
+    (
+        "xz (liblzma)",
+        "5.2.5",
+        "xz-5.2.5",
+        "a15c168e39e87d750c3dc766edc7f19bdda57dacf01e509678467eace91ad282",
+        "_lzma.pyd",
+    ),
+    (
+        "mpdecimal",
+        "4.0.0",
+        "mpdecimal-4.0.0",
+        "338fac3fb8cdd60f406b6326431338756f58a8af94229ffd9bf1e7c2b1ad71ca",
+        "_decimal.pyd",
+    ),
+    (
+        "zlib",
+        "1.3.1",
+        "zlib-1.3.1",
+        "e3f3fb32564952006eb18b091ca8464740e5eca29d328cfb0b2da22768e0b638",
+        "python313.dll",
+    ),
+]
+
+
+def runtime_external_sources() -> list[dict]:
+    """Source archives of the libraries inside the python.org Windows runtime."""
+    return [
+        {
+            "component": (
+                f"{name} {version} (in the Python {PYTHON_WINDOWS_VERSION} runtime: {where})"
+            ),
+            "url": f"https://github.com/python/cpython-source-deps/archive/refs/tags/{tag}.tar.gz",
+            "sha256": sha256,
+        }
+        for name, version, tag, sha256, where in RUNTIME_EXTERNALS
+    ]
+
+
 # The Inno Setup compiler the Windows build installs (build-windows.yml). Its
 # uninstaller (unins000.exe) is installed next to the app.
 INNO_SETUP_VERSION = "6.7.1"
@@ -931,6 +997,7 @@ def main() -> int:
                     "sha256": "6020bd10aff3bf4821be16f088ebb1591beb7b811dcd8fab1da8f7c22a7b27e7",
                 },
                 "pyinstaller": _pypi_sdist("pyinstaller", PYINSTALLER_VERSION),
+                "python_runtime_externals": runtime_external_sources(),
             },
         },
     )

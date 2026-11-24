@@ -170,6 +170,10 @@ def main(argv: list[str] | None = None) -> int:
         runtime["url"],
         fetch(runtime["url"], out / "other", runtime["sha256"]),
     )
+    # What the python.org Windows runtime compiles in or ships as DLLs (OpenSSL, libffi,
+    # bzip2, xz, mpdecimal, zlib): source CPython's own tarball doesn't contain.
+    for item in sources["python_runtime_externals"]:
+        add(item["component"], item["url"], fetch(item["url"], out / "other", item["sha256"]))
     pyinstaller = sources["pyinstaller"]
     add(
         f"PyInstaller {manifest['pyinstaller']}",

@@ -555,3 +555,23 @@ def test_wrong_build_marks_fail_the_repo_check(monkeypatch):
     failures = _failures(check.check_repo)
     assert any("pywebview: the lockfile's browser build leaves it out" in f for f in failures)
     assert any("THIRD_PARTY_NOTICES-browser.md lacks pywebview" in f for f in failures)
+
+
+def test_the_python_runtimes_own_libraries_have_pinned_source():
+    """OpenSSL, libffi, bzip2, xz, mpdecimal and zlib ship inside the Windows runtime.
+
+    CPython's tarball doesn't contain them, so the source bundle carries the
+    cpython-source-deps archives (the owner's artifact review).
+    """
+    manifest = check.load_manifest()
+    items = manifest["sources"]["python_runtime_externals"]
+    names = {item["component"].split()[0] for item in items}
+    assert names == {"OpenSSL", "libffi", "bzip2", "xz", "mpdecimal", "zlib"}
+    for item in items:
+        assert item["url"].startswith("https://github.com/python/cpython-source-deps/archive/")
+        assert len(item["sha256"]) == 64
+    collector = (ROOT / "scripts" / "collect_sources.py").read_text(encoding="utf-8")
+    assert 'sources["python_runtime_externals"]' in collector
+    generator = (ROOT / "scripts" / "collect_licenses.py").read_text(encoding="utf-8")
+    for item in items:
+        assert item["sha256"] in generator, "manifest and generator disagree"

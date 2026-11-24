@@ -303,9 +303,14 @@ def _bundled_distributions(pure) -> dict:
     # the file PyInstaller collected. That also covers packages such as pywin32, whose
     # loose top-level modules (win32con, winerror, ...) aren't in top_level.txt.
     by_file: dict[str, str] = {}
+    # Top-level folders a distribution installs (pywin32_system32, a namespace entry
+    # PyInstaller's pywin32 hook adds without a source file of its own).
+    by_folder: dict[str, str] = {}
     for dist in metadata.distributions():
         for record in dist.files or ():
             by_file[os.path.normcase(str(dist.locate_file(record)))] = dist.metadata["Name"]
+            if len(record.parts) > 1:
+                by_folder.setdefault(record.parts[0], dist.metadata["Name"])
     owners = metadata.packages_distributions()
     ours = {"api", "converter", "main", "browser_main"}
     distributions: dict[str, str] = {}
@@ -317,10 +322,13 @@ def _bundled_distributions(pure) -> dict:
         runtime = top in sys.stdlib_module_names or top.startswith("_sysconfigdata")
         if runtime or top in ours or top.startswith(("pyi", "_pyi")):
             continue
-        found = [by_file[key]] if (key := os.path.normcase(str(source))) in by_file else []
-        for dist in found or owners.get(top, ()):
+        key = os.path.normcase(str(source))
+        found = [by_file[key]] if key in by_file else list(owners.get(top, ()))
+        if not found and top in by_folder:
+            found = [by_folder[top]]
+        for dist in found:
             distributions[dist] = metadata.version(dist)
-        if not found and not owners.get(top):
+        if not found:
             unowned.add(top)
     return {"build": BUILD, "distributions": distributions, "unowned": sorted(unowned)}
 

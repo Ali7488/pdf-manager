@@ -738,3 +738,60 @@ def test_drop_with_nothing_usable_emits_nothing(api_obj, window):
     api_obj._on_drop({})
     api_obj._on_drop({"dataTransfer": None})
     assert window.events_named("filesAdded") == []
+
+
+# ----- Closing the window (decision P41) -----
+
+
+def finished_unsaved(api_obj, window):
+    started = api_obj.start_job("merge", dict(SETTINGS), {"files": ["/in/a.pdf"]})
+    assert api_obj._workflow.jobs.wait(started["jobId"], 5)
+    return started["jobId"]
+
+
+def test_closing_with_nothing_unsaved_closes_without_asking(api_obj, window):
+    assert window.events.closing.handlers == [api_obj._confirm_close]
+    assert api_obj._confirm_close() is True and window.confirmations == []
+
+
+def test_cancelling_the_close_keeps_the_window_and_the_results(api_obj, window, tmp_path):
+    job_id = finished_unsaved(api_obj, window)
+    scratch = list(tmp_path.glob("pdf-manager-*"))
+    window.confirm_answers = [False]  # The user clicks Cancel.
+    assert api_obj._confirm_close() is False  # pywebview then keeps the window open.
+    title, message = window.confirmations[0]
+    assert title == "Close PDF Manager?"
+    assert message == "One finished result isn't saved yet. Closing now deletes it. Close anyway?"
+    assert api_obj._workflow.jobs.unsaved_jobs() == [job_id]
+    assert scratch and all(folder.is_dir() for folder in scratch)
+    out = tmp_path / "saved"
+    out.mkdir()
+    saved = api_obj.save_results(job_id, {"folder": str(out), "asZip": False})
+    assert saved["issue"] is None and (out / "Sample - Merged.pdf").is_file()
+
+
+def test_confirming_the_close_lets_it_close(api_obj, window):
+    finished_unsaved(api_obj, window)
+    window.confirm_answers = [True]
+    assert api_obj._confirm_close() is True
+
+
+def test_closing_during_a_conversion_asks(api_obj, window, run):
+    run.release.clear()
+    started = api_obj.start_job("merge", dict(SETTINGS), {"files": ["/in/a.pdf"]})
+    try:
+        assert api_obj._confirm_close() is False
+        assert "still running" in window.confirmations[0][1]
+    finally:
+        run.release.set()
+        api_obj._workflow.jobs.wait(started["jobId"], 5)
+
+
+def test_a_broken_dialog_never_traps_the_window(api_obj, window, monkeypatch):
+    finished_unsaved(api_obj, window)
+
+    def broken(title, message):
+        raise RuntimeError("no dialog")
+
+    monkeypatch.setattr(window, "create_confirmation_dialog", broken)
+    assert api_obj._confirm_close() is True

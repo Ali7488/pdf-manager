@@ -109,12 +109,19 @@ class FakeWindow:
         self.dialog_calls: list[dict] = []
         self.events = FakeEvents()
         self.dom = FakeDom()
+        self.confirmations: list[tuple[str, str]] = []
+        self.confirm_answers: list[bool] = []
         self._lock = threading.Lock()
 
     def evaluate_js(self, script):
         """Record a script instead of running it."""
         with self._lock:
             self.scripts.append(script)
+
+    def create_confirmation_dialog(self, title, message):
+        """Record the question and give the next canned answer (default: Cancel)."""
+        self.confirmations.append((title, message))
+        return self.confirm_answers.pop(0) if self.confirm_answers else False
 
     def create_file_dialog(self, dialog_type=10, directory="", allow_multiple=False, **kwargs):
         """Return the next canned dialog result."""

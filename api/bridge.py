@@ -72,6 +72,26 @@ def event_script(name: str, payload: Any) -> str:
     return f'window.dispatchEvent(new CustomEvent("{EVENT_PREFIX}{name}", {{detail: {literal}}}));'
 
 
+def close_warning(running: bool, unsaved: int) -> str | None:
+    """What closing the desktop window would lose, in plain words (``None``: nothing)."""
+    results = (
+        "one finished result isn't saved yet"
+        if unsaved == 1
+        else f"{unsaved} finished results aren't saved yet"
+    )
+    if running and unsaved:
+        return (
+            f"A conversion is still running, and {results}. Closing now stops the "
+            "conversion and deletes the unsaved results. Close anyway?"
+        )
+    if running:
+        return "A conversion is still running. Closing now stops it. Close anyway?"
+    if unsaved:
+        lost = "it" if unsaved == 1 else "them"
+        return f"{results[0].upper()}{results[1:]}. Closing now deletes {lost}. Close anyway?"
+    return None
+
+
 def _ignore_event(_event: Any) -> None:
     """DOM event callback that does nothing (the JS side already called preventDefault)."""
 
@@ -106,6 +126,32 @@ class Api:
         """
         self._window = window
         window.events.loaded += self._on_loaded
+        window.events.closing += self._confirm_close
+
+    def _confirm_close(self) -> bool:
+        """The window is closing: ask first if that would lose work (decision P41).
+
+        Closing the desktop window quits the app, which cancels a running job
+        and deletes unsaved results (the desktop version of P35). If neither
+        exists, the window closes straight away. pywebview runs this on the
+        window's own thread and cancels the close when it returns False, so
+        cancelling the question leaves the window and the results as they were.
+
+        Returns:
+            True to let the window close.
+        """
+        try:
+            jobs = self._workflow.jobs
+            warning = close_warning(jobs.running_job() is not None, len(jobs.unsaved_jobs()))
+            if warning is None:
+                return True
+            closing = self._window.create_confirmation_dialog("Close PDF Manager?", warning)
+            log.info("Close with unfinished work: %s", "confirmed" if closing else "cancelled")
+            return bool(closing)
+        except Exception:
+            # Never trap the user in a window that can't close.
+            log.exception("Couldn't ask before closing; closing anyway")
+            return True
 
     def _on_loaded(self) -> None:
         """Window loaded: listen for files dropped anywhere on the page.

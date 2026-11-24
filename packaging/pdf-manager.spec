@@ -8,6 +8,12 @@ Build from the repository root (``packaging/build.ps1`` does this)::
 
 Output: ``dist/PDF Manager/PDF Manager.exe`` plus its ``_internal`` folder.
 
+With ``PDF_MANAGER_BUILD=browser`` (``packaging/build-browser.ps1``) it builds the
+browser-mode app instead: ``dist/PDF Manager (browser)/``, started by
+``packaging/browser_main.py``, from an environment without the desktop group, and
+with the window toolkit excluded (pywebview, pythonnet, Qt). Everything else is
+shared, so both builds bundle the same engine the same way.
+
 Runtime layout (what the API layer relies on):
 
 * ``Path(sys._MEIPASS) / "frontend" / "dist" / "index.html"``: the built React app.
@@ -21,6 +27,8 @@ so this spec only adds what the hooks can't know: the frontend, the backend choi
 the exclusions and the Windows version resource.
 """
 
+import json
+import os
 import platform
 import re
 import struct
@@ -33,7 +41,12 @@ from PyInstaller.compat import is_win
 # SPECPATH is injected by PyInstaller: the folder that holds this spec (packaging/).
 REPO = Path(SPECPATH).resolve().parent
 APP_NAME = "PDF Manager"
-ENTRY = REPO / "main.py"
+BUILD = os.environ.get("PDF_MANAGER_BUILD", "desktop")
+if BUILD not in ("desktop", "browser"):
+    raise SystemExit(f"[pdf-manager.spec] PDF_MANAGER_BUILD must be desktop or browser, not {BUILD}")
+BROWSER = BUILD == "browser"
+ENTRY = REPO / ("packaging/browser_main.py" if BROWSER else "main.py")
+DIST_NAME = f"{APP_NAME} (browser)" if BROWSER else APP_NAME
 FRONTEND_DIST = REPO / "frontend" / "dist"
 ICON = REPO / "PDF Manager.ico"
 
@@ -52,12 +65,25 @@ def _require(path: Path, hint: str) -> None:
         raise SystemExit(f"[pdf-manager.spec] Missing {path}. {hint}")
 
 
-_require(ENTRY, "The pywebview entry point main.py must be at the repository root.")
+_require(ENTRY, "The entry script (main.py, or packaging/browser_main.py) is missing.")
 _require(
     FRONTEND_DIST / "index.html",
     "Build the frontend first: cd frontend; npm ci; npm run build",
 )
 _require(ICON, "The app icon 'PDF Manager.ico' must be at the repository root.")
+
+# The exact commit this build is made from, for Settings > About's source link
+# (decision P37). Stops the build if tracked files differ from that commit.
+sys.path.insert(0, str(REPO))
+from api.build_info import BUILD_INFO_FILE, BuildInfoError, write_build_info  # noqa: E402
+
+BUILD_INFO = REPO / "build" / f"build-info-{BUILD}" / BUILD_INFO_FILE
+try:
+    _build_info = write_build_info(REPO, BUILD_INFO)
+except BuildInfoError as exc:
+    raise SystemExit(f"[pdf-manager.spec] {exc}")
+print(f"[pdf-manager.spec] Source revision {_build_info['revision']}"
+      f"{' (modified)' if _build_info['modified'] else ''}")
 
 
 def _read_version() -> str:
@@ -137,11 +163,11 @@ def _windows_version_info(version: str):
 
 # pywebview picks its GUI backend at runtime. On Windows that is WinForms with the
 # Edge WebView2 (Chromium) renderer, both driven through pythonnet ("clr").
-hiddenimports = [
-    "webview.platforms.winforms",
-    "webview.platforms.edgechromium",
-    "clr",
-]
+hiddenimports = (
+    []
+    if BROWSER
+    else ["webview.platforms.winforms", "webview.platforms.edgechromium", "clr"]
+)
 
 # Keep the bundle small (low overhead): no Tk, no test frameworks, and none of
 # pywebview's non-Windows backends (they would pull in Qt/GTK if installed).
@@ -159,6 +185,16 @@ excludes = [
     "pptx",  # python-pptx is a test-only dependency (tests, scripts/make_samples.py).
     "pydoc_data",
     "ensurepip",
+    # Setuptools isn't a runtime dependency: it comes from PyInstaller's own build
+    # environment, pulled in only because cffi (pythonnet's clr_loader) imports it
+    # inside functions that compile C code, which the app never calls. Bundling it also
+    # brought its vendored copies (jaraco, more_itertools, packaging, tomli, wheel, ...),
+    # none of them in the notices (the owner's artifact review).
+    # (distutils itself isn't excluded: Python 3.13 has none, and excluding the name
+    # clashes with PyInstaller's own distutils hook.)
+    "setuptools",
+    "pkg_resources",
+    "_distutils_hack",
     "webview.platforms.qt",
     "webview.platforms.gtk",
     "webview.platforms.cocoa",
@@ -173,6 +209,10 @@ excludes = [
     "cefpython3",
     "jnius",
 ]
+if BROWSER:
+    # The window toolkit: not installed in the browser build's environment, and kept
+    # out even if it is (scripts/check_licenses.py --build browser checks the result).
+    excludes += ["webview", "clr", "clr_loader", "pythonnet", "proxy_tools", "bottle"]
 
 
 def _webview_runtime_id() -> str:
@@ -236,10 +276,11 @@ def _unneeded(dest: str) -> bool:
 
 a = Analysis(
     [str(ENTRY)],
-    pathex=[str(REPO)],
+    pathex=[str(REPO)],  # Lets browser_main.py import the api package.
     binaries=[],
-    # Copy the whole built frontend so it lands at <_MEIPASS>/frontend/dist/.
-    datas=[(str(FRONTEND_DIST), "frontend/dist")],
+    # Copy the whole built frontend so it lands at <_MEIPASS>/frontend/dist/, and the
+    # build's source revision at <_MEIPASS>/build-info.json.
+    datas=[(str(FRONTEND_DIST), "frontend/dist"), (str(BUILD_INFO), ".")],
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
@@ -250,6 +291,51 @@ a = Analysis(
 
 a.datas = [entry for entry in a.datas if not _unneeded(entry[0])]
 a.binaries = [entry for entry in a.binaries if not _unneeded(entry[0])]
+
+# Which Python distribution every bundled pure-Python module comes from, for
+# scripts/check_licenses.py (it fails the build when one isn't in the notices for this
+# build). Pure modules live inside the exe's archive, where the bundle check can't see
+# them by file name.
+def _bundled_distributions(pure) -> dict:
+    import importlib.metadata as metadata
+
+    # Each module is attributed to the installed distribution whose files include
+    # the file PyInstaller collected. That also covers packages such as pywin32, whose
+    # loose top-level modules (win32con, winerror, ...) aren't in top_level.txt.
+    by_file: dict[str, str] = {}
+    # Top-level folders a distribution installs (pywin32_system32, a namespace entry
+    # PyInstaller's pywin32 hook adds without a source file of its own).
+    by_folder: dict[str, str] = {}
+    for dist in metadata.distributions():
+        for record in dist.files or ():
+            by_file[os.path.normcase(str(dist.locate_file(record)))] = dist.metadata["Name"]
+            if len(record.parts) > 1:
+                by_folder.setdefault(record.parts[0], dist.metadata["Name"])
+    owners = metadata.packages_distributions()
+    ours = {"api", "converter", "main", "browser_main"}
+    distributions: dict[str, str] = {}
+    unowned: set[str] = set()
+    for entry in pure:
+        name, source = entry[0], entry[1]
+        top = name.split(".")[0]
+        # The runtime's own modules, including CPython's generated _sysconfigdata_*.
+        runtime = top in sys.stdlib_module_names or top.startswith("_sysconfigdata")
+        if runtime or top in ours or top.startswith(("pyi", "_pyi")):
+            continue
+        key = os.path.normcase(str(source))
+        found = [by_file[key]] if key in by_file else list(owners.get(top, ()))
+        if not found and top in by_folder:
+            found = [by_folder[top]]
+        for dist in found:
+            distributions[dist] = metadata.version(dist)
+        if not found:
+            unowned.add(top)
+    return {"build": BUILD, "distributions": distributions, "unowned": sorted(unowned)}
+
+
+BUNDLE_PYTHON = REPO / "build" / f"bundle-python-{BUILD}.json"
+BUNDLE_PYTHON.write_text(json.dumps(_bundled_distributions(a.pure), indent=2) + "\n")
+print(f"[pdf-manager.spec] Bundled Python distributions: {BUNDLE_PYTHON}")
 
 pyz = PYZ(a.pure)
 
@@ -276,7 +362,7 @@ coll = COLLECT(
     a.datas,
     strip=False,
     upx=False,
-    name=APP_NAME,
+    name=DIST_NAME,
 )
 
-print(f"[pdf-manager.spec] Built {APP_NAME} {VERSION} (WebView2 runtime: {_RID})", file=sys.stderr)
+print(f"[pdf-manager.spec] Built {DIST_NAME} {VERSION} (WebView2 runtime: {_RID})", file=sys.stderr)

@@ -2,9 +2,11 @@
 
 PDF Manager's own code is released under the [MIT License](LICENSE), © 2026 Mohannad Ali.
 
-The distributed app (the Windows installer, and the Linux packages from v0.75) also
-includes the components below. Each keeps its own licence; the licence texts are in the
-[`licenses/`](licenses) folder, which is installed next to the app.
+The distributed app also includes the components below: the Windows
+installer (the **Desktop** build, and the Linux packages from v0.75) and the
+browser-mode ZIP (the **Browser** build; its own list is in
+`THIRD_PARTY_NOTICES-browser.md`). Each keeps its own licence; the licence texts are in
+the [`licenses/`](licenses) folder, which is installed next to the app.
 
 **PyMuPDF and MuPDF are licensed under the GNU Affero General Public License v3.0
 (AGPL-3.0)**, or a commercial licence from Artifex. Because the distributed app includes
@@ -18,84 +20,84 @@ date. It is not legal advice.
 
 ## Python packages (the app's engine and window)
 
-| Component | Version | Licence | Bundled on | Used for | Licence text |
-| --- | --- | --- | --- | --- | --- |
-| bottle | 0.13.4 | MIT | Linux, Windows |  | [`bottle-0.13.4/LICENSE`](licenses/python/bottle-0.13.4/LICENSE) |
-| cffi | 2.1.1 | MIT-0 | Windows |  | [`cffi-2.1.1/LICENSE`](licenses/python/cffi-2.1.1/LICENSE) |
-| clr-loader | 0.3.1 | MIT | Windows | Loads .NET for pythonnet | [`clr-loader-0.3.1/LICENSE`](licenses/python/clr-loader-0.3.1/LICENSE) |
-| packaging | 26.3 | Apache-2.0 OR BSD-2-Clause | Linux |  | [`packaging-26.3/LICENSE`](licenses/python/packaging-26.3/LICENSE), [`packaging-26.3/LICENSE.APACHE`](licenses/python/packaging-26.3/LICENSE.APACHE), [`packaging-26.3/LICENSE.BSD`](licenses/python/packaging-26.3/LICENSE.BSD) |
-| proxy-tools | 0.1.0 | MIT | Linux, Windows |  | [`proxy-tools-0.1.0/MIT.txt`](licenses/python/proxy-tools-0.1.0/MIT.txt) |
-| pycparser | 3.12 | BSD-3-Clause | Windows |  | [`pycparser-3.12/LICENSE`](licenses/python/pycparser-3.12/LICENSE) |
-| pymupdf | 1.28.2 | AGPL-3.0-only | Linux, Windows | All PDF work (rendering, OCR placement, merging, splitting, compressing) | [`pymupdf-1.28.2/COPYING`](licenses/python/pymupdf-1.28.2/COPYING), [`pymupdf-1.28.2/AGPL-3.0-only.txt`](licenses/python/pymupdf-1.28.2/AGPL-3.0-only.txt) |
-| pyside6 | 6.12.0 | LGPL-3.0-only | Linux | Qt window on Linux (via pywebview) | [`pyside6-6.12.0/LGPL-3.0-only.txt`](licenses/python/pyside6-6.12.0/LGPL-3.0-only.txt), [`pyside6-6.12.0/GPL-3.0-only.txt`](licenses/python/pyside6-6.12.0/GPL-3.0-only.txt) |
-| pyside6-addons | 6.12.0 | LGPL-3.0-only | Linux |  | [`pyside6-addons-6.12.0/LGPL-3.0-only.txt`](licenses/python/pyside6-addons-6.12.0/LGPL-3.0-only.txt), [`pyside6-addons-6.12.0/GPL-3.0-only.txt`](licenses/python/pyside6-addons-6.12.0/GPL-3.0-only.txt) |
-| pyside6-essentials | 6.12.0 | LGPL-3.0-only | Linux |  | [`pyside6-essentials-6.12.0/LGPL-3.0-only.txt`](licenses/python/pyside6-essentials-6.12.0/LGPL-3.0-only.txt), [`pyside6-essentials-6.12.0/GPL-3.0-only.txt`](licenses/python/pyside6-essentials-6.12.0/GPL-3.0-only.txt) |
-| pyside6-pdf | 6.12.0.140 | LGPL-3.0-only | Linux |  | [`pyside6-pdf-6.12.0.140/LGPL-3.0-only.txt`](licenses/python/pyside6-pdf-6.12.0.140/LGPL-3.0-only.txt), [`pyside6-pdf-6.12.0.140/GPL-3.0-only.txt`](licenses/python/pyside6-pdf-6.12.0.140/GPL-3.0-only.txt) |
-| pyside6-webengine | 6.12.0.140 | LGPL-3.0-only | Linux |  | [`pyside6-webengine-6.12.0.140/LGPL-3.0-only.txt`](licenses/python/pyside6-webengine-6.12.0.140/LGPL-3.0-only.txt), [`pyside6-webengine-6.12.0.140/GPL-3.0-only.txt`](licenses/python/pyside6-webengine-6.12.0.140/GPL-3.0-only.txt) |
-| pythonnet | 3.2.1 | MIT | Windows | Edge WebView2 window on Windows (via pywebview) | [`pythonnet-3.2.1/AUTHORS.md`](licenses/python/pythonnet-3.2.1/AUTHORS.md), [`pythonnet-3.2.1/LICENSE`](licenses/python/pythonnet-3.2.1/LICENSE) |
-| pywebview | 6.2.1 | BSD-3-Clause | Linux, Windows | The desktop window and the JavaScript ↔ Python bridge | [`pywebview-6.2.1/LICENSE`](licenses/python/pywebview-6.2.1/LICENSE) |
-| pywin32 | 312 | PSF | Windows | Optional Microsoft PowerPoint automation on Windows | [`pywin32-312/adodbapi/license.txt`](licenses/python/pywin32-312/adodbapi/license.txt), [`pywin32-312/pythonwin/License.txt`](licenses/python/pywin32-312/pythonwin/License.txt), [`pywin32-312/pythonwin/pywin/idle/LICENSE.txt`](licenses/python/pywin32-312/pythonwin/pywin/idle/LICENSE.txt), [`pywin32-312/com/License.txt`](licenses/python/pywin32-312/com/License.txt), [`pywin32-312/com/win32comext/mapi/src/MAPIStubLibrary/LICENSE`](licenses/python/pywin32-312/com/win32comext/mapi/src/MAPIStubLibrary/LICENSE), [`pywin32-312/pythonwin/Scintilla/License.txt`](licenses/python/pywin32-312/pythonwin/Scintilla/License.txt), [`pywin32-312/win32/License.txt`](licenses/python/pywin32-312/win32/License.txt), [`pywin32-312/win32com/License.txt`](licenses/python/pywin32-312/win32com/License.txt), [`pywin32-312/win32comext/License.txt`](licenses/python/pywin32-312/win32comext/License.txt), [`pywin32-312/win32comext/mapi/NOTICE.md`](licenses/python/pywin32-312/win32comext/mapi/NOTICE.md) |
-| qtpy | 2.4.3 | MIT | Linux |  | [`qtpy-2.4.3/AUTHORS.md`](licenses/python/qtpy-2.4.3/AUTHORS.md), [`qtpy-2.4.3/LICENSE.txt`](licenses/python/qtpy-2.4.3/LICENSE.txt) |
-| shiboken6 | 6.12.0 | LGPL-3.0-only | Linux |  | [`shiboken6-6.12.0/LGPL-3.0-only.txt`](licenses/python/shiboken6-6.12.0/LGPL-3.0-only.txt), [`shiboken6-6.12.0/GPL-3.0-only.txt`](licenses/python/shiboken6-6.12.0/GPL-3.0-only.txt) |
-| typing-extensions | 4.16.0 | PSF-2.0 | Linux, Windows |  | [`typing-extensions-4.16.0/LICENSE`](licenses/python/typing-extensions-4.16.0/LICENSE) |
+| Component | Version | Licence | Bundled on | Builds | Used for | Licence text |
+| --- | --- | --- | --- | --- | --- | --- |
+| bottle | 0.13.4 | MIT | Linux, Windows | Desktop |  | [`bottle-0.13.4/LICENSE`](licenses/python/bottle-0.13.4/LICENSE) |
+| cffi | 2.1.1 | MIT-0 | Windows | Desktop |  | [`cffi-2.1.1/LICENSE`](licenses/python/cffi-2.1.1/LICENSE) |
+| clr-loader | 0.3.1 | MIT | Windows | Desktop | Loads .NET for pythonnet | [`clr-loader-0.3.1/LICENSE`](licenses/python/clr-loader-0.3.1/LICENSE) |
+| packaging | 26.3 | Apache-2.0 OR BSD-2-Clause | Linux | Desktop |  | [`packaging-26.3/LICENSE`](licenses/python/packaging-26.3/LICENSE), [`packaging-26.3/LICENSE.APACHE`](licenses/python/packaging-26.3/LICENSE.APACHE), [`packaging-26.3/LICENSE.BSD`](licenses/python/packaging-26.3/LICENSE.BSD) |
+| proxy-tools | 0.1.0 | MIT | Linux, Windows | Desktop |  | [`proxy-tools-0.1.0/MIT.txt`](licenses/python/proxy-tools-0.1.0/MIT.txt) |
+| pycparser | 3.12 | BSD-3-Clause | Windows | Desktop |  | [`pycparser-3.12/LICENSE`](licenses/python/pycparser-3.12/LICENSE) |
+| pymupdf | 1.28.2 | AGPL-3.0-only | Linux, Windows | Desktop, Browser | All PDF work (rendering, OCR placement, merging, splitting, compressing) | [`pymupdf-1.28.2/COPYING`](licenses/python/pymupdf-1.28.2/COPYING), [`pymupdf-1.28.2/AGPL-3.0-only.txt`](licenses/python/pymupdf-1.28.2/AGPL-3.0-only.txt) |
+| pyside6 | 6.12.0 | LGPL-3.0-only | Linux | Desktop | Qt window on Linux (via pywebview) | [`pyside6-6.12.0/LGPL-3.0-only.txt`](licenses/python/pyside6-6.12.0/LGPL-3.0-only.txt), [`pyside6-6.12.0/GPL-3.0-only.txt`](licenses/python/pyside6-6.12.0/GPL-3.0-only.txt) |
+| pyside6-addons | 6.12.0 | LGPL-3.0-only | Linux | Desktop |  | [`pyside6-addons-6.12.0/LGPL-3.0-only.txt`](licenses/python/pyside6-addons-6.12.0/LGPL-3.0-only.txt), [`pyside6-addons-6.12.0/GPL-3.0-only.txt`](licenses/python/pyside6-addons-6.12.0/GPL-3.0-only.txt) |
+| pyside6-essentials | 6.12.0 | LGPL-3.0-only | Linux | Desktop |  | [`pyside6-essentials-6.12.0/LGPL-3.0-only.txt`](licenses/python/pyside6-essentials-6.12.0/LGPL-3.0-only.txt), [`pyside6-essentials-6.12.0/GPL-3.0-only.txt`](licenses/python/pyside6-essentials-6.12.0/GPL-3.0-only.txt) |
+| pyside6-pdf | 6.12.0.140 | LGPL-3.0-only | Linux | Desktop |  | [`pyside6-pdf-6.12.0.140/LGPL-3.0-only.txt`](licenses/python/pyside6-pdf-6.12.0.140/LGPL-3.0-only.txt), [`pyside6-pdf-6.12.0.140/GPL-3.0-only.txt`](licenses/python/pyside6-pdf-6.12.0.140/GPL-3.0-only.txt) |
+| pyside6-webengine | 6.12.0.140 | LGPL-3.0-only | Linux | Desktop |  | [`pyside6-webengine-6.12.0.140/LGPL-3.0-only.txt`](licenses/python/pyside6-webengine-6.12.0.140/LGPL-3.0-only.txt), [`pyside6-webengine-6.12.0.140/GPL-3.0-only.txt`](licenses/python/pyside6-webengine-6.12.0.140/GPL-3.0-only.txt) |
+| pythonnet | 3.2.1 | MIT | Windows | Desktop | Edge WebView2 window on Windows (via pywebview) | [`pythonnet-3.2.1/AUTHORS.md`](licenses/python/pythonnet-3.2.1/AUTHORS.md), [`pythonnet-3.2.1/LICENSE`](licenses/python/pythonnet-3.2.1/LICENSE) |
+| pywebview | 6.2.1 | BSD-3-Clause | Linux, Windows | Desktop | The desktop window and the JavaScript ↔ Python bridge | [`pywebview-6.2.1/LICENSE`](licenses/python/pywebview-6.2.1/LICENSE) |
+| pywin32 | 312 | PSF | Windows | Desktop, Browser | Browser mode's native file pickers (Windows) | [`pywin32-312/adodbapi/license.txt`](licenses/python/pywin32-312/adodbapi/license.txt), [`pywin32-312/pythonwin/License.txt`](licenses/python/pywin32-312/pythonwin/License.txt), [`pywin32-312/pythonwin/pywin/idle/LICENSE.txt`](licenses/python/pywin32-312/pythonwin/pywin/idle/LICENSE.txt), [`pywin32-312/com/License.txt`](licenses/python/pywin32-312/com/License.txt), [`pywin32-312/com/win32comext/mapi/src/MAPIStubLibrary/LICENSE`](licenses/python/pywin32-312/com/win32comext/mapi/src/MAPIStubLibrary/LICENSE), [`pywin32-312/pythonwin/Scintilla/License.txt`](licenses/python/pywin32-312/pythonwin/Scintilla/License.txt), [`pywin32-312/win32/License.txt`](licenses/python/pywin32-312/win32/License.txt), [`pywin32-312/win32com/License.txt`](licenses/python/pywin32-312/win32com/License.txt), [`pywin32-312/win32comext/License.txt`](licenses/python/pywin32-312/win32comext/License.txt), [`pywin32-312/win32comext/mapi/NOTICE.md`](licenses/python/pywin32-312/win32comext/mapi/NOTICE.md) |
+| qtpy | 2.4.3 | MIT | Linux | Desktop |  | [`qtpy-2.4.3/AUTHORS.md`](licenses/python/qtpy-2.4.3/AUTHORS.md), [`qtpy-2.4.3/LICENSE.txt`](licenses/python/qtpy-2.4.3/LICENSE.txt) |
+| shiboken6 | 6.12.0 | LGPL-3.0-only | Linux | Desktop |  | [`shiboken6-6.12.0/LGPL-3.0-only.txt`](licenses/python/shiboken6-6.12.0/LGPL-3.0-only.txt), [`shiboken6-6.12.0/GPL-3.0-only.txt`](licenses/python/shiboken6-6.12.0/GPL-3.0-only.txt) |
+| typing-extensions | 4.16.0 | PSF-2.0 | Linux, Windows | Desktop |  | [`typing-extensions-4.16.0/LICENSE`](licenses/python/typing-extensions-4.16.0/LICENSE) |
 
 ## Inside PyMuPDF: MuPDF and the libraries and fonts it compiles in
 
 PyMuPDF includes MuPDF, which compiles in the third-party code below. The licence
 files come from the MuPDF 1.28.2 source release.
 
-| Component | Version | Licence | Bundled on | Used for | Licence text |
-| --- | --- | --- | --- | --- | --- |
-| MuPDF (inside PyMuPDF) | 1.28.2 | AGPL-3.0 | Linux, Windows | PDF engine compiled into PyMuPDF | [`COPYING`](licenses/mupdf/COPYING) |
-| Brotli | from MuPDF 1.28.2 | MIT | Linux, Windows | Compiled into PyMuPDF by MuPDF | [`brotli/LICENSE`](licenses/mupdf/brotli/LICENSE) |
-| cmark-gfm | from MuPDF 1.28.2 | BSD-2-Clause and others (see COPYING) | Linux, Windows | Compiled into PyMuPDF by MuPDF | [`cmark-gfm/COPYING`](licenses/mupdf/cmark-gfm/COPYING) |
-| extract (Artifex) | from MuPDF 1.28.2 | AGPL-3.0 | Linux, Windows | Compiled into PyMuPDF by MuPDF | [`extract/COPYING`](licenses/mupdf/extract/COPYING) |
-| FreeType | from MuPDF 1.28.2 | FTL OR GPL-2.0-or-later | Linux, Windows | Compiled into PyMuPDF by MuPDF | [`freetype/LICENSE.TXT`](licenses/mupdf/freetype/LICENSE.TXT), [`freetype/docs/FTL.TXT`](licenses/mupdf/freetype/docs/FTL.TXT) |
-| Gumbo HTML parser | from MuPDF 1.28.2 | Apache-2.0 | Linux, Windows | Compiled into PyMuPDF by MuPDF | [`gumbo-parser/COPYING`](licenses/mupdf/gumbo-parser/COPYING) |
-| HarfBuzz | from MuPDF 1.28.2 | MIT ("Old MIT") | Linux, Windows | Compiled into PyMuPDF by MuPDF | [`harfbuzz/COPYING`](licenses/mupdf/harfbuzz/COPYING) |
-| jbig2dec (Artifex) | from MuPDF 1.28.2 | AGPL-3.0-or-later | Linux, Windows | Compiled into PyMuPDF by MuPDF | [`jbig2dec/LICENSE`](licenses/mupdf/jbig2dec/LICENSE), [`jbig2dec/COPYING`](licenses/mupdf/jbig2dec/COPYING) |
-| Little CMS (lcms2mt) | from MuPDF 1.28.2 | MIT | Linux, Windows | Compiled into PyMuPDF by MuPDF | [`lcms2/LICENSE`](licenses/mupdf/lcms2/LICENSE) |
-| Leptonica | from MuPDF 1.28.2 | BSD-2-Clause | Linux, Windows | Compiled into PyMuPDF by MuPDF | [`leptonica/leptonica-license.txt`](licenses/mupdf/leptonica/leptonica-license.txt) |
-| IJG libjpeg | from MuPDF 1.28.2 | IJG (see LEGAL ISSUES in README) | Linux, Windows | Compiled into PyMuPDF by MuPDF | [`libjpeg/README`](licenses/mupdf/libjpeg/README) |
-| MuJS (Artifex) | from MuPDF 1.28.2 | ISC | Linux, Windows | Compiled into PyMuPDF by MuPDF | [`mujs/COPYING`](licenses/mupdf/mujs/COPYING) |
-| OpenJPEG | from MuPDF 1.28.2 | BSD-2-Clause | Linux, Windows | Compiled into PyMuPDF by MuPDF | [`openjpeg/LICENSE`](licenses/mupdf/openjpeg/LICENSE) |
-| Tesseract OCR engine (library) | from MuPDF 1.28.2 | Apache-2.0 | Linux, Windows | Compiled into PyMuPDF by MuPDF | [`tesseract/LICENSE`](licenses/mupdf/tesseract/LICENSE) |
-| Zint barcode library (backend) | from MuPDF 1.28.2 | BSD-3-Clause | Linux, Windows | Compiled into PyMuPDF by MuPDF | [`zint/LICENSE`](licenses/mupdf/zint/LICENSE) |
-| zlib | from MuPDF 1.28.2 | Zlib | Linux, Windows | Compiled into PyMuPDF by MuPDF | [`zlib/LICENSE`](licenses/mupdf/zlib/LICENSE) |
-| ZXing-C++ | from MuPDF 1.28.2 | Apache-2.0 | Linux, Windows | Compiled into PyMuPDF by MuPDF | [`zxing-cpp/LICENSE`](licenses/mupdf/zxing-cpp/LICENSE) |
-| Droid fonts | from MuPDF 1.28.2 | Apache-2.0 | Linux, Windows | Compiled into PyMuPDF by MuPDF | [`droid/NOTICE`](licenses/mupdf/droid/NOTICE) |
-| Source Han fonts | from MuPDF 1.28.2 | OFL-1.1 | Linux, Windows | Compiled into PyMuPDF by MuPDF | [`han/LICENSE.txt`](licenses/mupdf/han/LICENSE.txt) |
-| Noto fonts | from MuPDF 1.28.2 | OFL-1.1 | Linux, Windows | Compiled into PyMuPDF by MuPDF | [`noto/COPYING`](licenses/mupdf/noto/COPYING) |
-| Charis SIL font | from MuPDF 1.28.2 | OFL-1.1 | Linux, Windows | Compiled into PyMuPDF by MuPDF | [`sil/OFL.txt`](licenses/mupdf/sil/OFL.txt) |
+| Component | Version | Licence | Bundled on | Builds | Used for | Licence text |
+| --- | --- | --- | --- | --- | --- | --- |
+| MuPDF (inside PyMuPDF) | 1.28.2 | AGPL-3.0 | Linux, Windows | Desktop, Browser | PDF engine compiled into PyMuPDF | [`COPYING`](licenses/mupdf/COPYING) |
+| Brotli | from MuPDF 1.28.2 | MIT | Linux, Windows | Desktop, Browser | Compiled into PyMuPDF by MuPDF | [`brotli/LICENSE`](licenses/mupdf/brotli/LICENSE) |
+| cmark-gfm | from MuPDF 1.28.2 | BSD-2-Clause and others (see COPYING) | Linux, Windows | Desktop, Browser | Compiled into PyMuPDF by MuPDF | [`cmark-gfm/COPYING`](licenses/mupdf/cmark-gfm/COPYING) |
+| extract (Artifex) | from MuPDF 1.28.2 | AGPL-3.0 | Linux, Windows | Desktop, Browser | Compiled into PyMuPDF by MuPDF | [`extract/COPYING`](licenses/mupdf/extract/COPYING) |
+| FreeType | from MuPDF 1.28.2 | FTL OR GPL-2.0-or-later | Linux, Windows | Desktop, Browser | Compiled into PyMuPDF by MuPDF | [`freetype/LICENSE.TXT`](licenses/mupdf/freetype/LICENSE.TXT), [`freetype/docs/FTL.TXT`](licenses/mupdf/freetype/docs/FTL.TXT) |
+| Gumbo HTML parser | from MuPDF 1.28.2 | Apache-2.0 | Linux, Windows | Desktop, Browser | Compiled into PyMuPDF by MuPDF | [`gumbo-parser/COPYING`](licenses/mupdf/gumbo-parser/COPYING) |
+| HarfBuzz | from MuPDF 1.28.2 | MIT ("Old MIT") | Linux, Windows | Desktop, Browser | Compiled into PyMuPDF by MuPDF | [`harfbuzz/COPYING`](licenses/mupdf/harfbuzz/COPYING) |
+| jbig2dec (Artifex) | from MuPDF 1.28.2 | AGPL-3.0-or-later | Linux, Windows | Desktop, Browser | Compiled into PyMuPDF by MuPDF | [`jbig2dec/LICENSE`](licenses/mupdf/jbig2dec/LICENSE), [`jbig2dec/COPYING`](licenses/mupdf/jbig2dec/COPYING) |
+| Little CMS (lcms2mt) | from MuPDF 1.28.2 | MIT | Linux, Windows | Desktop, Browser | Compiled into PyMuPDF by MuPDF | [`lcms2/LICENSE`](licenses/mupdf/lcms2/LICENSE) |
+| Leptonica | from MuPDF 1.28.2 | BSD-2-Clause | Linux, Windows | Desktop, Browser | Compiled into PyMuPDF by MuPDF | [`leptonica/leptonica-license.txt`](licenses/mupdf/leptonica/leptonica-license.txt) |
+| IJG libjpeg | from MuPDF 1.28.2 | IJG (see LEGAL ISSUES in README) | Linux, Windows | Desktop, Browser | Compiled into PyMuPDF by MuPDF | [`libjpeg/README`](licenses/mupdf/libjpeg/README) |
+| MuJS (Artifex) | from MuPDF 1.28.2 | ISC | Linux, Windows | Desktop, Browser | Compiled into PyMuPDF by MuPDF | [`mujs/COPYING`](licenses/mupdf/mujs/COPYING) |
+| OpenJPEG | from MuPDF 1.28.2 | BSD-2-Clause | Linux, Windows | Desktop, Browser | Compiled into PyMuPDF by MuPDF | [`openjpeg/LICENSE`](licenses/mupdf/openjpeg/LICENSE) |
+| Tesseract OCR engine (library) | from MuPDF 1.28.2 | Apache-2.0 | Linux, Windows | Desktop, Browser | Compiled into PyMuPDF by MuPDF | [`tesseract/LICENSE`](licenses/mupdf/tesseract/LICENSE) |
+| Zint barcode library (backend) | from MuPDF 1.28.2 | BSD-3-Clause | Linux, Windows | Desktop, Browser | Compiled into PyMuPDF by MuPDF | [`zint/LICENSE`](licenses/mupdf/zint/LICENSE) |
+| zlib | from MuPDF 1.28.2 | Zlib | Linux, Windows | Desktop, Browser | Compiled into PyMuPDF by MuPDF | [`zlib/LICENSE`](licenses/mupdf/zlib/LICENSE) |
+| ZXing-C++ | from MuPDF 1.28.2 | Apache-2.0 | Linux, Windows | Desktop, Browser | Compiled into PyMuPDF by MuPDF | [`zxing-cpp/LICENSE`](licenses/mupdf/zxing-cpp/LICENSE) |
+| Droid fonts | from MuPDF 1.28.2 | Apache-2.0 | Linux, Windows | Desktop, Browser | Compiled into PyMuPDF by MuPDF | [`droid/NOTICE`](licenses/mupdf/droid/NOTICE) |
+| Source Han fonts | from MuPDF 1.28.2 | OFL-1.1 | Linux, Windows | Desktop, Browser | Compiled into PyMuPDF by MuPDF | [`han/LICENSE.txt`](licenses/mupdf/han/LICENSE.txt) |
+| Noto fonts | from MuPDF 1.28.2 | OFL-1.1 | Linux, Windows | Desktop, Browser | Compiled into PyMuPDF by MuPDF | [`noto/COPYING`](licenses/mupdf/noto/COPYING) |
+| Charis SIL font | from MuPDF 1.28.2 | OFL-1.1 | Linux, Windows | Desktop, Browser | Compiled into PyMuPDF by MuPDF | [`sil/OFL.txt`](licenses/mupdf/sil/OFL.txt) |
 
 ## Interface packages (inlined into the app's single HTML file)
 
-| Component | Version | Licence | Bundled on | Used for | Licence text |
-| --- | --- | --- | --- | --- | --- |
-| @dnd-kit/accessibility | 3.1.1 | MIT | Linux, Windows |  | [`@dnd-kit__accessibility-3.1.1/LICENSE`](licenses/frontend/@dnd-kit__accessibility-3.1.1/LICENSE) |
-| @dnd-kit/core | 6.3.1 | MIT | Linux, Windows | Drag to reorder files | [`@dnd-kit__core-6.3.1/LICENSE`](licenses/frontend/@dnd-kit__core-6.3.1/LICENSE) |
-| @dnd-kit/sortable | 10.0.0 | MIT | Linux, Windows | Drag to reorder files | [`@dnd-kit__sortable-10.0.0/LICENSE`](licenses/frontend/@dnd-kit__sortable-10.0.0/LICENSE) |
-| @dnd-kit/utilities | 3.2.2 | MIT | Linux, Windows |  | [`@dnd-kit__utilities-3.2.2/LICENSE`](licenses/frontend/@dnd-kit__utilities-3.2.2/LICENSE) |
-| @fontsource-variable/open-sans | 5.3.0 | OFL-1.1 | Linux, Windows | Bundled font (Open Sans) | [`@fontsource-variable__open-sans-5.3.0/LICENSE`](licenses/frontend/@fontsource-variable__open-sans-5.3.0/LICENSE) |
-| react | 19.3.1 | MIT | Linux, Windows | User interface | [`react-19.3.1/LICENSE`](licenses/frontend/react-19.3.1/LICENSE) |
-| react-dom | 19.3.1 | MIT | Linux, Windows | User interface | [`react-dom-19.3.1/LICENSE`](licenses/frontend/react-dom-19.3.1/LICENSE) |
-| scheduler | 0.28.0 | MIT | Linux, Windows |  | [`scheduler-0.28.0/LICENSE`](licenses/frontend/scheduler-0.28.0/LICENSE) |
-| tslib | 2.9.1 | 0BSD | Linux, Windows |  | [`tslib-2.9.1/LICENSE.txt`](licenses/frontend/tslib-2.9.1/LICENSE.txt) |
+| Component | Version | Licence | Bundled on | Builds | Used for | Licence text |
+| --- | --- | --- | --- | --- | --- | --- |
+| @dnd-kit/accessibility | 3.1.1 | MIT | Linux, Windows | Desktop, Browser |  | [`@dnd-kit__accessibility-3.1.1/LICENSE`](licenses/frontend/@dnd-kit__accessibility-3.1.1/LICENSE) |
+| @dnd-kit/core | 6.3.1 | MIT | Linux, Windows | Desktop, Browser | Drag to reorder files | [`@dnd-kit__core-6.3.1/LICENSE`](licenses/frontend/@dnd-kit__core-6.3.1/LICENSE) |
+| @dnd-kit/sortable | 10.0.0 | MIT | Linux, Windows | Desktop, Browser | Drag to reorder files | [`@dnd-kit__sortable-10.0.0/LICENSE`](licenses/frontend/@dnd-kit__sortable-10.0.0/LICENSE) |
+| @dnd-kit/utilities | 3.2.2 | MIT | Linux, Windows | Desktop, Browser |  | [`@dnd-kit__utilities-3.2.2/LICENSE`](licenses/frontend/@dnd-kit__utilities-3.2.2/LICENSE) |
+| @fontsource-variable/open-sans | 5.3.0 | OFL-1.1 | Linux, Windows | Desktop, Browser | Bundled font (Open Sans) | [`@fontsource-variable__open-sans-5.3.0/LICENSE`](licenses/frontend/@fontsource-variable__open-sans-5.3.0/LICENSE) |
+| react | 19.3.1 | MIT | Linux, Windows | Desktop, Browser | User interface | [`react-19.3.1/LICENSE`](licenses/frontend/react-19.3.1/LICENSE) |
+| react-dom | 19.3.1 | MIT | Linux, Windows | Desktop, Browser | User interface | [`react-dom-19.3.1/LICENSE`](licenses/frontend/react-dom-19.3.1/LICENSE) |
+| scheduler | 0.28.0 | MIT | Linux, Windows | Desktop, Browser |  | [`scheduler-0.28.0/LICENSE`](licenses/frontend/scheduler-0.28.0/LICENSE) |
+| tslib | 2.9.1 | 0BSD | Linux, Windows | Desktop, Browser |  | [`tslib-2.9.1/LICENSE.txt`](licenses/frontend/tslib-2.9.1/LICENSE.txt) |
 
 ## Also included in the built app
 
-| Component | Version | Licence | Bundled on | Used for | Licence text |
-| --- | --- | --- | --- | --- | --- |
-| Python runtime (python.org Windows build) | 3.13.17 | PSF-2.0 (and the bundled libraries' licences inside) | Windows | Runs the app (bundled by PyInstaller) | [`python-runtime-windows-3.13.17/LICENSE.txt`](licenses/other/python-runtime-windows-3.13.17/LICENSE.txt), [`python-runtime-windows-3.13.17/license.rst`](licenses/other/python-runtime-windows-3.13.17/license.rst) |
-| Python runtime (Linux packages; confirm with the v0.75 build) | 3.13.18 | PSF-2.0 | Linux | Runs the app (bundled by PyInstaller) | [`python-runtime-linux/LICENSE.txt`](licenses/other/python-runtime-linux/LICENSE.txt) |
-| PyInstaller bootloader | 6.22.3 | GPL-2.0-or-later WITH Bootloader-exception | Linux, Windows | Starts the app; the exception allows any licence for the app | [`pyinstaller-6.22.3/COPYING.txt`](licenses/other/pyinstaller-6.22.3/COPYING.txt) |
-| Inno Setup (the installer and unins000.exe) | 6.7.1 | Inno Setup License (permissive) | Windows | Installs and uninstalls the app | [`inno-setup/license.txt`](licenses/other/inno-setup/license.txt) |
-| Feather Icons (design of the settings icon) | v4.29.2 | MIT | Linux, Windows | The settings gear icon is derived from Feather's | [`feather-icons/LICENSE`](licenses/other/feather-icons/LICENSE) |
-| Microsoft WebView2 SDK files (Microsoft.Web.WebView2.Core.dll, Microsoft.Web.WebView2.WinForms.dll, WebView2Loader.dll), inside pywebview | 1.0.3856.49 | BSD-3-Clause-style Microsoft licence (no source published; see note) | Windows | Connects the window to the Edge WebView2 Runtime on Windows | [`microsoft-webview2-sdk-1.0.3856.49/LICENSE.txt`](licenses/other/microsoft-webview2-sdk-1.0.3856.49/LICENSE.txt), [`microsoft-webview2-sdk-1.0.3856.49/NOTICE.txt`](licenses/other/microsoft-webview2-sdk-1.0.3856.49/NOTICE.txt) |
+| Component | Version | Licence | Bundled on | Builds | Used for | Licence text |
+| --- | --- | --- | --- | --- | --- | --- |
+| Python runtime (python.org Windows build) | 3.13.17 | PSF-2.0 (and the bundled libraries' licences inside) | Windows | Desktop, Browser | Runs the app (bundled by PyInstaller) | [`python-runtime-windows-3.13.17/LICENSE.txt`](licenses/other/python-runtime-windows-3.13.17/LICENSE.txt), [`python-runtime-windows-3.13.17/license.rst`](licenses/other/python-runtime-windows-3.13.17/license.rst) |
+| Python runtime (Linux packages; confirm with the v0.75 build) | 3.13.18 | PSF-2.0 | Linux | Desktop, Browser | Runs the app (bundled by PyInstaller) | [`python-runtime-linux/LICENSE.txt`](licenses/other/python-runtime-linux/LICENSE.txt) |
+| PyInstaller bootloader | 6.22.3 | GPL-2.0-or-later WITH Bootloader-exception | Linux, Windows | Desktop, Browser | Starts the app; the exception allows any licence for the app | [`pyinstaller-6.22.3/COPYING.txt`](licenses/other/pyinstaller-6.22.3/COPYING.txt) |
+| Inno Setup (the installer and unins000.exe) | 6.7.1 | Inno Setup License (permissive) | Windows | Desktop | Installs and uninstalls the app | [`inno-setup/license.txt`](licenses/other/inno-setup/license.txt) |
+| Feather Icons (design of the settings icon) | v4.29.2 | MIT | Linux, Windows | Desktop, Browser | The settings gear icon is derived from Feather's | [`feather-icons/LICENSE`](licenses/other/feather-icons/LICENSE) |
+| Microsoft WebView2 SDK files (Microsoft.Web.WebView2.Core.dll, Microsoft.Web.WebView2.WinForms.dll, WebView2Loader.dll), inside pywebview | 1.0.3856.49 | BSD-3-Clause-style Microsoft licence (no source published; see note) | Windows | Desktop | Connects the window to the Edge WebView2 Runtime on Windows | [`microsoft-webview2-sdk-1.0.3856.49/LICENSE.txt`](licenses/other/microsoft-webview2-sdk-1.0.3856.49/LICENSE.txt), [`microsoft-webview2-sdk-1.0.3856.49/NOTICE.txt`](licenses/other/microsoft-webview2-sdk-1.0.3856.49/NOTICE.txt) |
 
-**Note on the Microsoft WebView2 SDK files:** pywebview ships these Microsoft files
-byte-for-byte as they are in Microsoft's `Microsoft.Web.WebView2` NuGet package
-1.0.3856.49, which licenses them under the BSD-3-Clause-style terms in
+**Note on the Microsoft WebView2 SDK files (Desktop build only):** pywebview
+ships these Microsoft files byte-for-byte as they are in Microsoft's `Microsoft.Web.WebView2` NuGet
+package 1.0.3856.49, which licenses them under the BSD-3-Clause-style terms in
 `LICENSE.txt` (with third-party notices in `NOTICE.txt`). We found no published source
 code for them. Whether the AGPL-3.0 requires it is an open question; see
 [LICENSING.md](LICENSING.md).
@@ -105,19 +107,19 @@ Python runtime, PyMuPDF and pywin32 need Microsoft's Visual C++ runtime, which c
 the separately installed Microsoft Visual C++ Redistributable (see below); the installer
 checks for it. The Universal C Runtime is part of Windows 10 and 11.
 
-## Not included (installed separately, by the user or the installer wizard)
+## Not included (installed separately)
 
 | Program | Licence | Notes |
 | --- | --- | --- |
 | Tesseract OCR program | Apache-2.0 | Optional; installed with winget or a package manager. |
-| LibreOffice | MPL-2.0 | Optional; installed separately. |
-| Microsoft PowerPoint | Proprietary | Optional; used only if already installed. |
+| LibreOffice | MPL-2.0 | Optional, for PowerPoint files; installed separately. |
 | Microsoft Edge WebView2 Runtime | Microsoft software licence | Part of Windows 11; not shipped. |
 | Microsoft Visual C++ Redistributable (x64) | Microsoft software licence | Required; see note. |
 | Segoe UI font | Proprietary | Used only if Windows provides it; never bundled. |
+| The browser that browser mode opens in | Its own licence | Browser build; never shipped. |
 
 The Microsoft Visual C++ Redistributable (x64, version 14.44 or newer) is installed from
-Microsoft (the installer offers the download); it is never shipped with the app.
+Microsoft (the installer offers the download). It is never shipped with the app.
 
 The app runs the separately installed Tesseract program for OCR. MuPDF also compiles a
 copy of the Tesseract library into PyMuPDF (listed above), which PDF Manager doesn't use.

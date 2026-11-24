@@ -1,8 +1,8 @@
 """Linux (and macOS) implementation of the platform interface.
 
 Distribution packages put Tesseract and LibreOffice on ``PATH``, so no extra
-search locations are needed. Microsoft PowerPoint doesn't exist here;
-LibreOffice is the slide renderer.
+search locations are needed. LibreOffice converts presentations here, as on
+every platform (decision C17).
 """
 
 from __future__ import annotations
@@ -46,21 +46,6 @@ def tesseract_candidates() -> list[Path]:
 def libreoffice_candidates() -> list[Path]:
     """No locations beyond ``PATH`` (``soffice`` / ``libreoffice``)."""
     return []
-
-
-def powerpoint_installed() -> bool:
-    """Microsoft PowerPoint is never available off Windows."""
-    return False
-
-
-def powerpoint_path() -> Path | None:
-    """Microsoft PowerPoint is never available off Windows."""
-    return None
-
-
-def is_untrusted(path: Path) -> bool:
-    """No Mark-of-the-Web here; PowerPoint (which uses it) isn't available anyway."""
-    return False
 
 
 def copy_with_provenance(source: Path, target: Path) -> None:

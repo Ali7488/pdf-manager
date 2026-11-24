@@ -7,8 +7,8 @@
  *   give real paths); `"all"` returns documents and images.
  * - Files dropped in the browser become fake `InputFile`s via `simulateDrop`.
  * - Jobs emit realistic `jobProgress` events over a few seconds, honour
- *   `cancelJob`, warn about PowerPoint files (POWERPOINT_FALLBACK), and fail
- *   when an input's name contains "fail".
+ *   `cancelJob`, warn (OCR_FAILED) when an input's name contains "warn", and
+ *   fail when it contains "fail".
  * - `checkTools` applies the contract's rules to a configurable set of tools.
  * - `saveSettings` can be told to fail (`settingsSaveFails`), returning
  *   SETTINGS_SAVE_FAILED while still applying the change in memory, as Python does.
@@ -45,7 +45,7 @@ import { parsePageRanges } from "../lib/pageRanges";
 /** Which external tools the mock pretends are installed. */
 export interface MockTools {
   ocr: boolean;
-  powerpoint: boolean;
+  /** LibreOffice Impress, which converts every PowerPoint file (decision C17). */
   libreoffice: boolean;
 }
 
@@ -53,7 +53,7 @@ export interface MockTools {
 export interface MockOptions {
   /** Milliseconds between simulated steps. Default 300 (a job takes a few seconds). */
   tickMs?: number;
-  /** Installed tools. Default: PowerPoint only (no OCR, no LibreOffice). */
+  /** Installed tools. Default: LibreOffice only (no OCR). */
   tools?: Partial<MockTools>;
   /** Initial saved settings. */
   settings?: Partial<Settings>;
@@ -65,7 +65,12 @@ export interface MockOptions {
   settingsSaveFails?: boolean;
   /** Simulated operating system, reported by `getAppInfo`. Default "windows". */
   platform?: AppInfo["platform"];
+  /** The source revision `getAppInfo` reports (null: unknown). Default {@link MOCK_REVISION}. */
+  sourceRevision?: string | null;
 }
+
+/** The commit the mock says it was built from. */
+export const MOCK_REVISION = "0123456789abcdef0123456789abcdef01234567";
 
 /** Extra controls only the mock has. */
 export interface MockControls {
@@ -154,6 +159,19 @@ const OCR_MISSING = (): Issue =>
     ],
   );
 
+/** PowerPoint files were added but LibreOffice Impress isn't installed (decision C17). */
+const LIBREOFFICE_MISSING = (): Issue =>
+  makeIssue(
+    "SLIDE_RENDERER_MISSING",
+    "error",
+    "LibreOffice is needed for PowerPoint files",
+    "PDF Manager converts PowerPoint files (.pptx and .ppt) with the free LibreOffice Impress, which wasn't found. PDF files and images work without it.",
+    [
+      "Install the free LibreOffice from libreoffice.org (its Impress part converts presentations), then try again.",
+      "If you have Microsoft PowerPoint and need the slides to look exactly as they do there, open the presentation in PowerPoint, save or export it as a PDF, and add that PDF instead.",
+    ],
+  );
+
 /** The Ubuntu/Debian command that installs Tesseract with English (decision C16). */
 export const LINUX_OCR_INSTALL_COMMAND = "sudo apt install tesseract-ocr tesseract-ocr-eng";
 
@@ -210,7 +228,7 @@ interface MockJob {
  */
 export function createMockApi(options: MockOptions = {}): MockApi {
   const tickMs = options.tickMs ?? 300;
-  const tools: MockTools = { ocr: false, powerpoint: true, libreoffice: false, ...options.tools };
+  const tools: MockTools = { ocr: false, libreoffice: true, ...options.tools };
   let settings: Settings = { ...DEFAULT_SETTINGS, ...options.settings };
   const folderPicker = options.folderPicker ?? (() => `${SAMPLE_FOLDER}\\PDF Manager results`);
   const knownFiles = new Map<string, InputFile>();
@@ -280,19 +298,17 @@ export function createMockApi(options: MockOptions = {}): MockApi {
       totalPages += pages;
 
       if (kind === "pptx" || kind === "ppt") {
-        progress("rendering_slides", i, `Turning slides into pages: ${name}`);
+        progress("rendering_slides", i, `Converting slides with LibreOffice: ${name}`);
+      }
+      if (name.toLowerCase().includes("warn")) {
         warnings.push(
           makeIssue(
-            "POWERPOINT_FALLBACK",
+            "OCR_FAILED",
             "warning",
-            "PowerPoint had a problem, so LibreOffice was used",
-            `"${name}" was converted with LibreOffice instead. The layout may look slightly different.`,
-            [
-              "Open the result and check that the slides look right.",
-              "If they don't, close PowerPoint completely and try again.",
-              "Restarting the computer can also help if PowerPoint is stuck.",
-            ],
-            { details: "COM error 0x80048240: PowerPoint could not export the presentation.", file: path },
+            "One page's text couldn't be read",
+            `A page of "${name}" isn't searchable. The rest of the file is fine.`,
+            ["Open the result and check that page.", "Try again with a higher quality (DPI) in Settings."],
+            { details: "Tesseract exited with code 1 on page 2.", file: path },
           ),
         );
       }
@@ -432,12 +448,10 @@ export function createMockApi(options: MockOptions = {}): MockApi {
     setTimeout(tick, tickMs);
   }
 
-  return {
-    isMock: true,
-
-    simulateDrop(files: ArrayLike<File>) {
-      const added: InputFile[] = [];
-      for (const file of Array.from(files)) {
+  /** Turns browser File objects into fake InputFiles (unsupported ones are skipped, as Python does). */
+  const describeDropped = (files: ArrayLike<File>): InputFile[] => {
+    const added: InputFile[] = [];
+    for (const file of Array.from(files)) {
         const kind = kindFromName(file.name);
         if (!kind) continue; // Python would skip unsupported files too.
         added.push(
@@ -449,9 +463,28 @@ export function createMockApi(options: MockOptions = {}): MockApi {
             pageCount: kind === "pdf" ? Math.min(200, Math.max(1, Math.round(file.size / 100_000))) : null,
           }),
         );
-      }
+    }
+    return added;
+  };
+
+  return {
+    isMock: true,
+    mode: "mock",
+    saveMode: "folder",
+
+    simulateDrop(files: ArrayLike<File>) {
+      const added = describeDropped(files);
       if (added.length > 0) emitEvent("filesAdded", { files: added });
     },
+
+    addDroppedFiles: async (files: File[]) => {
+      await latency();
+      return describeDropped(files);
+    },
+    latestJob: () => Promise.resolve(null),
+    // The mock sends job events by itself.
+    watchJob: () => undefined,
+    quit: () => Promise.resolve({ quit: true, running: false, unsavedResults: 0 }),
 
     setTools(next: Partial<MockTools>) {
       Object.assign(tools, next);
@@ -465,7 +498,14 @@ export function createMockApi(options: MockOptions = {}): MockApi {
       await latency();
       const logsDir = platform === "windows" ? "C:\\Users\\Public\\PDF Manager\\logs" : "/home/user/.local/state/pdf-manager/logs";
       const licensesDir = platform === "windows" ? "C:\\Users\\Public\\PDF Manager" : "/opt/pdf-manager";
-      return { version: "1.0.0 (preview)", logsDir, licensesDir, platform };
+      return {
+        version: "1.0.0 (preview)",
+        logsDir,
+        licensesDir,
+        platform,
+        sourceRevision: options.sourceRevision === undefined ? MOCK_REVISION : options.sourceRevision,
+        sourceModified: false,
+      };
     },
 
     async getSettings() {
@@ -519,35 +559,12 @@ export function createMockApi(options: MockOptions = {}): MockApi {
       });
       const issues: Issue[] = [];
       if (ocrRequired && !tools.ocr) issues.push(OCR_MISSING());
-      if (hasSlides && !tools.powerpoint && !tools.libreoffice) {
-        issues.push(
-          makeIssue(
-            "SLIDE_RENDERER_MISSING",
-            "error",
-            "PowerPoint files can't be opened",
-            "Converting PowerPoint files needs Microsoft PowerPoint or LibreOffice, and neither was found.",
-            [
-              "Install Microsoft PowerPoint, or install LibreOffice (free).",
-              "Or remove the PowerPoint files from the list and try again.",
-            ],
-          ),
-        );
-      }
-      if (hasSlides && tools.powerpoint && !tools.libreoffice) {
-        issues.push(
-          makeIssue("SLIDE_RENDERER_MISSING", "warning", "LibreOffice not present", "PowerPoint will be used. LibreOffice is only a backup.", []),
-        );
-      }
+      if (hasSlides && !tools.libreoffice) issues.push(LIBREOFFICE_MISSING());
       return {
         ok: !issues.some((issue) => issue.severity === "error"),
         ocr: { required: ocrRequired, present: tools.ocr, path: tools.ocr ? (settings.tesseractPath ?? TESSERACT_PATH) : null },
-        powerpoint: {
-          required: hasSlides,
-          present: tools.powerpoint,
-          path: tools.powerpoint ? "C:\\Program Files\\Microsoft Office\\root\\Office16\\POWERPNT.EXE" : null,
-        },
         libreoffice: {
-          required: hasSlides && !tools.powerpoint,
+          required: hasSlides,
           present: tools.libreoffice,
           path: tools.libreoffice ? "C:\\Program Files\\LibreOffice\\program\\soffice.exe" : null,
         },

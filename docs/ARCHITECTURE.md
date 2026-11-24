@@ -24,11 +24,11 @@ converter/ Python service layer: pure conversion logic, no UI, no bridge
 | `core/` | `types.py`: `Action` enum, `ActionSettings`, `ActionData`, `ProgressEvent`, `OutputFile`, `JobResult`, accepted file types. `issues.py`: `Issue` (user-facing error/warning with troubleshooting steps), `ConversionError`, `Cancelled`. `context.py`: `CancelToken`, `JobContext` (settings, cancel, progress, warnings). |
 | `actions/` | `run.py`: `run_action`, the single entry point (F34). One module per action: `flatten`, `merge`, `split`, `images`, `compress`. |
 | `ocr/` | Tesseract: page rendering, page OCR, and the text-layer-only mode. |
-| `slides/` | PowerPoint files to PDF: optional Microsoft PowerPoint, LibreOffice fallback. |
-| `tools/` | `process.py` (run a program with timeout/cancel), `locate.py` (find Tesseract, LibreOffice, PowerPoint), `check.py` (the Convert modal's tool check). |
+| `slides/` | PowerPoint files to PDF with LibreOffice Impress, the only renderer (C17). |
+| `tools/` | `process.py` (run a program with timeout/cancel), `locate.py` (find Tesseract, LibreOffice), `check.py` (the Convert modal's tool check). |
 | `pdf/` | Bookmark helpers. |
 | `files/` | `info.py` (describe inputs for the file list), `naming.py` (`safe_destination`: never overwrite). |
-| `platforms/` | `windows.py`, `posix.py`, `windows_powerpoint.py`, selected once in `__init__.py`. |
+| `platforms/` | `windows.py`, `posix.py`, selected once in `__init__.py`. |
 
 ### Execution flow of one job
 
@@ -53,9 +53,9 @@ Errors: fatal problems raise `ConversionError(issue)`; a user cancel raises `Can
 
 ### Cross-cutting mechanisms
 
-- **Cancellation and timeouts (C5).** `JobContext.check_cancel()` is called between pages and files. External programs run through `tools.process.run_command`, which registers the process on the `CancelToken` so Cancel kills it immediately, and kills the whole process tree on timeout. Defaults: 120 s per OCR page (setting), 300 s per PowerPoint or LibreOffice export.
+- **Cancellation and timeouts (C5).** `JobContext.check_cancel()` is called between pages and files. External programs run through `tools.process.run_command`, which registers the process on the `CancelToken` so Cancel kills it immediately, and kills the whole process tree on timeout. Defaults: 120 s per OCR page (setting), 300 s per LibreOffice export.
 - **Progress.** Steps call `ctx.report(stage, message, page, page_count)`. Within a *phase* each input gets an equal share; multi-phase actions (flatten then merge, OCR then merge) call `ctx.begin_phase(start, span, count)` so the bar never moves backwards (tested).
-- **Warnings vs errors.** A warning (e.g. `POWERPOINT_FALLBACK`) is collected with `ctx.warn()` and returned with the results; an error stops the job. All wording, including troubleshooting steps, lives in `core/issues.py`.
+- **Warnings vs errors.** A warning (e.g. a page OCR couldn't read) is collected with `ctx.warn()` and returned with the results; an error stops the job. All wording, including troubleshooting steps, lives in `core/issues.py`.
 - **Logging (C13).** Modules log with `logging.getLogger(__name__)`; `run_command` logs every command, its duration, exit code and output at DEBUG. The API layer chooses the level (DEBUG in development, INFO in production; errors always in full).
 - **Originals are never modified.** Inputs are opened read-only; PowerPoint files are rendered from a scratch copy; tests compare input hashes before and after.
 
@@ -93,9 +93,9 @@ Vite + React + TypeScript, CSS Modules, feature folders (`pages/`, `components/`
 
 | Where | Choice | Why |
 | --- | --- | --- |
-| `slides/render.py`, `platforms/` | The scratch copy **keeps** the Windows Mark-of-the-Web. Downloaded presentations are rendered by LibreOffice, never automated with PowerPoint, with an `UNTRUSTED_PRESENTATION` warning (C14, audit R1). | Stripping the marker (an earlier version did) bypasses Office's Protected View trust signal. Files from the internet open in Protected View, which hidden automation can't use anyway. |
-| `slides/render.py` | PowerPoint and LibreOffice write into separate, freshly emptied folders (audit R3). | A partial file from a failed PowerPoint export must never be accepted as LibreOffice's result. LibreOffice can exit 0 without writing anything. |
-| `platforms/windows_powerpoint.py` | Export on a helper thread; quit or kill PowerPoint **only if the converter can prove it started that process**: PowerPoint wasn't running, exactly one new `POWERPNT.EXE` appeared, and it is the automation window's process (`owned_pid`, audit R2). Any doubt: never kill or quit. | PowerPoint is single-instance, so the converter may attach to the user's open PowerPoint. The thread allows a timeout when PowerPoint hangs (e.g. "Waiting for printer connection"). |
+| `slides/render.py` | **LibreOffice Impress is the only presentation renderer** on every platform, whatever a file's origin (C17). Microsoft PowerPoint is never automated; the earlier COM renderer and the provenance routing (C14) were removed. | One predictable path for drops, uploads and picks; no Office automation to hang, or to attach to the user's own PowerPoint (audit R2 no longer applies). For an exact PowerPoint look, users export a PDF from PowerPoint themselves (docs/PRESENTATION_FIDELITY.md). |
+| `slides/render.py`, `platforms/` | The scratch copy still **keeps** the Windows Mark-of-the-Web (`copy_with_provenance`, audit R1). | Nothing the app writes may look more trusted than the original. |
+| `slides/render.py` | LibreOffice writes into a freshly emptied folder (audit R3). | LibreOffice can exit 0 without writing anything; a leftover file must never pass for its result. |
 | `slides/render.py` | LibreOffice runs with a throwaway profile; success also requires a non-empty output file. | With the user's LibreOffice open, the command would otherwise hand off and do nothing; LibreOffice often exits 0 on failure. |
 | `tools/process.py`, `platforms/` | Kill the whole process tree (`taskkill /T`, or a process group on Linux). | `soffice` starts `soffice.bin`; killing only the parent leaves the real worker running. |
 | `actions/flatten.py` | Page images and OCR files stay in scratch until the job ends. | Deleting them immediately caused WinError 32 on Windows (file still held by a renderer or virus scanner). Regression test: `tests/test_temp_lock.py`. |
@@ -108,22 +108,34 @@ Vite + React + TypeScript, CSS Modules, feature folders (`pages/`, `components/`
 | `actions/compress.py` | Balanced: images above 200 DPI → 150 DPI, JPEG q75. Strong: above 120 → 96 DPI, q50. Light: lossless clean-up only. Never returns a bigger file. Uses PyMuPDF's low-level `mupdf.PdfImageRewriterOptions`. | Exact target resolutions need bicubic subsampling options the simple `rewrite_images` arguments don't offer. The low-level API is more likely to change between PyMuPDF versions (tests would catch it). |
 | `actions/split.py` | Ranges accept spaces and en/em dashes; overlapping ranges allowed; each part keeps in-range bookmarks with shifted pages and drops links to pages outside it. | Friendly input; valid output files. |
 
+### Browser mode (`api/web/`)
+
+`main.py --browser` serves the same interface from `127.0.0.1` (decision P33; [BROWSER_MODE.md](BROWSER_MODE.md)). `api/workflow.py` holds what both front doors share: settings, tool checks, OCR, jobs and saving. `api/bridge.py` adds only the pywebview window's dialogs, drops and DOM events. The browser-mode modules:
+
+- `web/session.py`: the per-launch opaque IDs, staged uploads and polled status;
+- `web/operations.py`: the explicit operations and their input checks;
+- `web/server.py`: the loopback HTTP server (session cookie, Host/Origin checks, limits);
+- `web/launch.py`: start, reuse, opening the default browser in app mode or a tab, and shutdown.
+
+The frontend picks `api/http.ts` when the server's bootstrap tag is present.
+
 ## Dependencies
 
-Runtime: **PyMuPDF** (all PDF work), **pywin32** (Windows only, optional PowerPoint). External programs: **Tesseract** (OCR, optional), **LibreOffice** (slides; required on Linux, backup on Windows), **Microsoft PowerPoint** (optional, Windows). The API layer uses **pywebview** (the window and the JS bridge; Edge WebView2 on Windows). The frontend's runtime dependencies are React and dnd-kit; the font is bundled. Details and per-platform package names: [`../README.md`](../README.md), [`PORTABILITY.md`](PORTABILITY.md). Python ≥ 3.11 (uses `StrEnum`); pinned to 3.13.
+Runtime: **PyMuPDF** (all PDF work), **pywin32** (Windows only: browser mode's native pickers). External programs: **Tesseract** (OCR, optional), **LibreOffice Impress** (needed only for PowerPoint files, on every platform; C17). The API layer uses **pywebview** (the window and the JS bridge; Edge WebView2 on Windows). The frontend's runtime dependencies are React and dnd-kit; the font is bundled. Details and per-platform package names: [`../README.md`](../README.md), [`PORTABILITY.md`](PORTABILITY.md). Python ≥ 3.11 (uses `StrEnum`); pinned to 3.13.
 
 Known dependency notes: the code imports `pymupdf` (the old `fitz` name is deprecated in 1.28); `pymupdf.image_profile` raises a `TypeError` in the installed 1.28.2, so it isn't used.
 
 ## Tests
 
-Python: `uv run pytest` (on 2026-11-23, Linux: **449 passed, 5 skipped**; the skipped ones are Windows-only NTFS tests). Tests needing Tesseract or LibreOffice skip when those aren't installed. Frontend: `npm test` in `frontend/` (**95 passed**).
+Python: `uv run pytest` (on 2026-11-23, Linux, with the e2e browser installed: **631 passed, 5 skipped**; the skipped ones are Windows-only tests, such as the NTFS ones). Tests needing Tesseract or LibreOffice skip when those aren't installed, and the e2e ones without a Playwright browser. Frontend: `npm test` in `frontend/` (**121 passed**).
 
 | Where | Covers |
 | --- | --- |
 | `tests/test_end_to_end.py` | Every action through `run_action`: naming, page counts, OCR on/off, contents page, order, monotonic progress, cancel, missing OCR, wrong file types, inputs unchanged. |
 | `tests/test_flatten.py`, `test_merge.py`, `test_split.py`, `test_images.py`, `test_compress.py`, `test_ocr.py` | Each action and the OCR text layer in detail. |
-| `tests/test_powerpoint.py` | Renderer order and fallback with a **fake** PowerPoint; untrusted-file routing (R1); the partial-output scenario (R3, fails on the old code); proven process ownership (R2); the COM helper thread's timeout/cancel rules. Real PowerPoint is never exercised. |
-| `tests/test_provenance.py` | Mark-of-the-Web parsing; on Windows (CI), real NTFS zone streams and that copies keep them. |
+| `tests/test_slides.py` | LibreOffice as the only renderer (real where installed): failures, timeout, cancel, a leftover output (R3), the tool check (LibreOffice only for presentations), and that no PowerPoint automation remains. |
+| `tests/test_provenance.py` | On Windows (CI), copies keep the NTFS Mark-of-the-Web stream (R1). |
+| `scripts/check_slide_fidelity.py` | Not a test: a manual fidelity check of LibreOffice's output on representative decks (docs/PRESENTATION_FIDELITY.md). |
 | `tests/test_tools.py`, `test_portability.py`, `test_temp_lock.py` | Running/killing external programs; no OS checks in shared service code; the WinError 32 regression. |
 | `tests/api/` | Paths, logging, settings store (including failed writes, R6), DTOs, job manager (including deterministic save/discard/shutdown races, R4), bridge contract (method names and argument lists), app entry, the import seam (R8). No real window is opened. |
 | `frontend/src/**/*.test.ts(x)` | Bridge mapping, mock, file list, action options and defaults, Split validation, Convert modal flow, settings save ordering (R5) and failure display (R6), tooltips. |

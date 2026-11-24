@@ -29,13 +29,25 @@ Also: drag and drop, drag to reorder, optional **OCR** (Tesseract) on every tool
 2. **Double-click it.** Because the installer isn't signed yet, Windows SmartScreen may say "Windows protected your PC". Only for a file from this repository's Releases page: click **More info → Run anyway**.
 3. Follow the short wizard. It installs for your user only (no administrator rights needed) and can optionally install:
    - **Tesseract OCR**, to make pages searchable (Windows may ask for permission);
-   - **LibreOffice**, only needed if Microsoft PowerPoint isn't installed.
+   - **LibreOffice**, needed only for PowerPoint files (PDFs and images work without it).
 4. PDF Manager needs the free **Microsoft Visual C++ Redistributable (x64)**, version 14.44 or newer, which many Windows programs already installed. If it's missing, the wizard says so and offers Microsoft's download (`https://aka.ms/vc14/vc_redist.x64.exe`); run `vc_redist.x64.exe` to install it. That step needs administrator permission.
 5. Start **PDF Manager** from the Start menu or the desktop icon.
 
 If PDF Manager shows **"Failed to load Python DLL"** when it starts, the Microsoft Visual C++ Redistributable is missing or out of date: install it from the link above, then start PDF Manager again.
 
 You can install OCR later from the app's **Settings**. Logs are written to a `logs` folder next to the installed app (open it from Settings); settings are in `%LOCALAPPDATA%\PDFManager`.
+
+### Windows 11: in your web browser (portable ZIP, being tested)
+
+The same app, without the installer or the desktop window: it opens in your own web browser ([details](docs/BROWSER_MODE.md)).
+
+1. Install the **Microsoft Visual C++ Redistributable (x64)**, version 14.44 or newer, if you don't have it (`https://aka.ms/vc14/vc_redist.x64.exe`; it needs administrator permission).
+2. Unzip **`PDF-Manager-<version>-browser-windows-x64.zip`** and double-click **`PDF Manager.exe`** in the folder.
+3. **Browser expectation:**
+   - If your **default browser is Microsoft Edge or a Chromium-based browser** (Google Chrome, Brave, Chromium), PDF Manager opens in **its own window, with no tabs or address bar** (app mode).
+   - **With any other default browser (for example Firefox), it opens as a normal tab** in that browser, at a local address (`http://127.0.0.1:...`).
+   - Either way it works offline, and your files never leave your computer.
+4. Closing the window leaves PDF Manager running, so it reopens quickly. Quit it from **Settings → Quit PDF Manager**. It also quits by itself after an hour without use, but never while a result is waiting to be saved.
 
 ### Linux (Ubuntu/Debian, Arch)
 
@@ -72,11 +84,10 @@ Python desktop bridge (api/)       jobs, settings, progress, file dialogs, savin
 Document engine (converter/)       one entry point: run_action(action, settings, data)
          +-- PyMuPDF       PDF processing, rendering, merging, splitting, compressing
          +-- Tesseract     optional offline OCR
-         +-- PowerPoint    optional Windows slide renderer (COM)
-         +-- LibreOffice   cross-platform slide renderer and fallback
+         +-- LibreOffice   converts PowerPoint files (Impress), on every system
 ```
 
-The interface is one self-contained HTML file loaded in the window: **no local web server**. Presentations downloaded from the internet or email are converted with LibreOffice rather than opened by PowerPoint automation, to keep your computer safe.
+The interface is one self-contained HTML file loaded in the window: **no local web server** (browser mode adds a loopback-only one, [details](docs/BROWSER_MODE.md)). PowerPoint files are converted with **LibreOffice Impress**, which PDF files and images never need. For a deck that has to look exactly as it does in PowerPoint, export it to PDF in PowerPoint and add that PDF ([fidelity notes](docs/PRESENTATION_FIDELITY.md)).
 
 ## Development
 
@@ -119,6 +130,7 @@ main.py                Desktop application entry point
 
 - [Architecture](docs/ARCHITECTURE.md): layers, execution flows, non-obvious choices, tests and CI.
 - [UI ↔ Python API](docs/API.md): bridge methods, JSON models and events.
+- [Browser mode](docs/BROWSER_MODE.md): the app in your own browser. It opens in app mode with Edge or a Chromium-based browser, otherwise as a localhost tab. Also covers security and the portable ZIP.
 - [Decisions](docs/DECISIONS.md): the owner's decisions.
 - [Engineering review](docs/ENGINEERING_REVIEW.md): known issues, test evidence and verification gaps.
 - [Portability](docs/PORTABILITY.md): Windows and Linux considerations.

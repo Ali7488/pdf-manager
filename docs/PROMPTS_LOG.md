@@ -138,9 +138,63 @@ A short, summarized record of each request made to the coding agent, and what ca
     - [x] Draft pull request #1; vault audit note (`75 Home Lab and System/BOTH DEVICES/Audits/2026-11-23 - PDF Manager Visual C++ Runtime Prerequisite.md`).
     - [x] Owner asked to finish and merge PR #1 (item 41).
     - [ ] Clean-machine test without the redistributable (carried over to the Windows 11 acceptance test, R10).
-41. **Browser-window app (branch `migrate/browser-app`).** Answers given: the original code can stay MIT, but the distributed app must be AGPL-3.0 while it includes PyMuPDF (or needs Artifex's commercial licence). Brave gets app mode like Edge and Chrome. Firefox has no app mode, so it gets a normal window or tab. Drag and drop works in a browser, but as file uploads, because browsers never reveal file paths. Requests: finish PR #1. Convert the app from a pywebview window to a local web app on 127.0.0.1, opened as a separate app-mode window (no tabs) in Edge or another Chromium-based browser (Chrome, Brave, Chromium). Otherwise open a normal tab in the default browser, and say so explicitly in the documentation. Do it on a separate migration branch for the owner to test and review before it is merged into main. Checklist:
-    - [ ] Merge PR #1.
-    - [ ] Local server, browser launcher, native dialogs, upload for drag and drop; pywebview, Qt and WebView2 removed.
-    - [ ] Frontend transport; tests; packaging, licence inventory and checks; docs and decisions.
-    - [ ] CI and Windows build; draft pull request for review.
+41. **Local browser mode (branch `migration/local-browser-mode`, base `9f58e64`).** Answers given:
+    - The original code can stay MIT, but the distributed app must be AGPL-3.0 while it includes PyMuPDF (or needs Artifex's commercial licence).
+    - Brave gets app mode like Edge and Chrome. Firefox has no app mode, so it gets a normal localhost tab.
+    - Drag and drop works in a browser as file uploads, because browsers never reveal file paths.
 
+    The owner then supplied a second audit and a detailed implementation brief:
+    - Finish PR #1 first.
+    - Add a browser mode next to the existing pywebview desktop mode, which stays usable for comparison.
+    - Open the OS default browser in app mode when it is Edge, Chrome, Brave or Chromium; otherwise open a normal localhost tab, and document that.
+    - Use a small, explicit HTTP API on 127.0.0.1: an exact Host/Origin check, a per-launch session, opaque file and destination IDs (no raw host paths from the browser), status polling while work is active (no event stream or heartbeats), bounded bodies and timeouts.
+    - For drag and drop and browser file selection, upload copies into private staging. Treat uploaded presentations as unknown provenance (LibreOffice, never PowerPoint). Use native pickers where available, and browser downloads as the save fallback.
+    - Package a portable ZIP per OS that is actually built, with its own licence checks.
+    - Add a real browser-to-Python integration suite.
+    - Keep styling and conversion behaviour unchanged. Don't merge or publish; leave the branch for the owner's review.
+    - The CLI save race is a separate fix.
+
+    Checklist:
+    - [x] Merge PR #1 (`9f58e64`).
+    - [x] Shared workflow extracted from the desktop bridge; browser-mode server, session, operations and launcher; native dialogs; `main.py --browser` / `--no-browser`.
+    - [x] Frontend HTTP adapter (server bootstrap, polling, uploads, download fallback, connection errors).
+    - [x] Browser-only dependency set; portable ZIP build; artifact licence checks. The owner added: include every licence as dependencies are added. Every new dependency's licence was checked; the browser build's licences are generated and checked.
+    - [x] Tests: unit, security, real browser integration (local, with the frozen Linux build too).
+    - [x] CI 45243745067 and Windows build 45243767264 green; draft pull request #2 for the owner's review (real Windows 11 testing still open).
+    - [x] Docs and decisions (P33, docs/BROWSER_MODE.md).
+
+42. **Update draft PR #2: LibreOffice-only presentations, per-upload UUIDs, unsaved-result protection, save recovery, exact source link.** The owner's decisions:
+    - Use LibreOffice Impress as the only automatic converter for `.ppt`/`.pptx` on every supported OS, with the same path for drag and drop and Add files. Explain what to install when a presentation is added and Impress is missing; keep PDF-only workflows independent of LibreOffice; document the manual PowerPoint-to-PDF route for a closer visual match. Test representative decks (missing or clipped text, numerical labels, charts, fonts, slide count) and record fidelity follow-ups.
+    - One server-generated UUID per upload (storage path and lookup), original name for display and output, fresh UUID for every new upload, reused for later conversions. Private write and validation, ID published only after staging succeeds, failed attempts cleaned up, retry = fresh upload; renderer choice independent of provenance metadata. Test identical name/size/time, simultaneous same-name uploads, failure then retry, and that each ID resolves to the right bytes.
+    - Keep quick reopen and the one-hour idle timeout, but never idle-shut-down with active work or an unsaved result; confirm before Quit discards unsaved results; test that a finished unsaved job survives the idle deadline.
+    - After a reload, a job saved to a folder shows its saved outcome or stays out of recovery, never a failing Save; Download again stays until Done; test folder saves and downloads across reloads.
+    - About links to the exact Git revision of the build; verify the preview ZIP links to its own commit and the release source bundle matches the shipped build.
+    - Run the regression tests and CI, rebuild the Windows preview ZIP from the updated commit, report its link, SHA and results, list the pending interactive Windows 11 checks, and keep PR #2 a draft.
+
+    The owner also asked for small commits along the way, full reasoned summaries, and a list of what is needed from them.
+
+    Found while reading: commit `b018810` had deleted decisions F1–F47 and O1–O3 from `docs/DECISIONS.md`; restored (`24c6330`). Decisions C17, P34–P38 recorded; O4 (installer LibreOffice default) and O5 (do downloads count as saved) opened with interim choices. Checklist:
+    - [x] Restore the deleted decisions; record the new ones.
+    - [x] Per-upload UUIDs, with tests.
+    - [x] Unsaved-result protection (idle shutdown, Quit confirmation), with tests.
+    - [x] Save recovery after a reload, with tests.
+    - [x] LibreOffice-only presentation conversion, add-time notice, installer and docs, with tests.
+    - [x] About links to the build's exact commit; workflow checks the ZIP and the source bundle.
+    - [x] *(Linux only; five of six decks pass; follow-ups in docs/PRESENTATION_FIDELITY.md)* Fidelity test of representative decks; follow-ups recorded.
+    - [x] Checks, CI (45271520135 and 45271531357 green at `d6fe8fd`), Windows build 45271518966 green at `d6fe8fd` (installer, ZIP, sources, same-commit). After this log update, the ZIP was rebuilt from the branch head; PR #2 has the final link and is still a draft.
+    - [ ] Interactive Windows 11 checks (docs/BROWSER_MODE.md) and owner answers to O4 and O5.
+43. **Prerelease audit.** Fetch `main` and PR #2, record base `9f58e64` and head `fbf3c7d`, and audit licences, dependencies and the real artifacts, then the whole codebase, then decide on a prerelease. Audit only. → Report in `docs.local/PRERELEASE_AUDIT_2026-11-23.md` (local). HOLD for both artifacts: B1 (downloads counted as delivered before fetching), B2 (unreachable unsaved jobs), B3 (simultaneous launches start two servers), S1 (desktop close deletes unsaved results) and the ZIP readme.
+44. **Fix the audit blockers, rebuild, and publish a testing prerelease.** Approved: B1, B2, B3, desktop close and the ZIP readme, in small commits on draft PR #2. Owner answers: O5 → downloads stay unsaved until Done (P39); one recoverable result at a time, enforced by the backend and explained in the UI (P40); one instance per profile and a confirmed desktop close (P41); O3 closed by the owner's pixel comparison. Fold in the owner's independent artifact findings:
+    - Setuptools and its vendored modules are in the desktop exe but not in the notices.
+    - packaging 26.3 is missing from the desktop source archive.
+    - OpenSSL and libffi DLLs ship without their source.
+
+    WebView2 and the static CRT stay open for evidence-based review. Afterwards, publish the rebuilt artifacts as a GitHub prerelease for the owner's VM test (P42); no merge, no final release. Leave the CLI race, mock cleanup and duplicate CI triggers as follow-ups. Checklist:
+    - [x] Record decisions P39–P42; close O3 and O5.
+    - [ ] B1: downloads unsaved until Done; download copies deleted on Done or discard.
+    - [ ] B2: one recoverable result at a time (backend rule, UI explanation, reload).
+    - [ ] B3: one server per profile (simultaneous launches, killed owner).
+    - [ ] Desktop close confirmation.
+    - [ ] ZIP readme.
+    - [ ] Artifact licensing: setuptools, packaging source, OpenSSL and libffi source.
+    - [ ] CI, Windows build, artifact verification, prerelease.

@@ -290,7 +290,6 @@ def tool_check_to_json(check: ToolCheck) -> dict[str, Any]:
     return {
         "ok": check.ok,
         "ocr": tool_status_to_json(check.ocr),
-        "powerpoint": tool_status_to_json(check.powerpoint),
         "libreoffice": tool_status_to_json(check.libreoffice),
         "issues": [issue_to_json(issue) for issue in check.issues],
     }
@@ -309,7 +308,6 @@ def failed_tool_check_json(issue: Issue) -> dict[str, Any]:
     return {
         "ok": False,
         "ocr": dict(unknown),
-        "powerpoint": dict(unknown),
         "libreoffice": dict(unknown),
         "issues": [issue_to_json(issue)],
     }

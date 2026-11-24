@@ -24,8 +24,6 @@ class IssueCode(StrEnum):
     OCR_FAILED = "OCR_FAILED"
     OCR_TIMEOUT = "OCR_TIMEOUT"
     OCR_INSTALL_FAILED = "OCR_INSTALL_FAILED"
-    POWERPOINT_FALLBACK = "POWERPOINT_FALLBACK"
-    UNTRUSTED_PRESENTATION = "UNTRUSTED_PRESENTATION"
     POWERPOINT_CONVERSION_FAILED = "POWERPOINT_CONVERSION_FAILED"
     SLIDE_RENDERER_MISSING = "SLIDE_RENDERER_MISSING"
     PASSWORD_PROTECTED = "PASSWORD_PROTECTED"
@@ -38,6 +36,7 @@ class IssueCode(StrEnum):
     SAVE_FAILED = "SAVE_FAILED"
     SETTINGS_SAVE_FAILED = "SETTINGS_SAVE_FAILED"
     JOB_ALREADY_RUNNING = "JOB_ALREADY_RUNNING"
+    RESULT_PENDING = "RESULT_PENDING"
     UNEXPECTED_ERROR = "UNEXPECTED_ERROR"
 
 
@@ -92,12 +91,17 @@ _LOGS_STEP = (
 )
 
 
-def _on_windows() -> bool:
-    """Whether to use Windows wording. Imported at call time to avoid an import cycle
-    (the platform modules import this module)."""
+def _os_family() -> str:
+    """ "windows", "linux" or "mac", for wording. Imported at call time to avoid an
+    import cycle (the platform modules import this module)."""
     from .. import platforms
 
-    return platforms.os_family() == "windows"
+    return platforms.os_family()
+
+
+def _on_windows() -> bool:
+    """Whether to use Windows wording."""
+    return _os_family() == "windows"
 
 
 def _clip(text: str | None, limit: int = 4000) -> str | None:
@@ -184,86 +188,46 @@ def ocr_install_failed(details: str | None) -> Issue:
     )
 
 
-def powerpoint_fallback(file: str, details: str | None) -> Issue:
-    """PowerPoint failed but LibreOffice rendered the slides instead."""
-    return Issue(
-        IssueCode.POWERPOINT_FALLBACK,
-        Severity.WARNING,
-        "Slides were converted with LibreOffice",
-        f"Microsoft PowerPoint couldn't convert {file}, so LibreOffice was used. "
-        "The slides may look slightly different.",
-        (
-            "Check that the presentation opens normally in PowerPoint.",
-            "If PowerPoint shows 'Waiting for printer connection', set a local printer "
-            "such as 'Microsoft Print to PDF' as your default printer.",
-            "Close any PowerPoint dialog boxes and try again.",
-        ),
-        _clip(details),
-        file,
+def _powerpoint_pdf_step() -> str:
+    """The manual route for decks that need a closer visual match (decision C17)."""
+    if _os_family() == "linux":  # No Microsoft PowerPoint here.
+        return (
+            "If the slides need to look exactly as they do in PowerPoint, export them as a PDF "
+            "from PowerPoint on a computer that has it, and add that PDF instead."
+        )
+    return (
+        "If you have Microsoft PowerPoint and need the slides to look exactly as they do there, "
+        "open the presentation in PowerPoint, save or export it as a PDF, and add that PDF instead."
     )
 
 
-def untrusted_presentation(file: str) -> Issue:
-    """A downloaded presentation was rendered with LibreOffice instead of PowerPoint (C14)."""
-    return Issue(
-        IssueCode.UNTRUSTED_PRESENTATION,
-        Severity.WARNING,
-        "Downloaded slides were converted with LibreOffice",
-        f"{file} came from the internet or an email, so PDF Manager didn't open it with "
-        "PowerPoint, to keep your computer safe. LibreOffice converted it instead; the slides "
-        "may look slightly different.",
-        (
-            "If the slides look wrong and you trust where the file came from, open it in "
-            "PowerPoint, check it, and save it as a PDF yourself.",
-            "Or, if you trust the file: right-click it, choose Properties, tick Unblock, "
-            "then convert it again.",
-        ),
-        None,
-        file,
-    )
-
-
-def untrusted_needs_libreoffice(file: str) -> Issue:
-    """A downloaded presentation must be rendered with LibreOffice, which isn't installed."""
-    return Issue(
-        IssueCode.SLIDE_RENDERER_MISSING,
-        Severity.ERROR,
-        "LibreOffice is needed for downloaded slides",
-        f"{file} came from the internet or an email. To keep your computer safe, PDF Manager "
-        "converts such files with LibreOffice, which isn't installed.",
-        (
-            "Install the free LibreOffice from libreoffice.org, then try again.",
-            "Or, if you trust the file: right-click it, choose Properties, tick Unblock, "
-            "then convert it again.",
-        ),
-        None,
-        file,
+def _install_libreoffice_step() -> str:
+    """How to install LibreOffice Impress on this platform."""
+    if _on_windows():
+        return (
+            "Install the free LibreOffice from libreoffice.org (its Impress part converts "
+            "presentations), then try again."
+        )
+    if _os_family() == "mac":
+        return "Install the free LibreOffice from libreoffice.org, then try again."
+    return (
+        "Install LibreOffice Impress with your system's software manager (package "
+        "'libreoffice-impress' on Ubuntu/Debian, 'libreoffice-fresh' on Arch), then try again."
     )
 
 
 def powerpoint_failed(file: str, details: str | None) -> Issue:
-    """Neither PowerPoint nor LibreOffice could render the slides."""
+    """LibreOffice Impress couldn't convert a presentation to PDF."""
     return Issue(
         IssueCode.POWERPOINT_CONVERSION_FAILED,
         Severity.ERROR,
         "Couldn't convert the slides",
-        f"{file} couldn't be turned into a PDF.",
+        f"LibreOffice couldn't turn {file} into a PDF.",
         (
-            (
-                "Open the presentation in PowerPoint to check it isn't damaged or "
-                "password-protected.",
-                "If PowerPoint shows 'Waiting for printer connection', set a local printer "
-                "such as 'Microsoft Print to PDF' as your default printer.",
-                "Save it as a PDF from PowerPoint yourself and add that PDF instead.",
-                _LOGS_STEP,
-            )
-            if _on_windows()
-            else (
-                "Open the presentation in LibreOffice Impress to check it isn't damaged or "
-                "password-protected.",
-                "Save it as a PDF from LibreOffice Impress yourself and add that PDF instead.",
-                _LOGS_STEP,
-            )
+            "Check that the presentation isn't damaged or password-protected: open it in "
+            "LibreOffice Impress.",
+            _powerpoint_pdf_step(),
+            _LOGS_STEP,
         ),
         _clip(details),
         file,
@@ -271,27 +235,14 @@ def powerpoint_failed(file: str, details: str | None) -> Issue:
 
 
 def slide_renderer_missing() -> Issue:
-    """PowerPoint files were added but neither PowerPoint nor LibreOffice is installed."""
-    if _on_windows():
-        message = (
-            "Converting PowerPoint files needs Microsoft PowerPoint or LibreOffice, "
-            "and neither was found."
-        )
-        install = (
-            "Install Microsoft PowerPoint, or install the free LibreOffice from libreoffice.org."
-        )
-    else:
-        message = "Converting PowerPoint files needs LibreOffice, which wasn't found."
-        install = (
-            "Install LibreOffice Impress with your system's software manager (package "
-            "'libreoffice-impress' on Ubuntu/Debian, 'libreoffice-fresh' on Arch)."
-        )
+    """PowerPoint files were added, but LibreOffice Impress (which converts them) is missing."""
     return Issue(
         IssueCode.SLIDE_RENDERER_MISSING,
         Severity.ERROR,
-        "No program to open PowerPoint files",
-        message,
-        (install, "Or save the presentation as a PDF yourself and add that PDF instead."),
+        "LibreOffice is needed for PowerPoint files",
+        "PDF Manager converts PowerPoint files (.pptx and .ppt) with the free LibreOffice "
+        "Impress, which wasn't found. PDF files and images work without it.",
+        (_install_libreoffice_step(), _powerpoint_pdf_step()),
     )
 
 
@@ -430,6 +381,22 @@ def job_already_running() -> Issue:
         "Another conversion is still running",
         "Only one conversion can run at a time.",
         ("Wait for it to finish, or cancel it, then try again.",),
+    )
+
+
+def result_pending() -> Issue:
+    """A finished result isn't saved yet, so a new conversion can't start (decision P40)."""
+    return Issue(
+        IssueCode.RESULT_PENDING,
+        Severity.ERROR,
+        "Your last results aren't saved yet",
+        "PDF Manager keeps one finished result at a time. Save or discard it before "
+        "starting a new conversion.",
+        (
+            "Click Show the results to open them again.",
+            "Then click Save (or Download) to keep them, or Discard if you don't need them.",
+            "After that, click Convert again.",
+        ),
     )
 
 

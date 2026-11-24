@@ -25,7 +25,10 @@ export type FileKind = "pdf" | "pptx" | "ppt" | "image";
 
 /** A file in the shared file list. */
 export interface InputFile {
-  /** Full absolute path on disk. Unique key for the list. */
+  /**
+   * Unique key for the list. The desktop window gets the full path on disk;
+   * browser mode gets an opaque file ID instead (the page never sees or sends paths).
+   */
   path: string;
   /** File name shown to the user, e.g. "Report.pdf". */
   name: string;
@@ -111,8 +114,6 @@ export type IssueCode =
   | "OCR_FAILED"
   | "OCR_TIMEOUT"
   | "OCR_INSTALL_FAILED"
-  | "POWERPOINT_FALLBACK"
-  | "UNTRUSTED_PRESENTATION"
   | "POWERPOINT_CONVERSION_FAILED"
   | "SLIDE_RENDERER_MISSING"
   | "PASSWORD_PROTECTED"
@@ -125,6 +126,7 @@ export type IssueCode =
   | "SAVE_FAILED"
   | "SETTINGS_SAVE_FAILED"
   | "JOB_ALREADY_RUNNING"
+  | "RESULT_PENDING"
   | "UNEXPECTED_ERROR";
 
 /** One row of the tool-check modal. */
@@ -140,8 +142,7 @@ export interface ToolCheckResult {
   /** True if the job can start. */
   ok: boolean;
   ocr: ToolStatus;
-  powerpoint: ToolStatus;
-  /** When PowerPoint is present, a missing LibreOffice doesn't block (ok stays true). */
+  /** LibreOffice Impress: required whenever the job has PowerPoint files (decision C17). */
   libreoffice: ToolStatus;
   /** Why ok is false (errors), or notes such as "LibreOffice not present" (warnings). */
   issues: Issue[];
@@ -172,6 +173,10 @@ export interface AppInfo {
   /** Folder with the licence texts (LICENSING.md, THIRD_PARTY_NOTICES.md, licenses/). */
   licensesDir: string;
   platform: "windows" | "linux" | "mac";
+  /** The exact Git commit this copy was built from (40 hex digits), or null if unknown. */
+  sourceRevision: string | null;
+  /** True if it was built with local changes not in that commit (development builds only). */
+  sourceModified: boolean;
 }
 
 export type JobStage =
@@ -226,6 +231,8 @@ export interface SaveOptions {
 }
 
 export interface SaveOutcome {
+  /** Browser mode without a folder picker: the files went to the browser's downloads. */
+  downloaded?: boolean;
   /** True if the user closed the folder picker; results are kept. */
   cancelled: boolean;
   /** Full paths written. */
@@ -237,8 +244,55 @@ export interface SaveOutcome {
 
 export type StartJobResult = { jobId: string; issue?: undefined } | { jobId?: undefined; issue: Issue };
 
-/** Typed client used by the UI. Implemented by the pywebview bridge and by the dev mock. */
+/** A job found after the page was reloaded (browser mode only). */
+export interface RecoveredJob {
+  jobId: string;
+  action: Action | null;
+  progress: JobProgress | null;
+  finished: JobFinished | null;
+  /**
+   * How its results were already saved (to a folder, or sent to the browser's downloads), or
+   * null if they weren't. A job saved to a folder no longer has results to save again.
+   */
+  saved: SaveOutcome | null;
+  /** Whether that save was one .zip (so Download again does the same). */
+  savedAsZip: boolean;
+}
+
+/** What `quit` did. */
+export interface QuitResult {
+  /** True if the app is closing. */
+  quit: boolean;
+  /** A conversion was running (it is cancelled if the quit goes ahead). */
+  running: boolean;
+  /** Finished results that aren't saved yet (deleted if the quit goes ahead). */
+  unsavedResults: number;
+}
+
+/**
+ * Typed client used by the UI. Implemented by the pywebview bridge (desktop),
+ * the local HTTP client (browser mode) and the dev mock.
+ */
 export interface PdfManagerApi {
+  /** Which front end this is. */
+  readonly mode: "desktop" | "browser" | "mock";
+  /** How results are saved: into a folder (a picker or the default folder) or as browser downloads. */
+  readonly saveMode: "folder" | "download";
+  /**
+   * Files dropped on the page: browser mode uploads them to the app and returns them. The
+   * desktop window gets drops from Python (the `filesAdded` event) and returns nothing here.
+   */
+  addDroppedFiles(files: File[]): Promise<InputFile[]>;
+  /** Browser mode, after a reload: the newest job whose results weren't discarded. Null elsewhere. */
+  latestJob(): Promise<RecoveredJob | null>;
+  /** Start (again) delivering `jobProgress`/`jobFinished` for a job. Browser mode polls; a no-op elsewhere. */
+  watchJob(jobId: string): void;
+  /**
+   * Browser mode: quit the app. It doesn't quit while a job runs or results are unsaved
+   * (`quit: false` says why) unless `discardUnsaved` confirms that. A no-op elsewhere (the
+   * window's close button quits).
+   */
+  quit(options?: { discardUnsaved?: boolean }): Promise<QuitResult>;
   getAppInfo(): Promise<AppInfo>;
   getSettings(): Promise<Settings>;
   /**
@@ -273,4 +327,6 @@ export interface PdfManagerEvents {
   jobFinished: JobFinished;
   ocrInstallProgress: { message: string };
   ocrInstallFinished: { ok: boolean; issue: Issue | null };
+  /** Browser mode: the app stopped answering (`jobId` while a job was being watched). */
+  connectionLost: { jobId: string | null };
 }

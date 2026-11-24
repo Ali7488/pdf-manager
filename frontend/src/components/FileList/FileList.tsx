@@ -28,6 +28,7 @@ import { useApp } from "../../state/AppContext";
 import { Button } from "../Button/Button";
 import { Icon } from "../Icon/Icon";
 import { InfoTip } from "../InfoTip/InfoTip";
+import { SlidesNotice } from "../SlidesNotice/SlidesNotice";
 import styles from "./FileList.module.css";
 
 /** Props for {@link FileList}. */
@@ -136,6 +137,7 @@ export function FileList({ action, headerActions }: FileListProps) {
           </SortableContext>
         </DndContext>
       )}
+      <SlidesNotice action={action} />
     </section>
   );
 }
@@ -149,6 +151,7 @@ interface FileRowProps {
 
 /** One sortable row: handle, details, remove button. */
 function FileRow({ file, position, applicable, onRemove }: FileRowProps) {
+  const { api } = useApp();
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: file.path,
   });
@@ -181,7 +184,8 @@ function FileRow({ file, position, applicable, onRemove }: FileRowProps) {
         <Icon name={file.kind === "image" ? "image" : "file"} size={18} />
       </span>
       <div className={styles.info}>
-        <span className={styles.name} title={file.path}>
+        {/* Browser mode's `path` is an ID, not a path: show the name instead. */}
+        <span className={styles.name} title={api.mode === "browser" ? file.name : file.path}>
           {file.name}
         </span>
         <span className={styles.meta}>

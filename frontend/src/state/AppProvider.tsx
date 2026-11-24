@@ -5,10 +5,12 @@
  */
 import { useCallback, useEffect, useMemo, useReducer, useState, type ReactNode } from "react";
 import { api as defaultApi, onEvent as defaultOnEvent } from "../api/client";
-import type { PdfManagerApi, Settings } from "../api/types";
+import { Action, type PdfManagerApi, type Settings } from "../api/types";
 import { AppContext, type AppContextValue, type OcrInstallState } from "./AppContext";
 import { appReducer, initialAppState, type AppState } from "./appReducer";
 import { createSettingsSaver } from "./settingsSaver";
+
+const ALL_ACTIONS: readonly string[] = Object.values(Action);
 
 /** Props for {@link AppProvider}. */
 export interface AppProviderProps {
@@ -56,6 +58,22 @@ export function AppProvider({ children, api = defaultApi, onEvent = defaultOnEve
     void api.getAppInfo().then((appInfo) => {
       if (active) dispatch({ type: "appInfoLoaded", appInfo });
     });
+    // Browser mode after a reload: show a job that is still running, or whose results wait.
+    api.latestJob().then(
+      (job) => {
+        const action = job?.action;
+        if (active && job && action && ALL_ACTIONS.includes(action)) {
+          dispatch({
+            type: "jobRecovered",
+            jobId: job.jobId,
+            action,
+            saved: job.saved ?? null,
+            savedAsZip: job.savedAsZip === true,
+          });
+        }
+      },
+      () => undefined, // The app isn't answering; that is reported separately.
+    );
     return () => {
       active = false;
     };

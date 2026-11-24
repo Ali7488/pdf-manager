@@ -193,7 +193,7 @@ try {
         & uv run --frozen --no-sync python scripts\check_licenses.py repo
     }
     Invoke-Native 'Licence check (bundle)' {
-        & uv run --frozen --no-sync python scripts\check_licenses.py bundle $appDir
+        & uv run --frozen --no-sync python scripts\check_licenses.py bundle $appDir --python-distributions build\bundle-python-desktop.json
     }
 
     Write-Step 'Compiling the installer (Inno Setup)'

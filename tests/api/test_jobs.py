@@ -25,7 +25,19 @@ from api.service import (
 )
 
 empty_pdf = service.issues.empty_pdf
-powerpoint_fallback = service.issues.powerpoint_fallback
+
+
+def file_warning(file: str, details: str | None) -> service.Issue:
+    """A warning about one input file (a job may return such warnings with its results)."""
+    return service.Issue(
+        IssueCode.OCR_FAILED,
+        service.issues.Severity.WARNING,
+        "One page wasn't read",
+        "Its text isn't searchable.",
+        (),
+        details,
+        file,
+    )
 
 
 class Recorder:
@@ -121,11 +133,11 @@ def test_default_run_action_is_looked_up_at_call_time(monkeypatch, recorder, tmp
 
 def test_warnings_are_logged_and_sent(make_manager, recorder, logs):
     """Warnings are sent with logFile set, and written to the log."""
-    warning = powerpoint_fallback("Slides.pptx", "raw renderer output")
+    warning = file_warning("Slides.pptx", "raw renderer output")
     manager = make_manager(succeeding("a.pdf", warnings=[warning]))
     manager.start(Action.FLATTEN, ActionSettings(), DATA)
     finished = recorder.finish()
-    assert finished["warnings"][0]["code"] == "POWERPOINT_FALLBACK"
+    assert finished["warnings"][0]["code"] == "OCR_FAILED"
     assert finished["warnings"][0]["logFile"] == str(logs)
     assert "raw renderer output" in logs.read_text(encoding="utf-8")
 
@@ -215,7 +227,13 @@ def test_only_one_job_at_a_time(make_manager, recorder):
     assert manager.running_job() == first
     release.set()
     recorder.finish()
-    # Once finished, a new job can start (finished results don't block).
+    # Its unsaved result blocks a new job (decision P40) until it is discarded.
+    with pytest.raises(ConversionError) as info:
+        manager.start(Action.MERGE, ActionSettings(), DATA)
+    assert info.value.issue.code == IssueCode.RESULT_PENDING
+    assert manager.pending_result() == first
+    manager.discard(first)
+    assert manager.pending_result() is None
     assert manager.start(Action.MERGE, ActionSettings(), DATA) != first
 
 
@@ -230,8 +248,9 @@ def test_each_job_gets_its_own_scratch(make_manager, recorder):
     manager = make_manager(run)
     for _ in range(2):
         recorder.finished.clear()
-        manager.start(Action.MERGE, ActionSettings(), DATA)
+        job_id = manager.start(Action.MERGE, ActionSettings(), DATA)
         recorder.finish()
+        manager.discard(job_id)  # Done, so the next one may start (P40).
     assert len(set(seen)) == 2
     assert all(path.name.startswith("pdf-manager-") for path in seen)
 
@@ -421,9 +440,17 @@ def test_new_stage_values_pass_through(make_manager, recorder):
     assert recorder.named("jobProgress")[-1]["stage"] == expected
 
 
+def test_shutdown_cleans_up_a_finished_result(make_manager, recorder, tmp_path):
+    """shutdown removes the scratch folder of a result nobody saved."""
+    manager, _ = finished_job(make_manager, recorder, "a.pdf")
+    assert list(tmp_path.glob("pdf-manager-*"))
+    manager.shutdown(timeout=5)
+    assert not list(tmp_path.glob("pdf-manager-*"))
+
+
 def test_shutdown_cancels_and_cleans_up(make_manager, recorder, tmp_path):
     """shutdown cancels the running job and removes every scratch folder."""
-    manager, _ = finished_job(make_manager, recorder, "a.pdf")
+    manager = make_manager(succeeding("a.pdf"))
     started = threading.Event()
 
     def run(action, settings, data, *, scratch, progress=None, cancel=None):
@@ -694,3 +721,83 @@ def test_save_after_shutdown_reports_results_gone(make_manager, recorder, tmp_pa
     assert "No results found" in info.value.issue.details
     assert list(out.iterdir()) == []
     assert not scratch_folders(tmp_path)
+
+
+def test_save_with_keep_leaves_results_for_another_save(make_manager, recorder, tmp_path):
+    """keep=True (browser download copies): the results stay until saved or discarded."""
+    first, second = tmp_path / "copy", tmp_path / "out"
+    first.mkdir()
+    second.mkdir()
+    manager, job_id = finished_job(make_manager, recorder, "a.pdf")
+    kept = manager.save(job_id, first, as_zip=False, keep=True)
+    assert [p.name for p in kept] == ["a.pdf"] and scratch_folders(tmp_path)
+    saved = manager.save(job_id, second, as_zip=False)
+    assert [p.name for p in saved] == ["a.pdf"] and not scratch_folders(tmp_path)
+
+
+def test_no_new_job_after_shutdown(make_manager, recorder, tmp_path):
+    """Once shut down, the manager refuses new jobs and leaves no scratch folder."""
+    manager = make_manager(succeeding("a.pdf"))
+    manager.shutdown()
+    with pytest.raises(ConversionError) as info:
+        manager.start(Action.FLATTEN, ActionSettings(), DATA)
+    assert "closing" in info.value.issue.details
+    assert not scratch_folders(tmp_path)
+
+
+def test_unsaved_jobs_are_succeeded_results_not_yet_saved_or_delivered(make_manager, recorder):
+    """Decision P35: what idle shutdown and Quit must not silently lose."""
+    manager = make_manager(succeeding("a.pdf"))
+    assert manager.unsaved_jobs() == []
+    first = manager.start(Action.FLATTEN, ActionSettings(), DATA)
+    recorder.finish()
+    assert manager.unsaved_jobs() == [first]
+    # A failed save keeps them unsaved.
+    with pytest.raises(service.ConversionError):
+        manager.save(first, Path("/no/such/folder"), False)
+    assert manager.unsaved_jobs() == [first]
+
+
+def test_a_folder_save_ends_unsaved_but_a_download_copy_does_not(make_manager, recorder, tmp_path):
+    """Decision P39: only a written folder save or a discard ends the protection."""
+    manager = make_manager(succeeding("a.pdf"))
+    out = tmp_path / "out"
+    out.mkdir()
+    copy = manager.start(Action.FLATTEN, ActionSettings(), DATA)
+    recorder.finish()
+    manager.save(copy, out, False, keep=True)  # A browser download's copy.
+    assert manager.unsaved_jobs() == [copy]
+    assert manager.save(copy, out, False, keep=True)  # Download again still works.
+    manager.save(copy, out, False)  # A folder save writes the files and ends it.
+    assert manager.unsaved_jobs() == []
+
+
+def test_failed_and_cancelled_jobs_are_never_unsaved(make_manager, recorder):
+    def failing(action, settings, data, *, scratch, progress=None, cancel=None):
+        raise service.ConversionError(service.unexpected_error("boom"))
+
+    manager = make_manager(failing)
+    manager.start(Action.FLATTEN, ActionSettings(), DATA)
+    recorder.finish()
+    assert manager.unsaved_jobs() == []
+
+
+def test_failed_and_saved_results_never_block_a_new_job(make_manager, recorder, tmp_path):
+    """Only an unsaved success holds the next job back (decision P40)."""
+
+    def failing(action, settings, data, *, scratch, progress=None, cancel=None):
+        raise service.ConversionError(service.unexpected_error("boom"))
+
+    manager = make_manager(failing)
+    manager.start(Action.FLATTEN, ActionSettings(), DATA)
+    recorder.finish()
+    recorder.finished.clear()
+    manager._run_action = succeeding("a.pdf")
+    saved = manager.start(Action.FLATTEN, ActionSettings(), DATA)  # After a failure: fine.
+    recorder.finish()
+    recorder.finished.clear()
+    out = tmp_path / "out"
+    out.mkdir()
+    manager.save(saved, out, False)  # Written to a folder: no longer pending.
+    assert manager.pending_result() is None
+    assert manager.start(Action.FLATTEN, ActionSettings(), DATA)

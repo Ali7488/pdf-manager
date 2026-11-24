@@ -17,19 +17,21 @@ describe("ConvertModal", () => {
     const saveResults = vi.spyOn(mock, "saveResults");
     await user.click(screen.getByRole("button", { name: "Convert" }));
 
-    // Tool check: only PowerPoint/LibreOffice rows (no OCR), with LibreOffice not needed.
+    // Tool check: only the LibreOffice row (no OCR): PowerPoint files are converted by LibreOffice.
     const tools = await screen.findByRole("list", { name: "Tools this job needs" });
     expect(within(tools).queryByText(/OCR/)).not.toBeInTheDocument();
-    await within(dialog()).findByText("Not present (not needed)");
+    expect(within(tools).queryByText(/Microsoft PowerPoint/)).not.toBeInTheDocument();
+    expect(within(tools).getByText("LibreOffice (for PowerPoint files)")).toBeInTheDocument();
+    await within(tools).findByText("Found");
 
     // Progress.
     await screen.findByRole("progressbar", { name: "Conversion progress" });
     await within(dialog()).findByText(/File \d of 3/);
 
-    // Finished: outputs, the PowerPoint warning, and Save.
+    // Finished: outputs, no warnings, and Save.
     await screen.findByRole("heading", { name: "Done" }, { timeout: 3000 });
     expect(screen.getByText("Report - Flattened.pdf")).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: /Warning: PowerPoint had a problem/ })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Please check" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Save as one .zip" })).not.toBeInTheDocument();
     // Unsaved results can't be dismissed by accident.
     expect(screen.queryByRole("button", { name: "Close" })).not.toBeInTheDocument();
@@ -158,15 +160,25 @@ describe("ConvertModal", () => {
     expect(screen.getAllByRole("button", { name: "Copy command" })).toHaveLength(1);
   });
 
-  it("explains when PowerPoint files can't be opened at all", async () => {
+  it("lists warnings with the results", async () => {
+    const warned: InputFile = { ...pdfs[0], path: "C:\\Docs\\Scan warn.pdf", name: "Scan warn.pdf" };
+    const { user } = await renderApp({ state: { page: Action.Merge, files: [warned] }, mock: { tickMs: 1 } });
+    await user.click(screen.getByRole("button", { name: "Convert" }));
+    await screen.findByRole("heading", { name: "Done" });
+    expect(screen.getByRole("heading", { name: "Please check" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Warning: One page's text couldn't be read" })).toBeInTheDocument();
+  });
+
+  it("explains that PowerPoint files need LibreOffice when it isn't installed", async () => {
     const { user } = await renderApp({
       state: { page: Action.Flatten, files: [SAMPLE_FILES[1]] },
-      mock: { tools: { powerpoint: false, libreoffice: false } },
+      mock: { tools: { libreoffice: false } },
     });
     await user.click(screen.getByRole("button", { name: "Convert" }));
     await screen.findByRole("heading", { name: "Something is missing" });
-    expect(within(dialog()).getAllByText("Missing")).toHaveLength(2);
-    expect(screen.getByRole("region", { name: "Error: PowerPoint files can't be opened" })).toBeInTheDocument();
+    expect(within(dialog()).getAllByText("Missing")).toHaveLength(1);
+    const issue = within(dialog()).getByRole("region", { name: "Error: LibreOffice is needed for PowerPoint files" });
+    expect(within(issue).getByText(/save or export it as a PDF/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Close" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });

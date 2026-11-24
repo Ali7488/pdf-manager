@@ -11,9 +11,10 @@
 ;     next to itself (decision C4).
 ;   * Pages: Welcome -> install location (first install only) -> optional
 ;     components -> desktop shortcut -> Install -> Finish ("Launch PDF Manager").
-;   * Optional components (decisions C11, F31), installed with winget after the
-;     app files: Tesseract OCR (unchecked) and LibreOffice (checked only when
-;     Microsoft PowerPoint isn't found). A failure never fails the setup.
+;   * Optional components (decisions F31, C17), installed with winget after the
+;     app files: Tesseract OCR (unchecked) and LibreOffice (checked unless already
+;     installed; it converts every PowerPoint file, open question O4). A failure
+;     never fails the setup.
 ;   * Checks for the Microsoft Edge WebView2 Runtime and offers the download.
 ;   * Checks for the Microsoft Visual C++ Redistributable (x64), which the app needs and
 ;     doesn't bundle (decision P32), and offers Microsoft's download. Installing it
@@ -85,9 +86,8 @@ ComponentsDescription=PDF Manager can install these free programs for you.
 ComponentsIntro=You can skip them now and add them later.
 OcrCheckbox=Tesseract OCR (text recognition)
 OcrExplain=OCR reads the words in scanned pages and pictures, so you can search and copy text in your PDFs.
-LibreOfficeCheckbox=LibreOffice (backup for PowerPoint files)
-LibreOfficeWithPowerPoint=Microsoft PowerPoint was found on this computer, so PDF Manager will use it. LibreOffice is only a backup in case PowerPoint can't convert a file.
-LibreOfficeWithoutPowerPoint=Microsoft PowerPoint wasn't found on this computer. PDF Manager needs PowerPoint or LibreOffice to convert PowerPoint files. LibreOffice is a large download.
+LibreOfficeCheckbox=LibreOffice (for PowerPoint files)
+LibreOfficeExplain=PDF Manager converts PowerPoint files (.pptx and .ppt) with LibreOffice Impress. You only need it for PowerPoint files: PDFs and images work without it. LibreOffice is a large download.
 AlreadyInstalled=%1 - already installed
 ComponentsNote=These programs are installed for everyone on this computer, so Windows may ask for permission. Choose Yes when it does. An internet connection is needed.
 StatusInstalling=Installing %1... This can take a few minutes.
@@ -99,7 +99,7 @@ NotInstalledHeader=PDF Manager is installed, but setup couldn't install these op
 NoWinget=(The Windows Package Manager, winget, isn't available on this computer.)
 OcrLater=Tesseract OCR: you can install it later in PDF Manager under Settings.
 LibreOfficeLater=LibreOffice: you can download it later from libreoffice.org.
-LibreOfficeNeeded=Until PowerPoint or LibreOffice is installed, PowerPoint files can't be converted. PDF files work normally.
+LibreOfficeNeeded=Until LibreOffice is installed, PowerPoint files can't be converted. PDF files and images work normally.
 WebView2Missing=PDF Manager needs the Microsoft Edge WebView2 Runtime, a free Windows component from Microsoft. It normally comes with Windows 11, but it wasn't found on this computer.
 WebView2Continue=Setup will continue either way. Do you want to download it now? Run the downloaded file to install it.
 WebView2StillMissing=The Microsoft Edge WebView2 Runtime still isn't installed, so PDF Manager won't open yet.
@@ -184,7 +184,6 @@ var
   ComponentsPage: TWizardPage;
   OcrCheckBox: TNewCheckBox;
   LibreOfficeCheckBox: TNewCheckBox;
-  PowerPointFound: Boolean;
   OcrAlreadyInstalled: Boolean;
   LibreOfficeAlreadyInstalled: Boolean;
 
@@ -209,15 +208,6 @@ begin
     Result := WebView2VersionAt(HKLM64, 'SOFTWARE\' + WebView2ClientKey);
   if not Result then
     Result := WebView2VersionAt(HKCU, 'Software\' + WebView2ClientKey);
-end;
-
-{ Whether Microsoft PowerPoint can be automated: the same registry key the app's
-  converter checks (converter.tools.locate.powerpoint_installed), in both registry views. }
-function IsPowerPointInstalled: Boolean;
-begin
-  Result := RegKeyExists(HKCR32, 'PowerPoint.Application\CLSID');
-  if not Result and IsWin64 then
-    Result := RegKeyExists(HKCR64, 'PowerPoint.Application\CLSID');
 end;
 
 { Whether Tesseract is already installed in one of its usual places. }
@@ -392,16 +382,14 @@ begin
   OcrCheckBox := AddCheckBox(Caption, Y, False, not OcrAlreadyInstalled);
   Y := AddText(CustomMessage('OcrExplain'), Indent, OcrCheckBox.Top + OcrCheckBox.Height + ScaleY(2)) + ScaleY(14);
 
-  { LibreOffice: checked only when PowerPoint isn't found (decisions C11, F31). }
+  { LibreOffice converts every PowerPoint file (decision C17), so it is checked unless
+    it is already installed (interim choice; the owner's open question O4). }
   Caption := CustomMessage('LibreOfficeCheckbox');
   if LibreOfficeAlreadyInstalled then
     Caption := FmtMessage(CustomMessage('AlreadyInstalled'), [Caption]);
   LibreOfficeCheckBox := AddCheckBox(Caption, Y,
-    not PowerPointFound and not LibreOfficeAlreadyInstalled, not LibreOfficeAlreadyInstalled);
-  if PowerPointFound then
-    Explanation := CustomMessage('LibreOfficeWithPowerPoint')
-  else
-    Explanation := CustomMessage('LibreOfficeWithoutPowerPoint');
+    not LibreOfficeAlreadyInstalled, not LibreOfficeAlreadyInstalled);
+  Explanation := CustomMessage('LibreOfficeExplain');
   Y := AddText(Explanation, Indent, LibreOfficeCheckBox.Top + LibreOfficeCheckBox.Height + ScaleY(2)) + ScaleY(18);
 
   AddText(CustomMessage('ComponentsNote'), 0, Y);
@@ -501,8 +489,7 @@ begin
   if LibreOfficeFailed then
   begin
     Summary := Summary + #13#10 + '- ' + CustomMessage('LibreOfficeLater');
-    if not PowerPointFound then
-      Summary := Summary + #13#10#13#10 + CustomMessage('LibreOfficeNeeded');
+    Summary := Summary + #13#10#13#10 + CustomMessage('LibreOfficeNeeded');
   end;
   SuppressibleMsgBox(Summary, mbInformation, MB_OK, IDOK);
 end;
@@ -525,13 +512,12 @@ end;
 
 procedure InitializeWizard;
 begin
-  PowerPointFound := IsPowerPointInstalled;
   OcrAlreadyInstalled := IsTesseractInstalled;
   LibreOfficeAlreadyInstalled := IsLibreOfficeInstalled;
   { Keep the argument list on the same line: in [Code], a line starting with "["
     is read by Inno Setup as a new section tag. }
-  Log(Format('PowerPoint found: %d, Tesseract found: %d, LibreOffice found: %d', [
-    Ord(PowerPointFound), Ord(OcrAlreadyInstalled), Ord(LibreOfficeAlreadyInstalled)]));
+  Log(Format('Tesseract found: %d, LibreOffice found: %d', [
+    Ord(OcrAlreadyInstalled), Ord(LibreOfficeAlreadyInstalled)]));
   CreateComponentsPage;
   { The welcome page says no administrator rights are needed, which is true of PDF
     Manager itself; say so when the Microsoft prerequisite will need them. }

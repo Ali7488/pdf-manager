@@ -297,3 +297,162 @@ def test_mac_fallback(monkeypatch, tmp_path):
     assert mac.ocr_install_unavailable().code == IssueCode.OCR_INSTALL_FAILED
     with pytest.raises(RuntimeError):
         mac.run_ocr_install()
+
+
+# ----- Browser mode: default browser and native pickers -----
+
+
+@pytest.mark.parametrize("module", MODULES)
+def test_every_platform_offers_the_browser_mode_functions(module):
+    for name in (
+        "default_browser",
+        "open_url",
+        "start_browser",
+        "dialogs_available",
+        "ask_files",
+        "ask_folder",
+    ):
+        assert callable(getattr(module, name))
+
+
+@pytest.mark.parametrize(
+    ("progid", "expected"),
+    [
+        ("MSEdgeHTM", "edge"),
+        ("MSEdgeBHTML", "edge"),
+        ("ChromeHTML", "chrome"),
+        ("BraveHTML", "brave"),
+        ("ChromiumHTM", "chromium"),
+        ("FirefoxURL-308046B0AF4A39CB", None),
+        ("IE.HTTP", None),
+        ("", None),
+    ],
+)
+def test_windows_progids_map_to_app_mode_browsers(progid, expected):
+    assert windows.classify_progid(progid) == expected
+
+
+@pytest.mark.parametrize(
+    ("command", "expected"),
+    [
+        (
+            '"C:\\Program Files\\Google\\Chrome\\chrome.exe" --single-argument %1',
+            "C:\\Program Files\\Google\\Chrome\\chrome.exe",
+        ),
+        ("C:\\Chromium\\chrome.exe -- %1", "C:\\Chromium\\chrome.exe"),
+        ("", None),
+    ],
+)
+def test_windows_open_command_executable(command, expected):
+    assert windows.command_executable(command) == expected
+
+
+@pytest.mark.parametrize(
+    ("desktop_id", "expected"),
+    [
+        ("microsoft-edge.desktop", "edge"),
+        ("google-chrome.desktop", "chrome"),
+        ("brave-browser.desktop", "brave"),
+        ("com.brave.Browser.desktop", "brave"),
+        ("chromium.desktop", "chromium"),
+        ("chromium-browser.desktop", "chromium"),
+        ("firefox.desktop", None),
+        ("org.kde.falkon.desktop", None),
+    ],
+)
+def test_linux_desktop_files_map_to_app_mode_browsers(desktop_id, expected):
+    assert linux.classify_desktop_id(desktop_id) == expected
+
+
+def test_linux_exec_lines_lose_their_field_codes():
+    flatpak = (
+        "/usr/bin/flatpak run --branch=stable --arch=x86_64 --command=brave "
+        "--file-forwarding com.brave.Browser @@u %U @@"
+    )
+    assert linux.desktop_exec_command(flatpak)[-1] == "com.brave.Browser"
+    assert linux.desktop_exec_command("/snap/bin/chromium %U") == ("/snap/bin/chromium",)
+    assert linux.desktop_exec_command('"unterminated') is None
+
+
+def test_linux_default_browser_reads_the_desktop_file(monkeypatch, tmp_path):
+    apps = tmp_path / "share" / "applications"
+    apps.mkdir(parents=True)
+    (apps / "brave-browser.desktop").write_text(
+        "[Desktop Entry]\nExec=/usr/bin/brave-browser-stable %U\n"
+        "[Desktop Action new-window]\nExec=/usr/bin/brave-browser-stable --new-window\n"
+    )
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "share"))
+    monkeypatch.setattr(
+        linux.subprocess,
+        "run",
+        lambda *a, **k: subprocess.CompletedProcess(a, 0, "brave-browser.desktop\n", ""),
+    )
+    browser = linux.default_browser()
+    assert browser.name == "Brave" and browser.app_command == ("/usr/bin/brave-browser-stable",)
+
+
+def test_linux_firefox_default_has_no_app_mode(monkeypatch):
+    monkeypatch.setattr(
+        linux.subprocess,
+        "run",
+        lambda *a, **k: subprocess.CompletedProcess(a, 0, "firefox.desktop\n", ""),
+    )
+    assert linux.default_browser().app_command is None
+
+
+def test_windows_open_dialog_results_become_paths():
+    assert windows.split_open_result("C:\\a\\One.pdf") == [Path("C:\\a\\One.pdf")]
+    assert windows.split_open_result("C:\\a\x00One.pdf\x00Two.pptx\x00") == [
+        Path("C:\\a") / "One.pdf",
+        Path("C:\\a") / "Two.pptx",
+    ]
+    assert windows.split_open_result("") == []
+
+
+def test_windows_filter_spec():
+    spec = windows.open_filter_spec(platforms.file_filters()["images"])
+    assert spec == "Images\x00*.png;*.jpg;*.jpeg\x00"
+    assert windows.open_filter_spec(()) is None
+
+
+def test_linux_picker_commands():
+    filters = platforms.file_filters()["documents"]
+    zenity = linux.files_command("zenity", "/usr/bin/zenity", filters, True)
+    assert (
+        "--multiple" in zenity
+        and "--file-filter=PDF and PowerPoint files | *.pdf *.pptx *.ppt" in zenity
+    )
+    kdialog = linux.files_command("kdialog", "/usr/bin/kdialog", filters, False)
+    assert "*.pdf *.pptx *.ppt|PDF and PowerPoint files" in kdialog and "--multiple" not in kdialog
+    assert linux.folder_command("zenity", "z", "/data")[-1] == "--filename=/data/"
+    assert linux.folder_command("kdialog", "k", "/data")[-1] == "/data"
+
+
+def test_linux_pickers_report_cancel_as_nothing_chosen(monkeypatch):
+    monkeypatch.setattr(
+        linux.shutil, "which", lambda name: f"/usr/bin/{name}" if name == "zenity" else None
+    )
+    results = iter(
+        [
+            subprocess.CompletedProcess([], 0, "/a/One.pdf\n/a/Two.pdf\n", ""),
+            subprocess.CompletedProcess([], 1, "", ""),
+            subprocess.CompletedProcess([], 0, "/data/out\n", ""),
+        ]
+    )
+    monkeypatch.setattr(linux.subprocess, "run", lambda *a, **k: next(results))
+    assert linux.ask_files(("Docs (*.pdf)",), True) == [Path("/a/One.pdf"), Path("/a/Two.pdf")]
+    assert linux.ask_files(("Docs (*.pdf)",), True) == []
+    assert linux.ask_folder("") == Path("/data/out")
+
+
+def test_linux_without_a_picker_program(monkeypatch):
+    monkeypatch.setattr(linux.shutil, "which", lambda name: None)
+    assert linux.dialogs_available() is False
+    assert linux.ask_files(("Docs (*.pdf)",), True) == [] and linux.ask_folder("") is None
+
+
+def test_filter_parsing():
+    from api.platforms._common import parse_filter
+
+    assert parse_filter("Images (*.png;*.jpg)") == ("Images", ["*.png", "*.jpg"])
+    assert parse_filter("Programs") == ("Programs", ["*"])

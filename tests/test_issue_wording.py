@@ -35,11 +35,11 @@ def test_linux_wording_has_no_windows_only_steps(monkeypatch):
     "factory,expected",
     [
         (lambda: issues.ocr_install_failed(None), "UB-Mannheim"),
-        (lambda: issues.powerpoint_failed("Deck.pptx", None), "Microsoft Print to PDF"),
-        (lambda: issues.slide_renderer_missing(), "Microsoft PowerPoint"),
+        (lambda: issues.powerpoint_failed("Deck.pptx", None), "Microsoft PowerPoint"),
+        (lambda: issues.slide_renderer_missing(), "libreoffice.org"),
         (lambda: issues.settings_save_failed(None), "AppData"),
     ],
 )
-def test_windows_wording_unchanged(monkeypatch, factory, expected):
+def test_windows_wording(monkeypatch, factory, expected):
     monkeypatch.setattr(platforms, "os_family", lambda: "windows")
     assert expected in all_text(factory())

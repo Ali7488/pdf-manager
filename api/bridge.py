@@ -1,8 +1,11 @@
-"""The ``Api`` object exposed to JavaScript as ``window.pywebview.api``.
+"""The ``Api`` object exposed to JavaScript as ``window.pywebview.api`` (desktop mode).
 
 Method names and argument order follow ``docs/API.md`` exactly; the
 frontend's typed client (``frontend/src/api/client.ts``) wraps them in
-camelCase. Rules every public method follows:
+camelCase. The work itself is done by :class:`api.workflow.Workflow`, which
+browser mode shares; this module adds only what belongs to the pywebview
+window: its native dialogs, its drop events and DOM-event delivery. Rules
+every public method follows:
 
 * **Never raise into JavaScript.** A rejected promise means a bug (see the
   contract), so every public method catches everything, logs it and returns
@@ -18,34 +21,25 @@ dispatched with ``window.evaluate_js`` (see :func:`event_script`).
 
 from __future__ import annotations
 
-import dataclasses
 import json
 import logging
-import os
 import re
-import subprocess
-import threading
-import time
-import traceback
-from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import Any
 
 import webview
 from webview.dom import DOMEventHandler
 
-from . import __version__, dto, logging_setup, paths, platforms, service
+from . import dto, platforms
 from .jobs import JobManager
-from .logging_setup import log_issue
-from .service import ConversionError, Issue, ocr_install_failed, ocr_missing, unexpected_error
-from .settings_store import DEFAULTS, SettingsStore
+from .settings_store import SettingsStore
+from .workflow import Workflow, describe_files
 
 log = logging.getLogger(__name__)
 
 EVENT_PREFIX = "pdfmanager:"
 _EVENT_NAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9]*$")
 
-TESSERACT_VERSION_TIMEOUT_SEC = 15
 DRAGOVER_DEBOUNCE_MS = 500  # Only preventDefault matters for dragover; Python ignores it.
 
 
@@ -78,60 +72,35 @@ def event_script(name: str, payload: Any) -> str:
     return f'window.dispatchEvent(new CustomEvent("{EVENT_PREFIX}{name}", {{detail: {literal}}}));'
 
 
+def close_warning(running: bool, unsaved: int) -> str | None:
+    """What closing the desktop window would lose, in plain words (``None``: nothing)."""
+    results = (
+        "one finished result isn't saved yet"
+        if unsaved == 1
+        else f"{unsaved} finished results aren't saved yet"
+    )
+    if running and unsaved:
+        return (
+            f"A conversion is still running, and {results}. Closing now stops the "
+            "conversion and deletes the unsaved results. Close anyway?"
+        )
+    if running:
+        return "A conversion is still running. Closing now stops it. Close anyway?"
+    if unsaved:
+        lost = "it" if unsaved == 1 else "them"
+        return f"{results[0].upper()}{results[1:]}. Closing now deletes {lost}. Close anyway?"
+    return None
+
+
 def _ignore_event(_event: Any) -> None:
     """DOM event callback that does nothing (the JS side already called preventDefault)."""
 
 
-def _describe_files(candidates: Iterable[str | Path]) -> list[dict[str, Any]]:
-    """Turn paths into the contract's ``InputFile`` objects.
-
-    Unsupported types, folders and missing files are skipped (and logged);
-    duplicates are dropped, keeping the first. Order is preserved.
-
-    Args:
-        candidates: Paths from a picker or a drop.
-
-    Returns:
-        ``InputFile`` objects.
-    """
-    files: list[dict[str, Any]] = []
-    seen: set[str] = set()
-    for candidate in candidates:
-        path = Path(candidate)
-        key = os.path.normcase(str(path))  # Case-insensitive on Windows, as Explorer is.
-        if key in seen:
-            continue
-        seen.add(key)
-        info = service.inspect_file(path)
-        if info is None:
-            log.info("Skipped (unsupported, a folder, or missing): %s", path)
-            continue
-        files.append(dto.input_file_to_json(info))
-    return files
-
-
-def _check_tesseract(path: Path) -> str | None:
-    """Check that a user-picked file really is Tesseract.
-
-    Args:
-        path: The chosen file.
-
-    Returns:
-        ``None`` if it is Tesseract, otherwise a technical reason for the
-        issue's details.
-    """
-    if not path.is_file():
-        return f"Not a file: {path}"
-    if path.stem.casefold() != "tesseract":
-        return f"Expected a file named {platforms.tesseract_file_name()}: {path}"
-    try:
-        proc = service.run_command([path, "--version"], timeout=TESSERACT_VERSION_TIMEOUT_SEC)
-    except (OSError, subprocess.SubprocessError) as exc:
-        return f"Couldn't run {path} --version: {exc}"
-    output = f"{proc.stdout or ''}{proc.stderr or ''}"
-    if proc.returncode != 0 or "tesseract" not in output.casefold():
-        return f"{path} --version exited with {proc.returncode}:\n{output.strip()}"
-    return None
+def _first_path(picked: Any) -> Path | None:
+    """The first path of a pywebview dialog result (a sequence, or a plain string)."""
+    if not picked:
+        return None
+    return Path(picked if isinstance(picked, str) else picked[0])
 
 
 class Api:
@@ -145,10 +114,7 @@ class Api:
 
     def __init__(self, settings: SettingsStore, jobs: JobManager | None = None):
         self._window: Any = None  # The pywebview window, set by _bind_window.
-        self._settings = settings
-        self._jobs = jobs if jobs is not None else JobManager(self._emit)
-        self._install_lock = threading.Lock()
-        self._installing = False
+        self._workflow = Workflow(settings, self._emit, jobs)
 
     # ----- Wiring (private: not exposed to JavaScript) -----
 
@@ -160,6 +126,32 @@ class Api:
         """
         self._window = window
         window.events.loaded += self._on_loaded
+        window.events.closing += self._confirm_close
+
+    def _confirm_close(self) -> bool:
+        """The window is closing: ask first if that would lose work (decision P41).
+
+        Closing the desktop window quits the app, which cancels a running job
+        and deletes unsaved results (the desktop version of P35). If neither
+        exists, the window closes straight away. pywebview runs this on the
+        window's own thread and cancels the close when it returns False, so
+        cancelling the question leaves the window and the results as they were.
+
+        Returns:
+            True to let the window close.
+        """
+        try:
+            jobs = self._workflow.jobs
+            warning = close_warning(jobs.running_job() is not None, len(jobs.unsaved_jobs()))
+            if warning is None:
+                return True
+            closing = self._window.create_confirmation_dialog("Close PDF Manager?", warning)
+            log.info("Close with unfinished work: %s", "confirmed" if closing else "cancelled")
+            return bool(closing)
+        except Exception:
+            # Never trap the user in a window that can't close.
+            log.exception("Couldn't ask before closing; closing anyway")
+            return True
 
     def _on_loaded(self) -> None:
         """Window loaded: listen for files dropped anywhere on the page.
@@ -195,7 +187,7 @@ class Api:
             missing = sum(1 for c in candidates if not c)
             if missing:
                 log.info("%d dropped item(s) had no full path and were skipped", missing)
-            files = _describe_files(c for c in candidates if c)
+            files = describe_files(c for c in candidates if c)
             log.info("Dropped %d item(s), %d usable", len(dropped), len(files))
             if files:
                 self._emit("filesAdded", {"files": files})
@@ -221,97 +213,44 @@ class Api:
 
     def _shutdown(self) -> None:
         """Cancel a running job and delete all scratch folders. Never raises."""
-        try:
-            self._jobs.shutdown()
-        except Exception:
-            log.exception("Error during shutdown")
+        self._workflow.shutdown()
 
-    def _guard(
-        self,
-        name: str,
-        fallback: Callable[[Issue], Any],
-        func: Callable[..., Any],
-        *args: Any,
-    ) -> Any:
-        """Run a public method's body so that it never raises into JavaScript.
-
-        Expected failures (:class:`ConversionError`, including malformed
-        input from :mod:`api.dto`) are logged and answered with
-        ``fallback(issue)``. Anything else is a bug: it is logged with its
-        traceback and answered with an ``UNEXPECTED_ERROR`` issue.
+    def _ask_folder(self, start: str) -> Path | None:
+        """Open the window's native folder picker.
 
         Args:
-            name: Method name, for the log.
-            fallback: Builds the contract-shaped result from an issue.
-            func: The method body.
-            *args: Its arguments.
-
-        Returns:
-            ``func(*args)``, or ``fallback(issue)`` on failure.
-        """
-        started = time.monotonic()
-        try:
-            result = func(*args)
-        except ConversionError as exc:
-            return fallback(log_issue(exc.issue))
-        except Exception as exc:
-            log.error("Bridge call %s failed", name)
-            return fallback(log_issue(unexpected_error(traceback.format_exc()), exc))
-        log.debug("Bridge call %s took %.0f ms", name, (time.monotonic() - started) * 1000)
-        return result
-
-    def _ask_folder(self) -> Path | None:
-        """Open the native folder picker, starting in the default save folder if set.
+            start: Folder to start in (may be empty).
 
         Returns:
             The chosen folder, or ``None`` if the user cancelled.
         """
-        start = self._settings.get().get("defaultSaveFolder") or ""
-        picked = self._window.create_file_dialog(webview.FileDialog.FOLDER, directory=start)
-        if not picked:
-            return None
-        # pywebview returns a sequence of paths; some backends return a plain string.
-        return Path(picked if isinstance(picked, str) else picked[0])
+        return _first_path(
+            self._window.create_file_dialog(webview.FileDialog.FOLDER, directory=start)
+        )
 
-    def _logs_folder(self) -> Path:
-        """The logs folder in use (it may be a fallback folder, see logging_setup)."""
-        current = logging_setup.log_file()
-        return current.parent if current is not None else paths.logs_dir()
+    def _ask_program(self) -> Path | None:
+        """Open the window's file picker for the Tesseract program."""
+        return _first_path(
+            self._window.create_file_dialog(
+                webview.FileDialog.OPEN,
+                allow_multiple=False,
+                file_types=platforms.program_filters(),
+            )
+        )
 
     # ----- Contract methods (public: exposed to JavaScript) -----
 
     def get_app_info(self) -> dict[str, Any]:
         """Return the app version, logs and licences folders, and platform (``AppInfo``)."""
-
-        def body() -> dict[str, Any]:
-            return {
-                "version": __version__,
-                "logsDir": str(self._logs_folder()),
-                "licensesDir": str(paths.licenses_dir()),
-                "platform": platforms.platform_name(),
-            }
-
-        return self._guard(
-            "get_app_info",
-            lambda issue: {
-                "version": __version__,
-                "logsDir": "",
-                "licensesDir": "",
-                "platform": platforms.platform_name(),
-            },
-            body,
-        )
+        return self._workflow.app_info()
 
     def get_settings(self) -> dict[str, Any]:
         """Return the saved ``Settings``."""
-        return self._guard("get_settings", lambda issue: dict(DEFAULTS), self._settings.get)
+        return self._workflow.get_settings()
 
     def save_settings(self, patch: dict) -> dict[str, Any]:
         """Merge and persist a partial ``Settings`` (``SaveSettingsResult``).
 
-        Invalid fields are ignored (and logged), so the returned settings show
-        what was actually kept. If the file can't be written, the settings
-        still apply until the app closes and ``issue`` is ``SETTINGS_SAVE_FAILED``.
         pywebview runs each call on its own thread; the store applies them one
         at a time, in the order they arrive.
 
@@ -321,16 +260,7 @@ class Api:
         Returns:
             ``{ settings, issue }``; ``issue`` is ``None`` when saved.
         """
-
-        def body() -> dict[str, Any]:
-            update = self._settings.update(patch)
-            return dto.save_settings_json(update.settings, update.issue)
-
-        return self._guard(
-            "save_settings",
-            lambda issue: dto.save_settings_json(self._settings.get(), issue),
-            body,
-        )
+        return self._workflow.save_settings(patch)
 
     def pick_files(self, kind: str) -> list[dict[str, Any]]:
         """Open the native file picker (multiple selection) and return ``InputFile[]``.
@@ -350,18 +280,19 @@ class Api:
             picked = self._window.create_file_dialog(
                 webview.FileDialog.OPEN, allow_multiple=True, file_types=filters[kind]
             )
-            return _describe_files(picked or [])
+            return describe_files(picked or [])
 
-        return self._guard("pick_files", lambda issue: [], body)
+        return self._workflow.guard("pick_files", lambda issue: [], body)
 
     def pick_folder(self) -> str | None:
         """Open the native folder picker. Returns the folder path, or ``None`` if cancelled."""
 
         def body() -> str | None:
-            folder = self._ask_folder()
+            start = self._workflow.settings.get().get("defaultSaveFolder") or ""
+            folder = self._ask_folder(start)
             return str(folder) if folder else None
 
-        return self._guard("pick_folder", lambda issue: None, body)
+        return self._workflow.guard("pick_folder", lambda issue: None, body)
 
     def check_tools(self, action: str, settings: dict, data: dict) -> dict[str, Any]:
         """Check the programs this job needs (``ToolCheckResult``). Same arguments as start_job.
@@ -371,17 +302,7 @@ class Api:
             settings: Frontend ``ActionSettings``.
             data: ``ActionData`` (``{ files }``).
         """
-
-        def body() -> dict[str, Any]:
-            parsed = dto.parse_action(action)
-            job_settings = dto.action_settings_from_json(settings, self._settings.get())
-            job_data = dto.action_data_from_json(data)
-            check = service.check_tools(parsed, job_settings, job_data)
-            check.issues = [log_issue(issue) for issue in check.issues]
-            log.debug("Tool check for %s: %s", parsed, check)
-            return dto.tool_check_to_json(check)
-
-        return self._guard("check_tools", dto.failed_tool_check_json, body)
+        return self._workflow.check_tools(action, settings, data)
 
     def get_ocr_status(self) -> dict[str, Any]:
         """Whether Tesseract OCR is installed, and where (``OcrStatus``, for Settings).
@@ -389,21 +310,11 @@ class Api:
         Uses the saved ``tesseractPath`` first, then the usual places. Nothing
         is saved and no picker opens (that is ``search_ocr``).
         """
-
-        def body() -> dict[str, Any]:
-            found = service.find_tesseract(self._settings.get().get("tesseractPath"))
-            return {"present": found is not None, "path": str(found) if found else None}
-
-        return self._guard("get_ocr_status", lambda issue: {"present": False, "path": None}, body)
+        return self._workflow.ocr_status()
 
     def get_ocr_languages(self) -> list[str]:
         """Return the installed Tesseract languages, e.g. ``["eng", "deu"]``; empty if no OCR."""
-
-        def body() -> list[str]:
-            tesseract = service.find_tesseract(self._settings.get().get("tesseractPath"))
-            return service.tesseract_languages(tesseract) if tesseract else []
-
-        return self._guard("get_ocr_languages", lambda issue: [], body)
+        return self._workflow.ocr_languages()
 
     def search_ocr(self) -> dict[str, Any]:
         """Find Tesseract, asking the user to pick the program if needed.
@@ -416,38 +327,7 @@ class Api:
         Returns:
             ``OcrSearchResult``.
         """
-
-        def not_found(issue: Issue) -> dict[str, Any]:
-            return {"found": False, "path": None, "issue": dto.issue_to_json(issue)}
-
-        def body() -> dict[str, Any]:
-            found = service.find_tesseract(self._settings.get().get("tesseractPath"))
-            if found is None:
-                picked = self._window.create_file_dialog(
-                    webview.FileDialog.OPEN,
-                    allow_multiple=False,
-                    file_types=platforms.program_filters(),
-                )
-                if not picked:
-                    return not_found(log_issue(ocr_missing()))
-                chosen = Path(picked if isinstance(picked, str) else picked[0])
-                problem = _check_tesseract(chosen)
-                if problem:
-                    # Proposed: move this wording into converter/issues.py as its own factory.
-                    issue = dataclasses.replace(
-                        ocr_missing(),
-                        message="The chosen file isn't the OCR program (Tesseract).",
-                        details=problem,
-                    )
-                    return not_found(log_issue(issue))
-                found = chosen
-            # A failed save is already logged by the store; the path still applies
-            # for this session. OcrSearchResult has no slot for that warning.
-            self._settings.update({"tesseractPath": str(found)})
-            log.info("OCR found at %s", found)
-            return {"found": True, "path": str(found), "issue": None}
-
-        return self._guard("search_ocr", not_found, body)
+        return self._workflow.search_ocr(self._ask_program)
 
     def install_ocr(self) -> None:
         """Start installing Tesseract with the platform's installer. Returns at once.
@@ -460,49 +340,7 @@ class Api:
         ``command`` holds the exact install command to copy. A second call
         while an install runs is ignored.
         """
-
-        def finish_failed(issue: Issue) -> None:
-            self._emit("ocrInstallFinished", {"ok": False, "issue": dto.issue_to_json(issue)})
-
-        def body() -> None:
-            unavailable = platforms.ocr_install_unavailable()
-            if unavailable is not None:
-                raise ConversionError(unavailable)
-            with self._install_lock:
-                if self._installing:
-                    log.info("OCR install already running; ignoring the request")
-                    return
-                self._installing = True
-            threading.Thread(target=self._install_worker, name="ocr-install", daemon=True).start()
-
-        self._guard("install_ocr", finish_failed, body)
-        return None
-
-    def _install_worker(self) -> None:
-        """Background thread: run the install, then check Tesseract is there. Never raises."""
-        try:
-            self._emit(
-                "ocrInstallProgress",
-                {"message": "Downloading and installing OCR. This can take a few minutes."},
-            )
-            details = platforms.run_ocr_install()
-            self._emit("ocrInstallProgress", {"message": "Checking the installation."})
-            # Judge by the result, not the exit code: an installer may also exit
-            # non-zero when Tesseract is already installed.
-            found = service.find_tesseract(self._settings.get().get("tesseractPath"))
-            if found is not None:
-                self._settings.update({"tesseractPath": str(found)})
-                log.info("OCR installed at %s", found)
-                self._emit("ocrInstallFinished", {"ok": True, "issue": None})
-            else:
-                issue = log_issue(ocr_install_failed(details))
-                self._emit("ocrInstallFinished", {"ok": False, "issue": dto.issue_to_json(issue)})
-        except Exception as exc:
-            issue = log_issue(ocr_install_failed(traceback.format_exc()), exc)
-            self._emit("ocrInstallFinished", {"ok": False, "issue": dto.issue_to_json(issue)})
-        finally:
-            with self._install_lock:
-                self._installing = False
+        self._workflow.install_ocr()
 
     def start_job(self, action: str, settings: dict, data: dict) -> dict[str, Any]:
         """Start a conversion: the single entry point for every action (decision F34).
@@ -516,21 +354,11 @@ class Api:
             ``{ jobId }``, or ``{ issue }`` if the job can't start (for
             example another job is running).
         """
-
-        def body() -> dict[str, Any]:
-            parsed = dto.parse_action(action)
-            job_settings = dto.action_settings_from_json(settings, self._settings.get())
-            job_data = dto.action_data_from_json(data)
-            return {"jobId": self._jobs.start(parsed, job_settings, job_data)}
-
-        return self._guard("start_job", lambda issue: {"issue": dto.issue_to_json(issue)}, body)
+        return self._workflow.start_job(action, settings, data)
 
     def cancel_job(self, job_id: str) -> None:
         """Ask a running job to stop; it then ends with status ``"cancelled"``."""
-        self._guard(
-            "cancel_job", lambda issue: None, lambda: self._jobs.cancel(dto.parse_job_id(job_id))
-        )
-        return None
+        self._workflow.cancel_job(job_id)
 
     def save_results(self, job_id: str, options: dict) -> dict[str, Any]:
         """Copy a job's results out of scratch, never overwriting (``SaveOutcome``).
@@ -544,28 +372,11 @@ class Api:
             ``SaveOutcome``. If the picker is cancelled, ``cancelled`` is true
             and the results are kept (decision F12).
         """
-
-        def body() -> dict[str, Any]:
-            parsed_id = dto.parse_job_id(job_id)
-            folder, as_zip = dto.parse_save_options(options)
-            if folder is None:
-                folder = self._ask_folder()
-                if folder is None:
-                    log.info("Save of job %s cancelled in the folder picker", parsed_id)
-                    return dto.save_outcome_json(cancelled=True)
-            saved = self._jobs.save(parsed_id, folder, as_zip)
-            return dto.save_outcome_json(saved=saved, folder=folder)
-
-        return self._guard("save_results", lambda issue: dto.save_outcome_json(issue=issue), body)
+        return self._workflow.save_results(job_id, options, self._ask_folder)
 
     def discard_results(self, job_id: str) -> None:
         """Delete a finished job's scratch folder. Safe to repeat, and after saving."""
-        self._guard(
-            "discard_results",
-            lambda issue: None,
-            lambda: self._jobs.discard(dto.parse_job_id(job_id)),
-        )
-        return None
+        self._workflow.discard_results(job_id)
 
     def open_folder(self, path: str) -> None:
         """Open a folder in the file manager. Anything but an existing folder is ignored.
@@ -573,27 +384,8 @@ class Api:
         Args:
             path: Folder to open.
         """
-
-        def body() -> None:
-            if not isinstance(path, str) or not path:
-                raise dto.invalid_request(f"path must be a folder path; got {path!r}")
-            folder = Path(path)
-            # Only folders: opening a file would open (or run) it.
-            if not folder.is_dir():
-                log.warning("Not opening %s: not an existing folder", folder)
-                return
-            platforms.open_folder(folder)
-
-        self._guard("open_folder", lambda issue: None, body)
-        return None
+        self._workflow.open_folder(path)
 
     def open_logs_folder(self) -> None:
         """Open the logs folder in the file manager, creating it if needed."""
-
-        def body() -> None:
-            folder = self._logs_folder()
-            folder.mkdir(parents=True, exist_ok=True)
-            platforms.open_folder(folder)
-
-        self._guard("open_logs_folder", lambda issue: None, body)
-        return None
+        self._workflow.open_logs_folder()

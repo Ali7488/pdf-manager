@@ -9,8 +9,11 @@ Current as of **2026-11-23**:
 - **Human review:** none of the generated code has had a complete line-by-line human review. A targeted read-only source risk audit (R1–R10, below) and an AI-agent licensing audit (`docs/LICENSING_AUDIT_2026-11-23.md`) have been done. Neither is a release sign-off.
 - **Automated checks (CI):** `.github/workflows/ci.yml` runs on every push: Python on Linux (with Tesseract and LibreOffice) and on Windows, the frontend checks, and a Linux start-up check. The licence inventory check (`tests/test_licensing.py`) is part of the Python suite. Latest local run: Python 483 passed, 5 skipped; frontend 95 passed.
 - **Windows build (CI, manual trigger):** `build-windows.yml` builds the installer, checks the bundle against the licence notices, installs it silently, checks the installed licence files, and starts the installed app in smoke-test mode. Last green run: [45202300026](https://github.com/Ali7488/pdf-manager/actions/runs/45202300026) (commit `fcd8531`). That's a GitHub virtual machine, **not a real Windows 11 PC**.
-- **Not verified on a real Windows 11 machine (R10):** PowerPoint automation (COM), native dialogs, drag and drop, the wizard's optional installs, upgrade and uninstall.
-- **Licensing:** the strategy (P31) is coherent. Open questions O1–O3 in `docs/DECISIONS.md` need the owner. Branch `fix/windows-vc-runtime` (P32, pending review) stops bundling the Visual C++ runtime. The installer checks for Microsoft's separately installed redistributable instead. The missing-runtime path has only been simulated on the runner; it still needs a test on a clean Windows PC.
+- **Not verified on a real Windows 11 machine (R10):** LibreOffice presentation conversion there (installed and missing), native dialogs, drag and drop, the wizard's optional installs, upgrade and uninstall. PowerPoint automation was removed (decision C17).
+- **Licensing:** the strategy (P31) is coherent. Open questions O1–O3 in `docs/DECISIONS.md` need the owner. Branch `fix/windows-vc-runtime` (P32, pending review) stops bundling the Visual C++ runtime. The installer checks for Microsoft's separately installed redistributable instead. The missing-runtime path has only been simulated on the runner; it still needs a test on a clean Windows PC. (Merged as PR #1.)
+- **Browser mode (P33, branch `migration/local-browser-mode`, pending review):** see docs/BROWSER_MODE.md for its tests. Not yet verified on a real PC: app-mode launches from the user's default browser, native pickers coming to the front, and the ZIP on a clean machine.
+
+- **PR #2 follow-up (2026-11-23):** see the section of that name below.
 
 Historical counts from earlier snapshots (163 and 317 tests, the pre-CI state) are kept in the fix log below for the record only.
 
@@ -43,8 +46,8 @@ These are **source-review findings**, not necessarily reproduced defects. Priori
 
 | ID | Priority | Status | Issue and evidence | Required resolution / acceptance test |
 | --- | --- | --- | --- | --- |
-| **R1** | **P1: security** | Fixed in code, Windows verification pending (C14): provenance kept; untrusted files routed to LibreOffice; NTFS stream tests pass on Windows CI. Not yet tried with real downloaded files and Office. | **Downloaded PowerPoint trust metadata is stripped.** `converter/slides/render.py:14–19, 52–62, 146–155` copies only document bytes, intentionally removing Windows Mark-of-the-Web before COM opens it. That can bypass Office's Protected View trust signal. | Preserve/trust-assess source provenance, select a safer fallback for untrusted documents or require explicit user approval; add tests with real downloaded/MOTW-tagged presentations on Windows. Do **not** silently remove provenance just to make COM render. |
-| **R2** | **P1: user-data safety** | Fixed in code, Windows verification pending: `owned_pid` proof rule; tested with fakes only, never with real Office. | **PowerPoint process ownership is uncertain.** `converter/platforms/windows_powerpoint.py:75–82, 129–139` infers whether an instance was running from `GetActiveObject`, then may `taskkill /F /T` a PID after a timeout. Existing tests simulate PIDs; they do not prove ownership with real Office/COM. | Require reliable proof a process belongs to this conversion before killing it. Test with a user PowerPoint session open and edited/unsaved presentations, timeouts and cancellation. Do not terminate a process if ownership is uncertain. |
+| **R1** | **P1: security** | *Superseded by C17 (2026-11-23): PowerPoint is never automated, so no file reaches Office; copies still keep their Mark-of-the-Web.* Earlier: fixed in code, Windows verification pending (C14): provenance kept; untrusted files routed to LibreOffice; NTFS stream tests pass on Windows CI. Not yet tried with real downloaded files and Office. | **Downloaded PowerPoint trust metadata is stripped.** `converter/slides/render.py:14–19, 52–62, 146–155` copies only document bytes, intentionally removing Windows Mark-of-the-Web before COM opens it. That can bypass Office's Protected View trust signal. | Preserve/trust-assess source provenance, select a safer fallback for untrusted documents or require explicit user approval; add tests with real downloaded/MOTW-tagged presentations on Windows. Do **not** silently remove provenance just to make COM render. |
+| **R2** | **P1: user-data safety** | *No longer applies (C17, 2026-11-23): the PowerPoint COM renderer and its process handling were removed.* Earlier: fixed in code, Windows verification pending: `owned_pid` proof rule; tested with fakes only, never with real Office. | **PowerPoint process ownership is uncertain.** `converter/platforms/windows_powerpoint.py:75–82, 129–139` infers whether an instance was running from `GetActiveObject`, then may `taskkill /F /T` a PID after a timeout. Existing tests simulate PIDs; they do not prove ownership with real Office/COM. | Require reliable proof a process belongs to this conversion before killing it. Test with a user PowerPoint session open and edited/unsaved presentations, timeouts and cancellation. Do not terminate a process if ownership is uncertain. |
 | **R3** | **P1: output integrity** | Fixed: isolated renderer folders; regression test fails on the old code and passes now. | **PowerPoint and LibreOffice fallback share an output filename.** `converter/slides/render.py:148, 155–169` and `libreoffice_convert():118–126` can accept a non-empty artifact left by a failed PowerPoint export as the LibreOffice result. | Isolate renderer outputs or delete/validate leftovers before fallback; test partial PowerPoint output followed by failed LibreOffice output. Verify final PDF matches intended slide count/content. |
 | **R4** | **P2: data integrity** | Fixed: one state per job; deterministic threaded tests (save+discard, save+shutdown, discard+discard). | **Save and discard use separate synchronization.** `api/jobs.py:192–194, 362–452` serializes saves but not discards; concurrent bridge calls may remove scratch files while they're being copied. Frontend blocks the normal Discard button during save, but backend invariant is not enforced. | Coordinate save/discard/shutdown state; add deterministic threaded save+discard and save+shutdown tests proving no partial/corrupted user outputs. |
 | **R5** | **P2: UI consistency** | Fixed: serialized, coalesced settings saves; inverted-response tests (which fail on the old provider). | **Settings requests may complete out of order.** `frontend/src/state/AppProvider.tsx:67–73` replaces local state with the full returned snapshot from each asynchronous save. A late response from an older edit can overwrite the visible result of a newer edit. | Serialize settings updates or add revision sequencing; simulate inverted response order and assert latest user choice stays visible and persisted. |
@@ -71,6 +74,46 @@ Implementation of the fixes above, by AI agents (not a human review). Evidence:
 2. **P2:** Repair R4–R6 and implement R7; verify behavior across UI and API rather than only testing a single function.
 3. **P3:** Resolve R8–R9 while updating documentation and recording verified outcomes.
 
+
+## PR #2 follow-up (2026-11-23)
+
+Owner request: prompts log item 42; decisions C17 and P34–P38. Agent-written, not human-reviewed.
+
+| Problem | Where | Fix | Evidence |
+| --- | --- | --- | --- |
+| Two **different files with the same name, size and modification time** shared one staged copy and one ID (uploads were keyed by those three values). | `api/web/session.py` | One server-generated UUID per upload, for storage and lookup. Private write and check, ID published after. Failed attempts deleted (P34). | `tests/api/test_web.py`: identical name/size/time; 8 simultaneous same-name uploads; failure then retry; publish-after-check. |
+| **Idle shutdown deleted finished, unsaved results** after an hour; **Quit** deleted them without asking. | `api/web/launch.py`, `server.py`, `operations.py`, `jobs.py` | `JobManager.unsaved_jobs()` keeps idle shutdown waiting; Quit asks first (P35). | A finished job survives eight idle deadlines; Quit holds back (API, frontend, e2e with two windows). |
+| After a reload, a job **already saved to a folder** came back with a **Save button that failed** (its results were gone). | `api/web/session.py`, Convert window | The session keeps each job's save outcome. A reload shows it; downloads keep Download again until Done (P36). | API, frontend and e2e (downloads across two reloads). |
+| Settings → About linked to the **version tag**, which preview builds don't have. | `frontend/src/lib/about.ts` | The exact commit is recorded at build time and checked in CI (P37). | `tests/api/test_build_info.py`; e2e against a locally frozen Linux bundle; workflow `same-commit` job. |
+| Presentation conversion depended on PowerPoint and on provenance metadata. | `converter/slides`, `tools/check.py`, platforms | LibreOffice Impress only (C17); the add-time notice when it is missing. | `tests/test_slides.py`, `SlidesNotice` tests; docs/PRESENTATION_FIDELITY.md. |
+| Commit `b018810` had **deleted decisions F1–F47 and O1–O3**. | `docs/DECISIONS.md` | Restored (`24c6330`). | — |
+| `test_settings_survive_a_restart` (e2e) **failed 3 times in 4** locally: it read a radio button before the settings loaded. | `tests/e2e/` | It now waits (Playwright's `to_be_checked`). | 5 of 5 runs pass. |
+
+Evidence at `d6fe8fd`:
+- **Local (Linux):** Python 631 passed and 5 skipped (Windows-only), including 20 browser tests; frontend 121 passed.
+- **CI:** [45271520135](https://github.com/Ali7488/pdf-manager/actions/runs/45271520135) and 45271531357, all jobs green.
+- **Windows build** [45271518966](https://github.com/Ali7488/pdf-manager/actions/runs/45271518966): installer built, installed and smoke-tested, recording source `d6fe8fd`. The browser ZIP's tests against the packaged exe with Edge: 18 passed, 2 skipped (no Tesseract or LibreOffice on the runner). The same-commit check passed. The first build at `a3a6010` failed only in that new check, from a pipefail quirk; fixed in `d6fe8fd`.
+
+Still open from this round: the fidelity follow-ups in docs/PRESENTATION_FIDELITY.md; owner questions O4 and O5; the interactive Windows 11 checks in docs/BROWSER_MODE.md.
+
+## Prerelease audit fixes (2026-11-23)
+
+The local prerelease audit at `fbf3c7d` (prompts log item 43) put both Windows artifacts on HOLD. Its findings, and the owner's artifact review, were fixed as follows (item 44; agent-written, not human-reviewed):
+
+| Finding | Fix | Evidence |
+| --- | --- | --- |
+| **B1 (P1):** preparing a browser download counted the result as delivered, so an interrupted download could be deleted by idle shutdown or an unconfirmed Quit. | Downloads stay unsaved until Done or Discard (P39); a folder save clears the protection only after writing every file. | `test_a_download_stays_unsaved_until_done`, job manager tests. |
+| **B2 (P2):** results evicted from the session's 20-entry list were unreachable, undiscardable and blocked idle shutdown forever. | One recoverable result at a time, enforced by `JobManager.start` (`RESULT_PENDING`). Recovery, idle shutdown and Quit use the job manager's pending result; Done always reaches the job manager and deletes download copies (P40). | API tests, the frontend's Show the results, e2e with two windows and a reload. |
+| **B3 (P2):** simultaneous launches started two servers on one profile. | Per-profile instance lock (P41). | Real-process test: two simultaneous launches reach one server; a killed owner recovers. |
+| **S1 (P2, pre-existing):** closing the desktop window deleted unsaved results without asking. | `closing` handler asks; Cancel keeps the window and the results (P41). | Bridge tests with a fake window; the real dialog is on the VM checklist. |
+| **L4:** the ZIP's `READ ME FIRST.txt` was out of date. | Updated (idle rule, Quit, LibreOffice). | — |
+| **Setuptools and vendored modules** in the desktop exe, not in the notices; **packaging** (Linux-only in the notices) in the Windows build. | Excluded in `pdf-manager.spec`. `check_licenses.py bundle --python-distributions` fails on any bundled pure-Python distribution not listed for the build and platform. | `tests/test_licensing.py`; CI's Windows build. |
+| **OpenSSL and libffi** (and bzip2, xz, mpdecimal, zlib) in the Python runtime, without their source. | Pinned `cpython-source-deps` archives in both source bundles. | Manifest and generator tests; the sources job. |
+
+Left open on purpose:
+- **O1:** WebView2 SDK files; the statically linked MSVC runtime in the PyInstaller bootloader.
+- **Follow-ups:** the CLI save race, the frontend mock and the duplicate CI triggers.
+- **An unidentified intermittent Python test failure:** 1 in 8 full local runs, under load. It hasn't come back in 12 stressed runs of the browser-mode and job tests.
 
 ## Open work
 

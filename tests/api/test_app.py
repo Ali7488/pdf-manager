@@ -122,6 +122,8 @@ def test_main_creates_window_and_shuts_down(monkeypatch, tmp_path, window, logs)
     assert fake.started == {"debug": True, "gui": "fake-gui"}
     # The Api is bound to the window and listens for page loads (drag and drop).
     assert window.events.loaded.handlers == [created["js_api"]._on_loaded]
+    # Closing the window asks first when that would lose work (P41).
+    assert window.events.closing.handlers == [created["js_api"]._confirm_close]
     assert shutdowns == [created["js_api"]]
 
 

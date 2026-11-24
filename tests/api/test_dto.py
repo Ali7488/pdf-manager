@@ -164,7 +164,6 @@ def test_every_issue_in_results_carries_command():
     check = ToolCheck(
         ok=False,
         ocr=ToolStatus(True, False, None),
-        powerpoint=ToolStatus(False, False, None),
         libreoffice=ToolStatus(False, False, None),
         issues=[issue],
     )
@@ -225,14 +224,14 @@ def test_tool_check_to_json():
     check = ToolCheck(
         False,
         ToolStatus(True, False, None),
-        ToolStatus(False, True, Path("/apps/POWERPNT.EXE")),
-        ToolStatus(False, False, None),
+        ToolStatus(True, True, Path("/apps/soffice")),
         [ocr_missing()],
     )
     result = dto.tool_check_to_json(check)
     assert result["ok"] is False
     assert result["ocr"] == {"required": True, "present": False, "path": None}
-    assert result["powerpoint"]["path"] == str(Path("/apps/POWERPNT.EXE"))
+    assert result["libreoffice"]["path"] == str(Path("/apps/soffice"))
+    assert "powerpoint" not in result
     assert [i["code"] for i in result["issues"]] == ["OCR_MISSING"]
     json.dumps(result)
 

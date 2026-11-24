@@ -12,7 +12,8 @@ import subprocess
 from pathlib import Path
 
 from ..service import Issue, ocr_install_failed
-from ._common import FILE_FILTERS, XDG_APP_FOLDER, xdg_dir
+from ._common import FILE_FILTERS, XDG_APP_FOLDER, DefaultBrowser, xdg_dir
+from .linux import lock_instance  # noqa: F401  (POSIX flock, the same on macOS)
 
 LOGS_FOLDER = "logs"
 
@@ -84,3 +85,47 @@ def run_ocr_install() -> str:
         RuntimeError: Always.
     """
     raise RuntimeError("There is no in-app OCR install on macOS.")
+
+
+# ----- Browser mode: a normal tab and the browser's own file selection -----
+
+
+def default_browser() -> DefaultBrowser:
+    """Not looked up on macOS: the URL goes to ``open`` (a normal tab)."""
+    return DefaultBrowser("unknown (macOS)")
+
+
+def start_browser(command: list[str]) -> None:
+    """Start the browser for browser mode, detached from this app.
+
+    Raises:
+        OSError: It couldn't be started.
+    """
+    subprocess.Popen(
+        command,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        close_fds=True,
+        start_new_session=True,
+    )
+
+
+def open_url(url: str) -> None:
+    """Open a URL with ``open``."""
+    subprocess.Popen(["open", url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def dialogs_available() -> bool:
+    """No native pickers in browser mode on macOS; the page uses the browser's own."""
+    return False
+
+
+def ask_files(filters: tuple[str, ...], multiple: bool) -> list[Path]:
+    """Never called: :func:`dialogs_available` is False."""
+    return []
+
+
+def ask_folder(start: str) -> Path | None:
+    """Never called: :func:`dialogs_available` is False."""
+    return None

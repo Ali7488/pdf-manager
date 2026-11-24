@@ -12,7 +12,7 @@ from pathlib import Path
 import fitz
 import pytest
 
-from api import bridge, platforms, service
+from api import logging_setup, platforms, service
 from api.bridge import Api, event_script
 from api.jobs import JobManager
 from api.platforms import linux, windows
@@ -110,7 +110,7 @@ def store(tmp_path):
 def api_obj(window, store, run, tmp_path, logs):
     """An Api bound to the fake window, with a fake run_action."""
     api = Api(store)
-    api._jobs = JobManager(api._emit, run_action=run, temp_dir=tmp_path)
+    api._workflow.jobs = JobManager(api._emit, run_action=run, temp_dir=tmp_path)
     api._bind_window(window)
     yield api
     api._shutdown()
@@ -225,7 +225,14 @@ def test_emit_failure_is_swallowed(api_obj, window):
 def test_get_app_info(api_obj, logs):
     """AppInfo has version, logs and licences folders, and platform."""
     info = api_obj.get_app_info()
-    assert set(info) == {"version", "logsDir", "licensesDir", "platform"}
+    assert set(info) == {
+        "version",
+        "logsDir",
+        "licensesDir",
+        "platform",
+        "sourceRevision",
+        "sourceModified",
+    }
     # From source the licence texts are at the repository root.
     licenses_dir = Path(info["licensesDir"])
     assert (licenses_dir / "LICENSE").is_file()
@@ -383,7 +390,6 @@ def test_check_tools_shape_and_logged_issues(api_obj, monkeypatch, logs):
             False,
             ToolStatus(True, False, None),
             ToolStatus(False, False, None),
-            ToolStatus(False, False, None),
             [ocr_missing()],
         )
 
@@ -392,6 +398,7 @@ def test_check_tools_shape_and_logged_issues(api_obj, monkeypatch, logs):
     assert seen == {"action": "flatten", "ocr": True, "files": [Path("/a.pdf")]}
     assert result["ok"] is False
     assert result["ocr"] == {"required": True, "present": False, "path": None}
+    assert set(result) == {"ok", "ocr", "libreoffice", "issues"}  # No PowerPoint row (C17).
     assert_issue(result["issues"][0], "OCR_MISSING")
     assert result["issues"][0]["logFile"] == str(logs)
 
@@ -672,7 +679,7 @@ def test_open_logs_folder_creates_it(api_obj, monkeypatch, logs):
     """open_logs_folder creates the logs folder if needed, then opens it."""
     opened = []
     monkeypatch.setattr(platforms, "open_folder", opened.append)
-    for handler in list(bridge.logging_setup._handlers):
+    for handler in list(logging_setup._handlers):
         handler.close()
     logs.unlink()
     logs.parent.rmdir()
@@ -731,3 +738,60 @@ def test_drop_with_nothing_usable_emits_nothing(api_obj, window):
     api_obj._on_drop({})
     api_obj._on_drop({"dataTransfer": None})
     assert window.events_named("filesAdded") == []
+
+
+# ----- Closing the window (decision P41) -----
+
+
+def finished_unsaved(api_obj, window):
+    started = api_obj.start_job("merge", dict(SETTINGS), {"files": ["/in/a.pdf"]})
+    assert api_obj._workflow.jobs.wait(started["jobId"], 5)
+    return started["jobId"]
+
+
+def test_closing_with_nothing_unsaved_closes_without_asking(api_obj, window):
+    assert window.events.closing.handlers == [api_obj._confirm_close]
+    assert api_obj._confirm_close() is True and window.confirmations == []
+
+
+def test_cancelling_the_close_keeps_the_window_and_the_results(api_obj, window, tmp_path):
+    job_id = finished_unsaved(api_obj, window)
+    scratch = list(tmp_path.glob("pdf-manager-*"))
+    window.confirm_answers = [False]  # The user clicks Cancel.
+    assert api_obj._confirm_close() is False  # pywebview then keeps the window open.
+    title, message = window.confirmations[0]
+    assert title == "Close PDF Manager?"
+    assert message == "One finished result isn't saved yet. Closing now deletes it. Close anyway?"
+    assert api_obj._workflow.jobs.unsaved_jobs() == [job_id]
+    assert scratch and all(folder.is_dir() for folder in scratch)
+    out = tmp_path / "saved"
+    out.mkdir()
+    saved = api_obj.save_results(job_id, {"folder": str(out), "asZip": False})
+    assert saved["issue"] is None and (out / "Sample - Merged.pdf").is_file()
+
+
+def test_confirming_the_close_lets_it_close(api_obj, window):
+    finished_unsaved(api_obj, window)
+    window.confirm_answers = [True]
+    assert api_obj._confirm_close() is True
+
+
+def test_closing_during_a_conversion_asks(api_obj, window, run):
+    run.release.clear()
+    started = api_obj.start_job("merge", dict(SETTINGS), {"files": ["/in/a.pdf"]})
+    try:
+        assert api_obj._confirm_close() is False
+        assert "still running" in window.confirmations[0][1]
+    finally:
+        run.release.set()
+        api_obj._workflow.jobs.wait(started["jobId"], 5)
+
+
+def test_a_broken_dialog_never_traps_the_window(api_obj, window, monkeypatch):
+    finished_unsaved(api_obj, window)
+
+    def broken(title, message):
+        raise RuntimeError("no dialog")
+
+    monkeypatch.setattr(window, "create_confirmation_dialog", broken)
+    assert api_obj._confirm_close() is True

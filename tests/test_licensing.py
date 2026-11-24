@@ -87,7 +87,9 @@ def test_new_python_dependency_without_notice_fails(monkeypatch):
     if shutil.which("uv") is None:
         pytest.skip("needs uv")
     locked = check.locked_python_packages()
-    monkeypatch.setattr(check, "locked_python_packages", lambda: {**locked, "newpackage": "1.0"})
+    monkeypatch.setattr(
+        check, "locked_python_packages", lambda *extra: {**locked, "newpackage": "1.0"}
+    )
     failures = _failures(check.check_repo)
     assert any("newpackage" in f for f in failures)
 
@@ -96,7 +98,9 @@ def test_version_bump_without_regenerating_fails(monkeypatch):
     if shutil.which("uv") is None:
         pytest.skip("needs uv")
     locked = check.locked_python_packages()
-    monkeypatch.setattr(check, "locked_python_packages", lambda: {**locked, "pymupdf": "9.9.9"})
+    monkeypatch.setattr(
+        check, "locked_python_packages", lambda *extra: {**locked, "pymupdf": "9.9.9"}
+    )
     assert any("pymupdf" in f and "9.9.9" in f for f in _failures(check.check_repo))
 
 
@@ -462,3 +466,154 @@ def test_every_bundled_python_package_has_a_source_location():
     assert bundled <= listed
     assert all(s["url"].startswith("https://") for s in manifest["sources"]["python"])
     assert json.dumps(manifest["sources"]["mupdf"]).count("mupdf.com") == 1
+
+
+# ----- The browser-mode ZIP (browser build) -----
+
+stage = _load("stage_licenses")
+
+
+def _browser_app(tmp_path: Path) -> Path:
+    """A minimal browser-mode app folder: no window toolkit, no installer."""
+    app = tmp_path / "PDF Manager (browser)"
+    internal = app / "_internal"
+    (internal / "pymupdf").mkdir(parents=True)
+    for relative in ("PDF Manager.exe", "_internal/python313.dll", "_internal/pymupdf/_mupdf.pyd"):
+        (app / relative).write_bytes(b"MZ")
+    return app
+
+
+def _bundle_failures(app, installed=False):
+    return _failures(lambda r: check.check_bundle(r, app, installed=installed, build="browser"))
+
+
+def test_the_manifest_knows_which_build_ships_what():
+    manifest = check.load_manifest()
+    builds = {check._norm(c["name"]): c["builds"] for c in manifest["components"]}
+    assert builds["pymupdf"] == ["desktop", "browser"]
+    assert builds["pywin32"] == ["desktop", "browser"]
+    for desktop_only in ("pywebview", "pythonnet", "clr-loader", "pyside6"):
+        assert builds[desktop_only] == ["desktop"], desktop_only
+    webview2 = next(c for c in manifest["components"] if "WebView2" in c["name"])
+    assert webview2["builds"] == ["desktop"]
+
+
+def test_a_clean_browser_app_passes(tmp_path):
+    app = _browser_app(tmp_path)
+    assert [f for f in _bundle_failures(app) if "Python" not in f] == []
+
+
+@pytest.mark.parametrize(
+    "relative",
+    [
+        "_internal/webview/lib/Microsoft.Web.WebView2.Core.dll",
+        "_internal/pythonnet/runtime/Python.Runtime.dll",
+        "_internal/clr_loader/ffi/dlls/amd64/ClrLoader.dll",
+        "_internal/webview/lib/WebBrowserInterop.x64.dll",
+        "unins000.exe",
+    ],
+)
+def test_the_desktop_toolkit_or_installer_in_the_browser_app_fails(tmp_path, relative):
+    app = _browser_app(tmp_path)
+    (app / relative).parent.mkdir(parents=True, exist_ok=True)
+    (app / relative).write_bytes(b"MZ")
+    assert any("desktop build only" in f for f in _bundle_failures(app))
+
+
+def test_a_desktop_package_in_the_browser_app_fails(tmp_path):
+    app = _browser_app(tmp_path)
+    (app / "_internal" / "pywebview-6.2.1.dist-info").mkdir()
+    assert any("pywebview" in f for f in _bundle_failures(app))
+
+
+def test_staged_browser_licences_are_exactly_the_builds(tmp_path):
+    app = _browser_app(tmp_path)
+    count = stage.stage(app, "browser")
+    manifest = check.load_manifest()
+    assert count == len(check.licence_files(manifest, "browser"))
+    notices = (app / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8")
+    assert "| pywebview |" not in notices and "| pymupdf |" in notices
+    assert not (app / "licenses" / "other" / "inno-setup").exists()
+    assert not [f for f in _bundle_failures(app, installed=True) if "Python" not in f]
+
+    (app / "licenses" / "other" / "inno-setup").mkdir(parents=True)
+    (app / "licenses" / "other" / "inno-setup" / "license.txt").write_text("x")
+    next(iter((app / "licenses" / "mupdf").rglob("*.txt"))).unlink()
+    failures = _bundle_failures(app, installed=True)
+    assert any("Stale licence files" in f and "inno-setup" in f for f in failures)
+    assert any(f.startswith("Installed app lacks licenses/mupdf/") for f in failures)
+
+
+def test_wrong_build_marks_fail_the_repo_check(monkeypatch):
+    if shutil.which("uv") is None:
+        pytest.skip("needs uv")
+    manifest = check.load_manifest()
+    for component in manifest["components"]:
+        if component["name"] == "pywebview":
+            component["builds"] = ["desktop", "browser"]
+    monkeypatch.setattr(check, "load_manifest", lambda: manifest)
+    failures = _failures(check.check_repo)
+    assert any("pywebview: the lockfile's browser build leaves it out" in f for f in failures)
+    assert any("THIRD_PARTY_NOTICES-browser.md lacks pywebview" in f for f in failures)
+
+
+def test_the_python_runtimes_own_libraries_have_pinned_source():
+    """OpenSSL, libffi, bzip2, xz, mpdecimal and zlib ship inside the Windows runtime.
+
+    CPython's tarball doesn't contain them, so the source bundle carries the
+    cpython-source-deps archives (the owner's artifact review).
+    """
+    manifest = check.load_manifest()
+    items = manifest["sources"]["python_runtime_externals"]
+    names = {item["component"].split()[0] for item in items}
+    assert names == {"OpenSSL", "libffi", "bzip2", "xz", "mpdecimal", "zlib"}
+    for item in items:
+        assert item["url"].startswith("https://github.com/python/cpython-source-deps/archive/")
+        assert len(item["sha256"]) == 64
+    collector = (ROOT / "scripts" / "collect_sources.py").read_text(encoding="utf-8")
+    assert 'sources["python_runtime_externals"]' in collector
+    generator = (ROOT / "scripts" / "collect_licenses.py").read_text(encoding="utf-8")
+    for item in items:
+        assert item["sha256"] in generator, "manifest and generator disagree"
+
+
+def _listing(tmp_path, build, distributions, unowned=()):
+    path = tmp_path / f"bundle-python-{build}.json"
+    path.write_text(
+        json.dumps({"build": build, "distributions": distributions, "unowned": list(unowned)})
+    )
+    return path
+
+
+@pytest.mark.parametrize(
+    "distributions,unowned,problem",
+    [
+        ({"pymupdf": "1.28.2"}, (), None),
+        ({"pymupdf": "1.28.2", "setuptools": "80.9.0"}, (), "setuptools 80.9.0 isn't in"),
+        ({"pymupdf": "1.28.1"}, (), "the notices list 1.28.2"),
+        ({"pymupdf": "1.28.2"}, ("jaraco",), "'jaraco' belongs to no installed distribution"),
+        ({"pywebview": "6.2.1"}, (), "pywebview 6.2.1 isn't in the browser notices"),
+    ],
+)
+def test_bundled_python_distributions_must_be_in_the_notices(
+    tmp_path, capsys, distributions, unowned, problem
+):
+    report = check.Report()
+    check.check_python_distributions(
+        report, _listing(tmp_path, "browser", distributions, unowned), "browser"
+    )
+    if problem is None:
+        assert report.failures == []
+    else:
+        assert any(problem in failure for failure in report.failures), report.failures
+
+
+def test_packaging_is_listed_for_the_linux_desktop_build_only(tmp_path, monkeypatch):
+    """packaging comes with qtpy (Linux); on Windows it would be an unlisted extra."""
+    for platform, listed in (("linux", True), ("win32", False)):
+        monkeypatch.setattr(check.sys, "platform", platform)
+        report = check.Report()
+        listing = _listing(tmp_path, "desktop", {"packaging": "26.3"})
+        check.check_python_distributions(report, listing, "desktop")
+        flagged = any("packaging 26.3 isn't in" in failure for failure in report.failures)
+        assert flagged is not listed, (platform, report.failures)

@@ -20,6 +20,7 @@ import { IssueView } from "../../../components/Issue/IssueView";
 import { Modal } from "../../../components/Modal/Modal";
 import { ProgressBar, Spinner } from "../../../components/Progress/Progress";
 import { isSlides } from "../../../lib/actions";
+import { connectionIssue } from "../../../lib/connectionIssue";
 import { formatBytes, formatPages } from "../../../lib/format";
 import { useApp } from "../../../state/AppContext";
 import styles from "./ConvertModal.module.css";
@@ -36,6 +37,19 @@ export interface ConvertModalProps {
   autoSaveFolder: string | null;
   /** Called when the modal is closed (after results are saved or discarded). */
   onClose(): void;
+  /**
+   * Browser mode, after the page was reloaded: follow this job, which is already
+   * running or finished, instead of checking the tools and starting a new one.
+   */
+  resumeJobId?: string;
+  /**
+   * How the resumed job's results were already saved. A job saved to a folder shows where
+   * (its results are no longer in the app, so Save isn't offered); a download keeps
+   * Download again until Done.
+   */
+  resumeSaved?: SaveOutcome | null;
+  /** Whether that save was one .zip. */
+  resumeSavedAsZip?: boolean;
 }
 
 /** Where the modal is in the flow. */
@@ -44,7 +58,8 @@ type Phase =
   | { name: "blocked"; check: ToolCheckResult }
   | { name: "starting"; check: ToolCheckResult }
   | { name: "startFailed"; issue: Issue }
-  | { name: "running"; check: ToolCheckResult; jobId: string; progress: JobProgress | null; cancelling: boolean }
+  | { name: "running"; check: ToolCheckResult | null; jobId: string; progress: JobProgress | null; cancelling: boolean }
+  | { name: "lost"; check: ToolCheckResult | null; jobId: string }
   | { name: "finished"; result: JobFinished };
 
 /** Saving the results of a succeeded job. */
@@ -72,13 +87,29 @@ type JobEvent = { kind: "progress"; payload: JobProgress } | { kind: "finished";
  * Results are never lost by accident: while they're unsaved the modal can only
  * be left with Save or Discard (which asks to confirm).
  */
-export function ConvertModal({ action, settings, files, autoSaveFolder, onClose }: ConvertModalProps) {
+export function ConvertModal({
+  action,
+  settings,
+  files,
+  autoSaveFolder,
+  onClose,
+  resumeJobId,
+  resumeSaved = null,
+  resumeSavedAsZip = false,
+}: ConvertModalProps) {
   const { api, onEvent, dispatch, ocrInstall, ocrVersion, bumpOcrVersion } = useApp();
-  const [phase, setPhase] = useState<Phase>({ name: "checking" });
-  const [save, setSave] = useState<SaveState>({ status: "idle" });
+  const [phase, setPhase] = useState<Phase>(() =>
+    resumeJobId
+      ? { name: "running", check: null, jobId: resumeJobId, progress: null, cancelling: false }
+      : { name: "checking" },
+  );
+  const [save, setSave] = useState<SaveState>(() =>
+    resumeSaved ? { status: "saved", outcome: resumeSaved } : { status: "idle" },
+  );
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [lastAsZip, setLastAsZip] = useState(resumeSavedAsZip);
   const [popupIssue, setPopupIssue] = useState<Issue | null>(null);
-  const jobIdRef = useRef<string | null>(null);
+  const jobIdRef = useRef<string | null>(resumeJobId ?? null);
   const earlyEvents = useRef<JobEvent[]>([]);
   const startedRef = useRef(false);
   const lastOcrVersion = useRef(ocrVersion);
@@ -89,7 +120,15 @@ export function ConvertModal({ action, settings, files, autoSaveFolder, onClose 
 
   const saveTo = async (jobId: string, folder: string | null, asZip: boolean) => {
     setSave({ status: "saving", folder });
-    const outcome = await api.saveResults(jobId, { folder, asZip });
+    setLastAsZip(asZip);
+    let outcome: SaveOutcome;
+    try {
+      outcome = await api.saveResults(jobId, { folder, asZip });
+    } catch (error) {
+      // The results are still in the app: Save stays available to try again.
+      setSave({ status: "failed", issue: connectionIssue(error) });
+      return;
+    }
     if (outcome.issue) setSave({ status: "failed", issue: outcome.issue });
     else if (outcome.cancelled) setSave({ status: "pickerCancelled" });
     else setSave({ status: "saved", outcome });
@@ -107,7 +146,8 @@ export function ConvertModal({ action, settings, files, autoSaveFolder, onClose 
   };
 
   /** Checks the tools, then starts the job if nothing blocks it. */
-  const checkAndStart = async () => {
+  const checkThenStart = async () => {
+    if (resumeJobId) return; // A resumed job is already running or finished.
     const data = { files: paths };
     const check = await api.checkTools(action, settings, data);
     if (!check.ok) {
@@ -128,6 +168,15 @@ export function ConvertModal({ action, settings, files, autoSaveFolder, onClose 
     early.forEach(applyEvent);
   };
 
+  /** {@link checkThenStart}; a request PDF Manager didn't answer ends in "The job couldn't start". */
+  const checkAndStart = async () => {
+    try {
+      await checkThenStart();
+    } catch (error) {
+      setPhase({ name: "startFailed", issue: connectionIssue(error) });
+    }
+  };
+
   const recheck = () => {
     setPhase({ name: "checking" });
     void checkAndStart();
@@ -143,6 +192,10 @@ export function ConvertModal({ action, settings, files, autoSaveFolder, onClose 
     startedRef.current = true;
     void checkAndStart();
   });
+  const onConnectionLost = useEffectEvent((jobId: string | null) => {
+    if (jobId === null || jobId !== jobIdRef.current) return;
+    setPhase((current) => (current.name === "running" ? { name: "lost", check: current.check, jobId } : current));
+  });
   const onOcrMaybeAvailable = useEffectEvent(() => {
     if (phase.name === "blocked") recheck();
   });
@@ -150,13 +203,20 @@ export function ConvertModal({ action, settings, files, autoSaveFolder, onClose 
   useEffect(() => {
     const offProgress = onEvent("jobProgress", (payload) => onJobEvent({ kind: "progress", payload }));
     const offFinished = onEvent("jobFinished", (payload) => onJobEvent({ kind: "finished", payload }));
+    const offLost = onEvent("connectionLost", ({ jobId }) => onConnectionLost(jobId));
     return () => {
       offProgress();
       offFinished();
+      offLost();
     };
   }, [onEvent]);
 
   useEffect(() => onMount(), []);
+
+  // A resumed job: follow it (browser mode polls the app for its status).
+  useEffect(() => {
+    if (resumeJobId) api.watchJob(resumeJobId);
+  }, [api, resumeJobId]);
 
   // After OCR is installed or found, check again automatically.
   useEffect(() => {
@@ -168,13 +228,42 @@ export function ConvertModal({ action, settings, files, autoSaveFolder, onClose 
   const cancel = async () => {
     if (phase.name !== "running") return;
     setPhase({ ...phase, cancelling: true });
-    await api.cancelJob(phase.jobId);
+    try {
+      await api.cancelJob(phase.jobId);
+    } catch {
+      // Not sent: let the user press Cancel again.
+      setPhase((current) => (current.name === "running" ? { ...current, cancelling: false } : current));
+    }
+  };
+
+  /** After a lost connection: follow the job again (its status is kept in the app). */
+  const reconnect = () => {
+    if (phase.name !== "lost") return;
+    setPhase({ name: "running", check: phase.check, jobId: phase.jobId, progress: null, cancelling: false });
+    api.watchJob(phase.jobId);
   };
 
   const searchOcr = async () => {
     const result = await api.searchOcr();
     if (result.found) bumpOcrVersion();
     else if (result.issue) setPopupIssue(result.issue);
+  };
+
+  /**
+   * RESULT_PENDING (decision P40): open the unsaved result again, in its own tab,
+   * the same way a reload does, so it can be saved, downloaded or discarded.
+   */
+  const showPendingResult = async () => {
+    const job = await api.latestJob().catch(() => null); // Not answering: reported separately.
+    if (!job?.action) return;
+    onClose();
+    dispatch({
+      type: "jobRecovered",
+      jobId: job.jobId,
+      action: job.action,
+      saved: job.saved ?? null,
+      savedAsZip: job.savedAsZip === true,
+    });
   };
 
   const openSettings = () => {
@@ -184,7 +273,7 @@ export function ConvertModal({ action, settings, files, autoSaveFolder, onClose 
 
   /** Closes and frees the job's scratch folder. Only called once results are saved or not needed. */
   const closeAndCleanUp = (jobId: string | null) => {
-    if (jobId) void api.discardResults(jobId);
+    if (jobId) api.discardResults(jobId).catch(() => undefined); // Cleaned up when the app closes.
     onClose();
   };
 
@@ -193,6 +282,8 @@ export function ConvertModal({ action, settings, files, autoSaveFolder, onClose 
   let body: ReactNode;
   let footer: ReactNode = null;
   let closable = false;
+  // Browser mode without a folder picker: results go to the browser's downloads.
+  const downloads = api.saveMode === "download";
 
   if (phase.name === "checking" || phase.name === "starting") {
     body = (
@@ -244,10 +335,30 @@ export function ConvertModal({ action, settings, files, autoSaveFolder, onClose 
     title = "The job couldn't start";
     closable = true;
     body = <IssueView issue={phase.issue} />;
-    footer = (
+    const pending = phase.issue.code === "RESULT_PENDING" && api.mode !== "desktop";
+    footer = pending ? (
+      <>
+        <Button onClick={onClose}>Close</Button>
+        <Button variant="primary" onClick={() => void showPendingResult()}>
+          Show the results
+        </Button>
+      </>
+    ) : (
       <Button variant="primary" onClick={onClose}>
         Close
       </Button>
+    );
+  } else if (phase.name === "lost") {
+    title = "Lost contact with PDF Manager";
+    closable = true;
+    body = <IssueView issue={connectionIssue("The app stopped answering while the job was running.")} />;
+    footer = (
+      <>
+        <Button onClick={onClose}>Close</Button>
+        <Button variant="primary" onClick={reconnect}>
+          Try again
+        </Button>
+      </>
     );
   } else if (phase.name === "running") {
     title = "Converting";
@@ -327,13 +438,18 @@ export function ConvertModal({ action, settings, files, autoSaveFolder, onClose 
               ))}
             </ul>
           </div>
-          <SaveStatus save={save} />
+          <SaveStatus save={save} downloads={downloads} />
           {warnings}
         </>
       );
       if (saved) {
         footer = (
           <>
+            {saved.downloaded && (
+              <Button icon="folder" onClick={() => void saveTo(result.jobId, null, lastAsZip)}>
+                Download again
+              </Button>
+            )}
             {saved.folder && (
               <Button icon="folder" onClick={() => void api.openFolder(saved.folder!)}>
                 Open folder
@@ -363,11 +479,11 @@ export function ConvertModal({ action, settings, files, autoSaveFolder, onClose 
             </Button>
             {action === Action.Split && result.outputs.length > 1 && (
               <Button onClick={() => void saveTo(result.jobId, null, true)} disabled={busy}>
-                Save as one .zip
+                {downloads ? "Download as one .zip" : "Save as one .zip"}
               </Button>
             )}
             <Button variant="primary" icon="folder" onClick={() => void saveTo(result.jobId, null, false)} disabled={busy}>
-              Save
+              {downloads ? "Download" : "Save"}
             </Button>
           </>
         );
@@ -405,14 +521,14 @@ function OcrActions({ onSearch, onOpenSettings }: { onSearch(): void; onOpenSett
 }
 
 /** What happened when saving, in plain words. */
-function SaveStatus({ save }: { save: SaveState }) {
+function SaveStatus({ save, downloads }: { save: SaveState; downloads: boolean }) {
   switch (save.status) {
     case "idle":
       return null;
     case "saving":
       return (
         <p className={styles.statusLine} aria-live="polite">
-          <Spinner /> {save.folder ? `Saving to ${save.folder}` : "Choose a folder to save to"}
+          <Spinner /> {save.folder ? `Saving to ${save.folder}` : downloads ? "Preparing your download" : "Choose a folder to save to"}
         </p>
       );
     case "pickerCancelled":
@@ -424,6 +540,18 @@ function SaveStatus({ save }: { save: SaveState }) {
     case "failed":
       return <IssueView issue={save.issue} compact />;
     case "saved":
+      if (save.outcome.downloaded)
+        return (
+          <p className={`${styles.notice} ${styles.success}`} role="status">
+            <Icon name="check" size={18} />
+            <span>
+              {save.outcome.savedPaths.length === 1
+                ? "Sent to your browser's downloads. "
+                : `${save.outcome.savedPaths.length} files sent to your browser's downloads. `}
+              If you don't see them, click Download again.
+            </span>
+          </p>
+        );
       return (
         <p className={`${styles.notice} ${styles.success}`} role="status">
           <Icon name="check" size={18} />

@@ -13,7 +13,6 @@ import type {
   OcrSearchResult,
   OcrStatus,
   PdfManagerApi,
-  PdfManagerEvents,
   SaveOptions,
   SaveOutcome,
   SaveSettingsResult,
@@ -32,43 +31,7 @@ declare global {
   }
 }
 
-/** Name of an event Python can send. */
-export type EventName = keyof PdfManagerEvents;
-
-/** Prefix of the DOM events Python dispatches on `window`. */
-export const EVENT_PREFIX = "pdfmanager:";
-
-/**
- * Subscribes to an event from Python.
- *
- * Python dispatches `pdfmanager:<name>` CustomEvents on `window` with the
- * payload in `event.detail`. The mock dispatches the same events, so this works
- * in both modes.
- *
- * @param name - Event name, e.g. `"jobProgress"`.
- * @param handler - Called with the event payload.
- * @returns A function that removes the listener.
- */
-export function onEvent<K extends EventName>(
-  name: K,
-  handler: (payload: PdfManagerEvents[K]) => void,
-): () => void {
-  const listener = (event: Event) => {
-    handler((event as CustomEvent<PdfManagerEvents[K]>).detail);
-  };
-  window.addEventListener(EVENT_PREFIX + name, listener);
-  return () => window.removeEventListener(EVENT_PREFIX + name, listener);
-}
-
-/**
- * Dispatches an event the same way Python does. Used by the mock and tests.
- *
- * @param name - Event name.
- * @param payload - Event payload, delivered as `event.detail`.
- */
-export function emitEvent<K extends EventName>(name: K, payload: PdfManagerEvents[K]): void {
-  window.dispatchEvent(new CustomEvent(EVENT_PREFIX + name, { detail: payload }));
-}
+export { EVENT_PREFIX, emitEvent, onEvent, type EventName } from "./events";
 
 /** True if pywebview has injected its object into the page. */
 export function isPywebviewPresent(): boolean {
@@ -119,6 +82,15 @@ async function callPython<T>(method: string, ...args: unknown[]): Promise<T> {
  */
 export function createBridgeApi(): PdfManagerApi {
   return {
+    mode: "desktop",
+    saveMode: "folder",
+    // Python reads dropped files' real paths itself and sends `filesAdded`.
+    addDroppedFiles: () => Promise.resolve([]),
+    latestJob: () => Promise.resolve(null),
+    // Python sends job events by itself.
+    watchJob: () => undefined,
+    // The window's close button quits the desktop app.
+    quit: () => Promise.resolve({ quit: true, running: false, unsavedResults: 0 }),
     getAppInfo: () => callPython<AppInfo>("get_app_info"),
     getSettings: () => callPython<Settings>("get_settings"),
     saveSettings: (patch: Partial<Settings>) => callPython<SaveSettingsResult>("save_settings", patch),

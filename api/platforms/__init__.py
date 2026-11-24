@@ -40,6 +40,21 @@ Interface:
     run_ocr_install() -> str
         Run the OCR install and wait; returns technical details for the log.
         Only called when ``ocr_install_unavailable()`` returned ``None``.
+
+Browser mode only (``api.web``):
+    default_browser() -> DefaultBrowser
+        The user's default browser, with its app-mode command when it is
+        Edge, Chrome, Brave or Chromium.
+    open_url(url) -> None
+        Open a URL with the system's handler (a normal tab).
+    start_browser(command) -> None
+        Start a browser command (app mode), detached from the app.
+    dialogs_available() -> bool
+        Whether native file and folder pickers can be shown.
+    ask_files(filters, multiple) -> list[Path]
+        Native Open dialog; empty if cancelled.
+    ask_folder(start) -> Path | None
+        Native folder picker; ``None`` if cancelled.
 """
 
 from __future__ import annotations
@@ -47,51 +62,82 @@ from __future__ import annotations
 import os
 import sys
 
+from ._common import DefaultBrowser
+
 if os.name == "nt":
     from .windows import (
+        ask_files,
+        ask_folder,
+        default_browser,
+        dialogs_available,
         file_filters,
         installed_logs_dir,
+        lock_instance,
         ocr_install_unavailable,
         open_folder,
+        open_url,
         platform_name,
         prepare_gui,
         program_filters,
         run_ocr_install,
         settings_dir,
+        start_browser,
         tesseract_file_name,
     )
 elif sys.platform == "darwin":
     from .mac import (
+        ask_files,
+        ask_folder,
+        default_browser,
+        dialogs_available,
         file_filters,
         installed_logs_dir,
+        lock_instance,
         ocr_install_unavailable,
         open_folder,
+        open_url,
         platform_name,
         prepare_gui,
         program_filters,
         run_ocr_install,
         settings_dir,
+        start_browser,
         tesseract_file_name,
     )
 else:
     from .linux import (
+        ask_files,
+        ask_folder,
+        default_browser,
+        dialogs_available,
         file_filters,
         installed_logs_dir,
+        lock_instance,
         ocr_install_unavailable,
         open_folder,
+        open_url,
         platform_name,
         prepare_gui,
         program_filters,
         run_ocr_install,
         settings_dir,
+        start_browser,
         tesseract_file_name,
     )
 
 __all__ = [
+    "start_browser",
+    "DefaultBrowser",
+    "ask_files",
+    "ask_folder",
+    "default_browser",
+    "dialogs_available",
     "file_filters",
     "installed_logs_dir",
+    "lock_instance",
     "ocr_install_unavailable",
     "open_folder",
+    "open_url",
     "platform_name",
     "prepare_gui",
     "program_filters",

@@ -1,30 +1,21 @@
-"""Rendering PowerPoint files (PPT/PPTX) to PDF.
+"""Rendering PowerPoint files (PPT/PPTX) to PDF with LibreOffice Impress.
 
-Two renderers, tried in this order:
+**One renderer everywhere (decision C17).** LibreOffice Impress, running
+headless with a throwaway profile, converts every presentation on every
+supported operating system, whether it was dropped, uploaded or picked with
+Add files. Microsoft PowerPoint is never automated. Macros never run: a
+headless conversion doesn't execute document macros under LibreOffice's
+default macro security. For decks that need a closer visual match, the
+documented route is to export them to PDF in PowerPoint and add that PDF.
 
-1. **Microsoft PowerPoint** (optional, Windows only, via
-   ``platforms.export_slides_with_powerpoint``): the most faithful rendering.
-2. **LibreOffice** (cross-platform): always the fallback, and the only
-   renderer on Linux.
+If LibreOffice isn't installed, the job stops with ``SLIDE_RENDERER_MISSING``
+(the Convert window's tool check normally catches that first); if it fails,
+with ``POWERPOINT_CONVERSION_FAILED`` and LibreOffice's output.
 
-If PowerPoint fails and LibreOffice succeeds, the job continues with a
-``POWERPOINT_FALLBACK`` warning that carries PowerPoint's real error. If both
-fail, the job stops with ``POWERPOINT_CONVERSION_FAILED`` and both errors.
-
-**Untrusted files (decision C14, audit R1).** Files downloaded from the
-internet or received by email carry Windows' Mark-of-the-Web. That provenance
-is **kept** on the scratch copy (never stripped). Such files are not opened by
-PowerPoint automation at all: LibreOffice renders them (headless, with its
-default macro security, so no macros run) and the job gets an
-``UNTRUSTED_PRESENTATION`` warning. If LibreOffice isn't installed, the job
-stops with an issue explaining why LibreOffice is needed.
-
-**Isolated outputs (audit R3).** Each renderer writes into its own folder
-(``powerpoint/`` and a fresh, empty ``libreoffice/``), so a partial file left by
-a failed PowerPoint export can never be mistaken for LibreOffice's result.
-
-The input is always copied into scratch first, so the original is never
-touched by either renderer.
+The input is always copied into scratch first (keeping any Windows
+Mark-of-the-Web, which is never stripped, audit R1), so the original is never
+touched, and LibreOffice writes into a fresh, empty folder, so a leftover file
+can never be mistaken for its result (audit R3).
 """
 
 from __future__ import annotations
@@ -37,21 +28,13 @@ from pathlib import Path
 
 from .. import platforms
 from ..core.context import JobContext
-from ..core.issues import (
-    ConversionError,
-    powerpoint_failed,
-    powerpoint_fallback,
-    slide_renderer_missing,
-    untrusted_needs_libreoffice,
-    untrusted_presentation,
-)
+from ..core.issues import ConversionError, powerpoint_failed, slide_renderer_missing
 from ..core.types import Stage
 from ..tools import find_libreoffice, run_command
 
 log = logging.getLogger(__name__)
 
-# Seconds a renderer may take for one presentation before it is stopped.
-POWERPOINT_TIMEOUT_SEC = 300
+# Seconds LibreOffice may take for one presentation before it is stopped.
 LIBREOFFICE_TIMEOUT_SEC = 300
 
 
@@ -144,66 +127,29 @@ def libreoffice_convert(
 
 
 def render_slides(source: Path, dest_dir: Path, ctx: JobContext, file_label: str) -> Path:
-    """Render a PowerPoint file to PDF, one page per slide.
+    """Render a PowerPoint file to PDF with LibreOffice Impress, one page per slide.
 
     Args:
         source: The ``.ppt`` or ``.pptx`` file. It is never modified.
-        dest_dir: This file's scratch folder; ``<stem>.pdf`` is written here.
-        ctx: Job context (progress, cancel, warnings).
+        dest_dir: This file's scratch folder; the PDF is written under it.
+        ctx: Job context (progress, cancel).
         file_label: Input file name, for messages.
 
     Returns:
         Path to the rendered PDF.
 
     Raises:
-        ConversionError: Both renderers failed (``POWERPOINT_CONVERSION_FAILED``)
-            or neither is installed (``SLIDE_RENDERER_MISSING``).
+        ConversionError: LibreOffice isn't installed (``SLIDE_RENDERER_MISSING``)
+            or couldn't convert the file (``POWERPOINT_CONVERSION_FAILED``).
         Cancelled: The user cancelled.
     """
     dest_dir.mkdir(parents=True, exist_ok=True)
     local = copy_for_rendering(source, dest_dir / "input")
-    untrusted = platforms.is_untrusted(source)
-    powerpoint_error: str | None = None
-
-    exporter = platforms.export_slides_with_powerpoint
-    if untrusted:
-        log.info("%s is marked as downloaded; not opening it with PowerPoint.", file_label)
-    elif exporter is not None and platforms.powerpoint_installed():
-        ctx.report(Stage.RENDERING_SLIDES, f"Converting slides with PowerPoint: {file_label}")
-        output = _fresh_folder(dest_dir / "powerpoint") / f"{source.stem}.pdf"
-        try:
-            exporter(local, output, POWERPOINT_TIMEOUT_SEC, ctx.cancel)
-            return output
-        except Exception as exc:
-            # Cancelled is an Exception too: a user cancel must stop the job,
-            # not fall back to LibreOffice.
-            if ctx.cancel.cancelled:
-                raise
-            powerpoint_error = str(exc)
-            log.warning("PowerPoint couldn't convert %s; trying LibreOffice.", file_label)
-            log.debug("PowerPoint error for %s:\n%s", file_label, powerpoint_error)
-
     ctx.check_cancel()
     ctx.report(Stage.RENDERING_SLIDES, f"Converting slides with LibreOffice: {file_label}")
     try:
-        result = libreoffice_convert(
+        return libreoffice_convert(
             local, _fresh_folder(dest_dir / "libreoffice"), "pdf:impress_pdf_Export", ".pdf", ctx
         )
-    except ConversionError as exc:
-        if untrusted:
-            raise ConversionError(untrusted_needs_libreoffice(file_label)) from exc
-        if powerpoint_error is None:
-            raise  # LibreOffice missing and PowerPoint not available: renderer missing.
-        details = f"PowerPoint: {powerpoint_error}\n\nLibreOffice: not installed."
-        raise ConversionError(powerpoint_failed(file_label, details)) from exc
     except LibreOfficeError as exc:
-        details = f"LibreOffice: {exc}"
-        if powerpoint_error is not None:
-            details = f"PowerPoint: {powerpoint_error}\n\n{details}"
-        raise ConversionError(powerpoint_failed(file_label, details)) from exc
-
-    if untrusted:
-        ctx.warn(untrusted_presentation(file_label))
-    elif powerpoint_error is not None:
-        ctx.warn(powerpoint_fallback(file_label, powerpoint_error))
-    return result
+        raise ConversionError(powerpoint_failed(file_label, f"LibreOffice: {exc}")) from exc

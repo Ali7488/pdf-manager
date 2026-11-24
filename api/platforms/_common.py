@@ -7,12 +7,11 @@ Only the platform modules import this file; shared API code goes through
 from __future__ import annotations
 
 import os
+from dataclasses import dataclass
 from pathlib import Path
 
-# Native picker filters, in pywebview's "Description (*.ext;*.ext)" format. The
-# Windows (WinForms) and Cocoa backends read this format as is; pywebview's Qt
-# backend turns each ";" into the space Qt expects, so the strings are the same
-# everywhere.
+# Native picker filters, as "Description (*.ext;*.ext)". Each platform's dialog
+# code turns them into its own format with parse_filter.
 FILE_FILTERS: dict[str, tuple[str, ...]] = {
     "all": ("Supported files (*.pdf;*.pptx;*.ppt;*.png;*.jpg;*.jpeg)",),
     "documents": ("PDF and PowerPoint files (*.pdf;*.pptx;*.ppt)",),
@@ -21,6 +20,52 @@ FILE_FILTERS: dict[str, tuple[str, ...]] = {
 
 # Folder name under the XDG base folders (~/.config, ~/.local/state).
 XDG_APP_FOLDER = "pdf-manager"
+
+# The interface's page title, which app-mode browsers show as the window title.
+# The Windows dialogs use it to find the window they belong to.
+WINDOW_TITLE = "PDF Manager"
+
+
+def parse_filter(text: str) -> tuple[str, list[str]]:
+    """Split a ``"Description (*.a;*.b)"`` filter into its parts.
+
+    Args:
+        text: One entry of :data:`FILE_FILTERS` (or of ``program_filters()``).
+
+    Returns:
+        ``(description, ["*.a", "*.b"])``. Without a pattern list, the
+        patterns are ``["*"]``.
+    """
+    description, _, rest = text.partition("(")
+    patterns = [p.strip() for p in rest.rstrip(")").split(";") if p.strip()]
+    return description.strip(), patterns or ["*"]
+
+
+@dataclass(frozen=True)
+class DefaultBrowser:
+    """The user's default web browser, as browser mode sees it.
+
+    Attributes:
+        name: What it is, for the log (for example ``"Microsoft Edge"`` or a
+            Windows ProgId / Linux desktop file it didn't recognise).
+        app_command: The command that starts it, without the URL, when it is
+            a Chromium-family browser that opens ``--app=<url>`` as a window
+            without tabs (Edge, Chrome, Brave, Chromium). ``None`` otherwise:
+            the URL then goes to the system's URL opener, which shows a tab.
+    """
+
+    name: str
+    app_command: tuple[str, ...] | None = None
+
+
+# Chromium-family browsers that browser mode opens in app mode, by the words
+# their Windows ProgId or Linux desktop file name starts with or contains.
+APP_MODE_BROWSERS = {
+    "edge": "Microsoft Edge",
+    "chrome": "Google Chrome",
+    "brave": "Brave",
+    "chromium": "Chromium",
+}
 
 
 def xdg_dir(variable: str, default: tuple[str, ...]) -> Path:

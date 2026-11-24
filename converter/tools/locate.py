@@ -1,4 +1,4 @@
-"""Finding the external programs: Tesseract OCR, LibreOffice and (on Windows) PowerPoint.
+"""Finding the external programs: Tesseract OCR and LibreOffice.
 
 Platform-independent: ``PATH`` is searched here, and each platform adds its
 own usual install locations through ``converter.platforms``.
@@ -13,9 +13,6 @@ from pathlib import Path
 
 from .. import platforms
 from .process import run_command
-
-# Re-exported so callers don't need to know which platform module provides it.
-powerpoint_installed = platforms.powerpoint_installed
 
 
 def _first_existing(candidates: Sequence[Path]) -> Path | None:
@@ -84,8 +81,3 @@ def tesseract_languages(tesseract: Path) -> list[str]:
     # Output: a header line ("List of available languages ..."), then one code per line.
     lines = (proc.stdout or proc.stderr or "").splitlines()[1:]
     return sorted({line.strip() for line in lines if line.strip() and line.strip() != "osd"})
-
-
-def find_powerpoint() -> Path | None:
-    """Path of Microsoft PowerPoint's executable if installed (Windows only), for display."""
-    return platforms.powerpoint_path()

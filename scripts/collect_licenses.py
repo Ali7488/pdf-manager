@@ -48,6 +48,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 LICENSES = ROOT / "licenses"
 NOTICES = ROOT / "THIRD_PARTY_NOTICES.md"
+# The notices of the browser-mode ZIP (PDF Manager in the user's own browser),
+# which ships a subset of the components: no window toolkit, no installer.
+BROWSER_NOTICES = ROOT / "THIRD_PARTY_NOTICES-browser.md"
+BUILDS = ("desktop", "browser")
 FRONTEND = ROOT / "frontend"
 SPDX_TEXT = "https://raw.githubusercontent.com/spdx/license-list-data/main/text/{}.txt"
 MANIFEST = LICENSES / "manifest.json"
@@ -59,6 +63,72 @@ PYINSTALLER_VERSION = "6.22.3"
 # when the bundled interpreter is a different version.
 PYTHON_WINDOWS_VERSION = "3.13.17"
 FEATHER_VERSION = "v4.29.2"
+
+# Libraries the python.org Windows build of PYTHON_WINDOWS_VERSION compiles in or ships
+# as DLLs, from source that isn't in CPython's tarball: CPython fetches it from
+# python/cpython-source-deps at these tags (PCbuild/get_externals.bat). The corresponding
+# source bundle includes them (decision P42 follow-up; the owner's artifact review).
+# (name, version, cpython-source-deps tag, SHA-256 of GitHub's tag archive, shipped in)
+RUNTIME_EXTERNALS = [
+    (
+        "OpenSSL",
+        "3.5.9",
+        "openssl-3.5.9",
+        "d6cf0d9a651f25fe506f6b3dc133a80b9b79a0bc565f570dcf8fdbd597551485",
+        "libssl-3.dll, libcrypto-3.dll",
+    ),
+    (
+        "libffi",
+        "3.4.4",
+        "libffi-3.4.4",
+        "9d802681adfea27d84cae0487a785fb9caa925bdad44c401b364c59ab2b8edda",
+        "libffi-8.dll",
+    ),
+    (
+        "bzip2",
+        "1.0.8",
+        "bzip2-1.0.8",
+        "ab8d1b0cc087c20d4c32c0e4fcf7d0c733a95da12cedc6d63b3f0a9af07427e2",
+        "_bz2.pyd",
+    ),
+    (
+        "xz (liblzma)",
+        "5.2.5",
+        "xz-5.2.5",
+        "a15c168e39e87d750c3dc766edc7f19bdda57dacf01e509678467eace91ad282",
+        "_lzma.pyd",
+    ),
+    (
+        "mpdecimal",
+        "4.0.0",
+        "mpdecimal-4.0.0",
+        "338fac3fb8cdd60f406b6326431338756f58a8af94229ffd9bf1e7c2b1ad71ca",
+        "_decimal.pyd",
+    ),
+    (
+        "zlib",
+        "1.3.1",
+        "zlib-1.3.1",
+        "e3f3fb32564952006eb18b091ca8464740e5eca29d328cfb0b2da22768e0b638",
+        "python313.dll",
+    ),
+]
+
+
+def runtime_external_sources() -> list[dict]:
+    """Source archives of the libraries inside the python.org Windows runtime."""
+    return [
+        {
+            "component": (
+                f"{name} {version} (in the Python {PYTHON_WINDOWS_VERSION} runtime: {where})"
+            ),
+            "url": f"https://github.com/python/cpython-source-deps/archive/refs/tags/{tag}.tar.gz",
+            "sha256": sha256,
+        }
+        for name, version, tag, sha256, where in RUNTIME_EXTERNALS
+    ]
+
+
 # The Inno Setup compiler the Windows build installs (build-windows.yml). Its
 # uninstaller (unins000.exe) is installed next to the app.
 INNO_SETUP_VERSION = "6.7.1"
@@ -132,12 +202,19 @@ class Component:
     used_for: str = ""
     files: list[str] = field(default_factory=list)
     group: str = ""
+    # Which builds ship it: the desktop installer and/or the browser-mode ZIP.
+    builds: set[str] = field(default_factory=lambda: set(BUILDS))
 
 
-def runtime_python_packages() -> dict[str, tuple[str, set[str]]]:
-    """Runtime packages from the lockfile: name → (version, platforms bundled on)."""
+def runtime_python_packages(*extra: str) -> dict[str, tuple[str, set[str]]]:
+    """Runtime packages from the lockfile: name → (version, platforms bundled on).
+
+    Args:
+        *extra: More ``uv export`` options; ``"--no-group", "desktop"`` gives
+            browser mode's packages (no window toolkit).
+    """
     out = subprocess.run(
-        ["uv", "export", "--no-dev", "--frozen", "--no-hashes", "--no-emit-project"],
+        ["uv", "export", "--no-dev", "--frozen", "--no-hashes", "--no-emit-project", *extra],
         cwd=ROOT,
         capture_output=True,
         text=True,
@@ -342,7 +419,7 @@ USED_FOR = {
     "pywebview": "The desktop window and the JavaScript ↔ Python bridge",
     "pythonnet": "Edge WebView2 window on Windows (via pywebview)",
     "clr-loader": "Loads .NET for pythonnet",
-    "pywin32": "Optional Microsoft PowerPoint automation on Windows",
+    "pywin32": "Browser mode's native file pickers (Windows)",
     "pyside6": "Qt window on Linux (via pywebview)",
     "react": "User interface",
     "react-dom": "User interface",
@@ -694,6 +771,7 @@ def write_manifest(components: list[Component], extra: dict) -> None:
                 "version": c.version,
                 "license": c.license,
                 "platforms": sorted(c.platforms),
+                "builds": [b for b in BUILDS if b in c.builds],
                 "group": c.group,
                 "files": c.files,
             }
@@ -703,8 +781,38 @@ def write_manifest(components: list[Component], extra: dict) -> None:
     MANIFEST.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
-def write_notices(groups: dict[str, list[Component]]) -> None:
-    """Write THIRD_PARTY_NOTICES.md."""
+VC_REDIST = "Microsoft Visual C++ Redistributable (x64)"
+SEGOE_UI = ("Segoe UI font", "Proprietary", "Used only if Windows provides it; never bundled.")
+OPTIONAL_PROGRAMS = [
+    (
+        "Tesseract OCR program",
+        "Apache-2.0",
+        "Optional; installed with winget or a package manager.",
+    ),
+    ("LibreOffice", "MPL-2.0", "Optional, for PowerPoint files; installed separately."),
+]
+
+
+def _not_included(rows: list[tuple[str, str, str]], how: str) -> str:
+    """The "Not included" table and the Visual C++ Redistributable sentence."""
+    table = "\n".join(f"| {a} | {b} | {c} |" for a, b, c in rows)
+    return (
+        f"{table}\n\nThe {VC_REDIST.replace(' (x64)', '')} (x64, version 14.44 or newer) is "
+        f"installed from\n{how} It is never shipped with the app."
+    )
+
+
+def write_notices(groups: dict[str, list[Component]], build: str | None = None) -> None:
+    """Write THIRD_PARTY_NOTICES.md (every build), or one build's notices.
+
+    Args:
+        groups: The components, by section.
+        build: ``None`` for THIRD_PARTY_NOTICES.md, which lists every build with
+            a "Builds" column; ``"browser"`` for THIRD_PARTY_NOTICES-browser.md,
+            which lists only what the browser-mode ZIP ships.
+    """
+    if build is not None:
+        groups = {k: [c for c in v if build in c.builds] for k, v in groups.items()}
 
     def rows(components: list[Component]) -> str:
         out = []
@@ -712,20 +820,89 @@ def write_notices(groups: dict[str, list[Component]]) -> None:
             where = ", ".join(sorted(p.capitalize() for p in c.platforms))
             files = ", ".join(f"[`{f.split('/', 1)[-1]}`](licenses/{f})" for f in c.files) or "—"
             used = c.used_for or USED_FOR.get(c.name, "")
-            out.append(f"| {c.name} | {c.version} | {c.license} | {where} | {used} | {files} |")
+            builds = (
+                "" if build else f" {', '.join(b.capitalize() for b in BUILDS if b in c.builds)} |"
+            )
+            out.append(
+                f"| {c.name} | {c.version} | {c.license} | {where} |{builds} {used} | {files} |"
+            )
         return "\n".join(out)
 
-    header = (
-        "| Component | Version | Licence | Bundled on | Used for | Licence text |\n"
-        "| --- | --- | --- | --- | --- | --- |"
-    )
+    if build:
+        header = (
+            "| Component | Version | Licence | Bundled on | Used for | Licence text |\n"
+            "| --- | --- | --- | --- | --- | --- |"
+        )
+    else:
+        header = (
+            "| Component | Version | Licence | Bundled on | Builds | Used for | Licence text |\n"
+            "| --- | --- | --- | --- | --- | --- | --- |"
+        )
+    if build == "browser":
+        intro = """The browser-mode ZIP (PDF Manager in your own web browser) also includes the
+components below. Each keeps its own licence; the licence texts are in the
+[`licenses/`](licenses) folder next to this file. It doesn't include the desktop window's
+toolkit (pywebview and its parts) or the installer."""
+    else:
+        intro = """The distributed app also includes the components below: the Windows
+installer (the **Desktop** build, and the Linux packages from v0.75) and the
+browser-mode ZIP (the **Browser** build; its own list is in
+`THIRD_PARTY_NOTICES-browser.md`). Each keeps its own licence; the licence texts are in
+the [`licenses/`](licenses) folder, which is installed next to the app."""
+    if build == "browser":
+        notes = """**Note on the Microsoft C and C++ runtimes:** the ZIP doesn't ship them. The
+Python runtime, PyMuPDF and pywin32 need Microsoft's Visual C++ runtime, which comes from the
+separately installed Microsoft Visual C++ Redistributable (see below). The Universal C
+Runtime is part of Windows 10 and 11."""
+        not_included = _not_included(
+            [
+                (
+                    "Your web browser (Microsoft Edge, Google Chrome, Brave, Chromium, Firefox or "
+                    "another)",
+                    "Its own licence",
+                    "PDF Manager opens in it; never shipped.",
+                ),
+                *OPTIONAL_PROGRAMS,
+                (VC_REDIST, "Microsoft software licence", "Required on Windows; see note."),
+                SEGOE_UI,
+            ],
+            "Microsoft; the ZIP has no installer to check for it.",
+        )
+    else:
+        notes = f"""**Note on the Microsoft WebView2 SDK files (Desktop build only):** pywebview
+ships these Microsoft files byte-for-byte as they are in Microsoft's `Microsoft.Web.WebView2` NuGet
+package {WEBVIEW2_SDK_VERSION}, which licenses them under the BSD-3-Clause-style terms in
+`LICENSE.txt` (with third-party notices in `NOTICE.txt`). We found no published source
+code for them. Whether the AGPL-3.0 requires it is an open question; see
+[LICENSING.md](LICENSING.md).
+
+**Note on the Microsoft C and C++ runtimes:** the Windows app doesn't ship them. The
+Python runtime, PyMuPDF and pywin32 need Microsoft's Visual C++ runtime, which comes from
+the separately installed Microsoft Visual C++ Redistributable (see below); the installer
+checks for it. The Universal C Runtime is part of Windows 10 and 11."""
+        not_included = _not_included(
+            [
+                *OPTIONAL_PROGRAMS,
+                (
+                    "Microsoft Edge WebView2 Runtime",
+                    "Microsoft software licence",
+                    "Part of Windows 11; not shipped.",
+                ),
+                (VC_REDIST, "Microsoft software licence", "Required; see note."),
+                SEGOE_UI,
+                (
+                    "The browser that browser mode opens in",
+                    "Its own licence",
+                    "Browser build; never shipped.",
+                ),
+            ],
+            "Microsoft (the installer offers the download).",
+        )
     text = f"""# Third-party notices
 
 PDF Manager's own code is released under the [MIT License](LICENSE), © 2026 Mohannad Ali.
 
-The distributed app (the Windows installer, and the Linux packages from v0.75) also
-includes the components below. Each keeps its own licence; the licence texts are in the
-[`licenses/`](licenses) folder, which is installed next to the app.
+{intro}
 
 **PyMuPDF and MuPDF are licensed under the GNU Affero General Public License v3.0
 (AGPL-3.0)**, or a commercial licence from Artifex. Because the distributed app includes
@@ -737,7 +914,7 @@ This file is generated by `scripts/collect_licenses.py` from the packages actual
 bundled, and `scripts/check_licenses.py` fails CI and the Windows build when it is out of
 date. It is not legal advice.
 
-## Python packages (the app's engine and window)
+## Python packages (the app's engine{" and window" if build is None else ""})
 
 {header}
 {rows(groups["python"])}
@@ -760,45 +937,30 @@ files come from the MuPDF {groups["mupdf"][0].version} source release.
 {header}
 {rows(groups["other"])}
 
-**Note on the Microsoft WebView2 SDK files:** pywebview ships these Microsoft files
-byte-for-byte as they are in Microsoft's `Microsoft.Web.WebView2` NuGet package
-{WEBVIEW2_SDK_VERSION}, which licenses them under the BSD-3-Clause-style terms in
-`LICENSE.txt` (with third-party notices in `NOTICE.txt`). We found no published source
-code for them. Whether the AGPL-3.0 requires it is an open question; see
-[LICENSING.md](LICENSING.md).
+{notes}
 
-**Note on the Microsoft C and C++ runtimes:** the Windows app doesn't ship them. The
-Python runtime, PyMuPDF and pywin32 need Microsoft's Visual C++ runtime, which comes from
-the separately installed Microsoft Visual C++ Redistributable (see below); the installer
-checks for it. The Universal C Runtime is part of Windows 10 and 11.
-
-## Not included (installed separately, by the user or the installer wizard)
+## Not included (installed separately)
 
 | Program | Licence | Notes |
 | --- | --- | --- |
-| Tesseract OCR program | Apache-2.0 | Optional; installed with winget or a package manager. |
-| LibreOffice | MPL-2.0 | Optional; installed separately. |
-| Microsoft PowerPoint | Proprietary | Optional; used only if already installed. |
-| Microsoft Edge WebView2 Runtime | Microsoft software licence | Part of Windows 11; not shipped. |
-| Microsoft Visual C++ Redistributable (x64) | Microsoft software licence | Required; see note. |
-| Segoe UI font | Proprietary | Used only if Windows provides it; never bundled. |
-
-The Microsoft Visual C++ Redistributable (x64, version 14.44 or newer) is installed from
-Microsoft (the installer offers the download); it is never shipped with the app.
+{not_included}
 
 The app runs the separately installed Tesseract program for OCR. MuPDF also compiles a
 copy of the Tesseract library into PyMuPDF (listed above), which PDF Manager doesn't use.
 """
-    NOTICES.write_text(text, encoding="utf-8")
+    (BROWSER_NOTICES if build == "browser" else NOTICES).write_text(text, encoding="utf-8")
 
 
 def main() -> int:
     if LICENSES.exists():
         shutil.rmtree(LICENSES)
     packages = runtime_python_packages()
+    browser_packages = runtime_python_packages("--no-group", "desktop")
     python = python_components()
     for c in python:
         c.group = "python"
+        if c.name.lower() not in browser_packages:
+            c.builds = {"desktop"}  # The desktop window's toolkit.
     frontend = frontend_components()
     for c in frontend:
         c.group = "frontend"
@@ -808,9 +970,14 @@ def main() -> int:
         raise SystemExit("Run `uv sync` first: the installed PyMuPDF isn't the locked one.")
     mupdf, mupdf_source = mupdf_components(pymupdf.mupdf_version)
     webview2, webview2_hashes = webview2_component(packages["pywebview"][0])
+    webview2.builds = {"desktop"}
     other = python_runtime_components() + other_components() + [webview2]
+    for c in other:
+        if c.name.startswith("Inno Setup"):
+            c.builds = {"desktop"}  # The browser-mode ZIP has no installer.
     groups = {"python": python, "mupdf": mupdf, "frontend": frontend, "other": other}
     write_notices(groups)
+    write_notices(groups, "browser")
     write_manifest(
         python + mupdf + frontend + other,
         {
@@ -830,6 +997,7 @@ def main() -> int:
                     "sha256": "6020bd10aff3bf4821be16f088ebb1591beb7b811dcd8fab1da8f7c22a7b27e7",
                 },
                 "pyinstaller": _pypi_sdist("pyinstaller", PYINSTALLER_VERSION),
+                "python_runtime_externals": runtime_external_sources(),
             },
         },
     )

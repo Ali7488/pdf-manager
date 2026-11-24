@@ -223,7 +223,7 @@ def command_tools(args: argparse.Namespace) -> int:
     action = ACTIONS[args.action]
     settings = ActionSettings(use_ocr=args.ocr, tesseract_path=args.tesseract)
     check = check_tools(action, settings, ActionData([Path(f) for f in args.files]))
-    for name in ("ocr", "powerpoint", "libreoffice"):
+    for name in ("ocr", "libreoffice"):
         status = getattr(check, name)
         need = "needed" if status.required else "not needed"
         found = f"found: {status.path}" if status.present else "not found"
@@ -293,7 +293,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("tools", help="Check which programs an action needs and whether present.")
     p.add_argument("action", choices=list(ACTIONS))
-    p.add_argument("files", nargs="*", help="Input files (PowerPoint files need a renderer).")
+    p.add_argument("files", nargs="*", help="Input files (PowerPoint files need LibreOffice).")
     p.add_argument("--ocr", action="store_true", help="Check for OCR too.")
     p.add_argument("--tesseract", help="Path to the Tesseract executable.")
     p.set_defaults(handler=command_tools)

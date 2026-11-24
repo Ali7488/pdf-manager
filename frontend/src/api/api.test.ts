@@ -81,15 +81,24 @@ describe("mock API", () => {
   });
 
   it("applies the tool-check rules", async () => {
-    const api = createMockApi({ tickMs: 1, tools: { ocr: false, powerpoint: true, libreoffice: false } });
+    const api = createMockApi({ tickMs: 1, tools: { ocr: false, libreoffice: true } });
     const files = await api.pickFiles("documents");
     const slides = files.filter((file) => file.kind === "pptx").map((file) => file.path);
 
     const noOcr = await api.checkTools(Action.Flatten, defaultActionSettings(), { files: slides });
     expect(noOcr.ok).toBe(true);
     expect(noOcr.ocr.required).toBe(false);
-    expect(noOcr.powerpoint).toMatchObject({ required: true, present: true });
-    expect(noOcr.libreoffice).toMatchObject({ required: false, present: false });
+    expect(noOcr.libreoffice).toMatchObject({ required: true, present: true });
+
+    const noLibreOffice = createMockApi({ tickMs: 1, tools: { libreoffice: false } });
+    const blocked = await noLibreOffice.checkTools(Action.Flatten, defaultActionSettings(), { files: slides });
+    expect(blocked.ok).toBe(false);
+    expect(blocked.issues.map((issue) => issue.code)).toEqual(["SLIDE_RENDERER_MISSING"]);
+    const pdfOnly = await noLibreOffice.checkTools(Action.Flatten, defaultActionSettings(), {
+      files: files.filter((file) => file.kind === "pdf").map((file) => file.path),
+    });
+    expect(pdfOnly.ok).toBe(true);
+    expect(pdfOnly.libreoffice.required).toBe(false);
 
     const withOcr = await api.checkTools(
       Action.Flatten,
@@ -108,7 +117,7 @@ describe("mock API", () => {
     expect(compress.ocr.required).toBe(false);
   });
 
-  it("runs a job with progress, warnings for PowerPoint files and outputs", async () => {
+  it("runs a job with progress and outputs, and no warnings for PowerPoint files", async () => {
     const api = createMockApi({ tickMs: 1 });
     const files = await api.pickFiles("documents");
     const progress: JobProgress[] = [];
@@ -122,7 +131,7 @@ describe("mock API", () => {
     expect(result.jobId).toBe(started.jobId);
     expect(result.status).toBe("succeeded");
     expect(result.outputs).toHaveLength(3);
-    expect(result.warnings.map((warning) => warning.code)).toEqual(["POWERPOINT_FALLBACK"]);
+    expect(result.warnings).toEqual([]);
     expect(progress.length).toBeGreaterThan(3);
     expect(progress.every((p) => p.fraction > 0 && p.fraction < 1)).toBe(true);
   });

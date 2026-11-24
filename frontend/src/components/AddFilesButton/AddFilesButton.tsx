@@ -26,6 +26,8 @@ export function AddFilesButton({ kind, label, variant = "secondary", size = "md"
     try {
       const files = await api.pickFiles(kind);
       if (files.length > 0) dispatch({ type: "filesAdded", files });
+    } catch {
+      // Browser mode reports a lost connection itself; nothing was added.
     } finally {
       setBusy(false);
     }

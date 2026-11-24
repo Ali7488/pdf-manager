@@ -20,7 +20,6 @@ const PATHS = {
   alert: "M12 4 2.5 20h19zM12 10v4M12 17h.01",
   upload: "M12 16V4m0 0-4 4m4-4 4 4M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4",
   file: "M6 3h8l4 4v14H6zM14 3v4h4",
-  minus: "M5 12h14",
 } as const;
 
 /** Icon names available to {@link Icon}. */

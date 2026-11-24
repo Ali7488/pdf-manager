@@ -7,8 +7,13 @@
 # (scripts/check_licenses.py) runs on the bundle and on the installed app. The
 # Visual C++ Redistributable check is exercised with a simulated missing runtime
 # (the runner itself has the redistributable).
-# A second job gathers the third-party source code for the release (AGPL-3.0
-# section 6; see LICENSING.md). Neither job publishes anything.
+# A second job builds the portable browser-mode ZIP and tests it end to end with
+# the runner's Edge. A third gathers the corresponding source code for both
+# (AGPL-3.0 section 6; see LICENSING.md): the app's own source as an archive of the
+# exact commit, plus the third-party sources. Every build records that commit
+# (PDF_MANAGER_SOURCE_REVISION; Settings > About links to it, decision P37), and the
+# last job checks that the shipped ZIP and the source bundle name the same commit.
+# No job publishes anything.
 name: Build Windows installer
 
 on:
@@ -24,6 +29,8 @@ jobs:
     env:
       UV_PYTHON: '3.13.17'
       UV_PYTHON_PREFERENCE: only-system
+      # The build stops unless the checkout is exactly this commit (api/build_info.py).
+      PDF_MANAGER_SOURCE_REVISION: ${{ github.sha }}
     steps:
       - name: Check out the code
         uses: actions/checkout@v5
@@ -78,6 +85,11 @@ jobs:
           # Every native file has a notice, and the installed licence files match the repo.
           & uv run --frozen --no-sync python scripts/check_licenses.py bundle $appDir --installed
           if ($LASTEXITCODE -ne 0) { throw 'Licence check of the installed app failed' }
+          # The app links to the source of exactly this commit (decision P37).
+          $info = Get-Content (Join-Path $appDir '_internal\build-info.json') -Raw | ConvertFrom-Json
+          if ($info.revision -ne '${{ github.sha }}' -or $info.modified) {
+            throw "The installed app records source $($info.revision) (modified: $($info.modified)), not ${{ github.sha }}"
+          }
           $env:PDF_MANAGER_SMOKE_TEST = '1'
           $run = Start-Process $app -Wait -PassThru
           $log = Join-Path $appDir 'logs\pdf-manager.log'
@@ -152,11 +164,97 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  browser-zip:
+    # The portable browser-mode ZIP (docs/BROWSER_MODE.md): built, unzipped as a user
+    # would, licence-checked, and tested end to end with the runner's Edge.
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      UV_PYTHON: '3.13.17'
+      UV_PYTHON_PREFERENCE: only-system
+      # The build stops unless the checkout is exactly this commit (api/build_info.py).
+      PDF_MANAGER_SOURCE_REVISION: ${{ github.sha }}
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13.17'
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: Build the browser-mode ZIP
+        shell: pwsh
+        run: |
+          uv sync --frozen
+          ./packaging/build-browser.ps1
+
+      - name: Unzip it, check its licences and run the browser tests against it
+        shell: pwsh
+        timeout-minutes: 15
+        run: |
+          $zip = Get-ChildItem dist/PDF-Manager-*-browser-windows-x64.zip | Select-Object -First 1
+          $dest = Join-Path $env:RUNNER_TEMP 'unzipped'
+          Expand-Archive -LiteralPath $zip.FullName -DestinationPath $dest -Force
+          $appDir = Join-Path $dest 'PDF Manager (browser)'
+          # The unzipped folder: no desktop toolkit, exactly its licence texts.
+          & uv run --frozen --no-sync python scripts/check_licenses.py bundle $appDir --installed --build browser
+          if ($LASTEXITCODE -ne 0) { throw 'Licence check of the unzipped app failed' }
+          # Every file of the desktop toolkit must be absent.
+          $toolkit = Get-ChildItem -Path $appDir -Recurse -Include '*WebView2*', 'Python.Runtime.dll', 'ClrLoader.dll', 'Qt6*.dll' -ErrorAction SilentlyContinue
+          if ($toolkit) { $toolkit | Select-Object -First 5 FullName; throw 'Desktop toolkit files in the browser ZIP' }
+          # The ZIP links to the source of exactly this commit (decision P37).
+          $info = Get-Content (Join-Path $appDir '_internal\build-info.json') -Raw | ConvertFrom-Json
+          if ($info.revision -ne '${{ github.sha }}' -or $info.modified) {
+            throw "The ZIP records source $($info.revision) (modified: $($info.modified)), not ${{ github.sha }}"
+          }
+          Write-Host "The ZIP's source revision: $($info.revision)"
+          # The browser tests also check that Settings > About links to this commit.
+          $env:PDF_MANAGER_E2E_REVISION = '${{ github.sha }}'
+          uv sync --frozen --group e2e
+          $env:PDF_MANAGER_E2E_APP = Join-Path $appDir 'PDF Manager.exe'
+          $env:PDF_MANAGER_E2E_BROWSER = "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe"
+          if (-not (Test-Path $env:PDF_MANAGER_E2E_BROWSER)) { $env:PDF_MANAGER_E2E_BROWSER = "$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe" }
+          & uv run --frozen --no-sync pytest tests/e2e -q -p no:cacheprovider -rs
+          if ($LASTEXITCODE -ne 0) { throw 'Browser tests against the packaged app failed' }
+          Get-FileHash -Algorithm SHA256 $zip.FullName | Format-List
+
+      - name: Keep the app's logs if something failed
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-zip-logs
+          path: ${{ runner.temp }}/unzipped/PDF Manager (browser)/logs/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload the browser-mode ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: PDF-Manager-browser-ZIP
+          path: dist/PDF-Manager-*-browser-windows-x64.zip
+          if-no-files-found: error
+          retention-days: 14
+
   sources:
-    # The third-party source code for the release (attach it to the release by hand,
-    # with the installer, after the owner approves publishing).
+    # The corresponding source code for the release (attach it to the release by hand,
+    # with the installer, after the owner approves publishing): the app's own source at
+    # this commit, and the third-party sources.
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      PDF_MANAGER_SOURCE_REVISION: ${{ github.sha }}
     steps:
       - name: Check out the code
         uses: actions/checkout@v5
@@ -168,7 +266,13 @@ jobs:
         run: uv run --no-project python scripts/check_licenses.py repo
 
       - name: Download the third-party sources
-        run: uv run --no-project python scripts/collect_sources.py build/sources --platform windows
+        run: |
+          uv run --no-project python scripts/collect_sources.py build/sources --platform windows
+          uv run --no-project python scripts/collect_sources.py build/sources-browser --platform windows --build browser
+          for bundle in build/sources build/sources-browser; do
+            test "$(cat "$bundle/SOURCE_REVISION")" = "${{ github.sha }}"
+            test -f "$bundle/app/pdf-manager-${{ github.sha }}-source.tar.gz"
+          done
 
       - name: Upload the source bundle
         uses: actions/upload-artifact@v4
@@ -177,3 +281,38 @@ jobs:
           path: build/sources/
           if-no-files-found: error
           retention-days: 14
+
+      - name: Upload the browser-mode ZIP's source bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: PDF-Manager-browser-third-party-sources
+          path: build/sources-browser/
+          if-no-files-found: error
+          retention-days: 14
+
+  same-commit:
+    # The ZIP people download and the source bundle attached next to it must be the
+    # same commit, and the one this run built (decision P37).
+    needs: [browser-zip, sources]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download the browser-mode ZIP and its source bundle
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: PDF-Manager-browser-*
+
+      - name: Compare the ZIP's recorded commit with the source bundle's
+        run: |
+          set -euo pipefail
+          unzip -q artifacts/PDF-Manager-browser-ZIP/PDF-Manager-*-browser-windows-x64.zip -d zip
+          zip_revision=$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); assert not d["modified"]; print(d["revision"])' "zip/PDF Manager (browser)/_internal/build-info.json")
+          source_revision=$(cat artifacts/PDF-Manager-browser-third-party-sources/SOURCE_REVISION)
+          echo "ZIP: $zip_revision; source bundle: $source_revision; run: ${{ github.sha }}"
+          test "$zip_revision" = "${{ github.sha }}"
+          test "$source_revision" = "${{ github.sha }}"
+          # List to a file first: "tar | grep -q" fails under pipefail when grep stops early.
+          tar -tzf "artifacts/PDF-Manager-browser-third-party-sources/app/pdf-manager-${{ github.sha }}-source.tar.gz" > app-source-files.txt
+          grep -qx "pdf-manager-${{ github.sha }}/api/build_info.py" app-source-files.txt
+          echo "The app's source archive holds $(wc -l < app-source-files.txt) entries at ${{ github.sha }}"

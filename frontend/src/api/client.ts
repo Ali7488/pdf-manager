@@ -1,12 +1,15 @@
 /**
  * The API the app uses, picked once at startup:
  *
+ * - Browser mode (the app served this page, with its bootstrap tag): the local
+ *   HTTP client (`http.ts`).
  * - Inside the desktop app (pywebview present), the real bridge to Python.
- * - In development (`npm run dev`) and tests without pywebview, the in-memory
+ * - In development (`npm run dev`) and tests without either, the in-memory
  *   mock, so the UI works in a plain browser.
  *
- * A production build always uses the bridge; the bridge waits for
- * `pywebviewready` if pywebview injects itself after the page loads.
+ * A production build never uses the mock: without browser mode's tag it uses
+ * the bridge, which waits for `pywebviewready` if pywebview injects itself
+ * after the page loads.
  * Set `VITE_API=bridge` to force the bridge in development (for example when
  * a pywebview window points at the Vite dev server).
  * Set `VITE_MOCK_SETTINGS_SAVE_FAILS=1` to make the mock's settings saves fail,
@@ -15,6 +18,7 @@
  * system; on Linux, Install OCR then shows the command to copy and run.
  */
 import { createBridgeApi, isPywebviewPresent, onEvent } from "./bridge";
+import { createHttpApi, readBrowserBootstrap } from "./http";
 import { createMockApi } from "./mock";
 import type { AppInfo, PdfManagerApi } from "./types";
 
@@ -27,15 +31,19 @@ function mockPlatform(value: string | undefined): AppInfo["platform"] | undefine
   return value === "windows" || value === "linux" || value === "mac" ? value : undefined;
 }
 
+const browserMode = readBrowserBootstrap();
+
 /** True when the in-memory mock is in use. */
-export const usingMock: boolean = mockAllowed && !isPywebviewPresent();
+export const usingMock: boolean = mockAllowed && browserMode === null && !isPywebviewPresent();
 
 /** The API client for the whole app. */
-export const api: PdfManagerApi = usingMock
-  ? createMockApi({
-      settingsSaveFails: import.meta.env.VITE_MOCK_SETTINGS_SAVE_FAILS === "1",
-      platform: mockPlatform(import.meta.env.VITE_MOCK_PLATFORM),
-    })
-  : createBridgeApi();
+export const api: PdfManagerApi = browserMode
+  ? createHttpApi(browserMode)
+  : usingMock
+    ? createMockApi({
+        settingsSaveFails: import.meta.env.VITE_MOCK_SETTINGS_SAVE_FAILS === "1",
+        platform: mockPlatform(import.meta.env.VITE_MOCK_PLATFORM),
+      })
+    : createBridgeApi();
 
 export { onEvent };

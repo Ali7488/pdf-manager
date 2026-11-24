@@ -15,3 +15,13 @@ export const APP_LICENSE = "GNU AGPL-3.0";
 
 /** Where the complete corresponding source code is available. */
 export const SOURCE_URL = "https://github.com/Ali7488/pdf-manager";
+
+/**
+ * The source code of exactly this build: the Git commit it was made from (AGPL-3.0
+ * sections 6 and 13; decision P37). A version tag isn't used: preview builds have none.
+ *
+ * @param revision - The 40-digit commit `getAppInfo` reports as `sourceRevision`.
+ */
+export function sourceUrlFor(revision: string): string {
+  return `${SOURCE_URL}/tree/${revision}`;
+}

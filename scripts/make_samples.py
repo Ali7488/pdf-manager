@@ -6,9 +6,9 @@ All content is neutral sample text created here; no real documents are used.
     uv run scripts/make_samples.py some/dir   # or anywhere else
 
 Each file's purpose is listed in ``SAMPLES`` and written to ``samples/README.txt``.
-The legacy ``.ppt`` is only made when LibreOffice is installed. On Windows, a
-"downloaded" copy of the slides is also made (it carries the Mark-of-the-Web, to
-test the untrusted-file rule).
+The legacy ``.ppt`` is only made when LibreOffice is installed. Presentations are
+converted by LibreOffice whatever their origin (decision C17), so no "downloaded"
+copy is needed any more; ``scripts/check_slide_fidelity.py`` covers fidelity.
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ SAMPLES: dict[str, str] = {
     "02-scanned-pages.pdf": "2 pages that are only images of text (no text layer). OCR.",
     "03-rotated-scan.pdf": "An image-only page rotated 90 degrees. OCR alignment.",
     "04-mixed-text-and-scan.pdf": "Page 1 real text, page 2 image only. OCR only adds to page 2.",
-    "05-slides.pptx": "3 slides with presenter notes (notes must NOT appear). PowerPoint.",
+    "05-slides.pptx": "3 slides with presenter notes (notes must NOT appear). LibreOffice.",
     "06-slides-legacy.ppt": "Old PowerPoint format (only made if LibreOffice is installed).",
     "07-photo-portrait.jpg": "Photo stored sideways with an EXIF rotation tag. Images to PDF.",
     "08-diagram.png": "A PNG image with text. Images to PDF (+ OCR).",
@@ -36,7 +36,6 @@ SAMPLES: dict[str, str] = {
     "11-damaged.pdf": "A truncated, broken PDF. Must give a clear error.",
     "12-ملف-unicode-name.pdf": "Non-Latin file name. Merge with --contents (title rendering).",
     "13-long-document.pdf": "40 numbered pages. Split by ranges / every N / per page.",
-    "14-downloaded-slides.pptx": "Windows only: carries the Mark-of-the-Web (ZoneId=3).",
 }
 
 PAGE = (595, 842)  # A4 portrait, in points.
@@ -209,15 +208,6 @@ def long_document(path: Path) -> None:
         doc.save(str(path))
 
 
-def mark_as_downloaded(path: Path) -> bool:
-    """Windows only: add the Mark-of-the-Web (Internet zone) to ``path``."""
-    if sys.platform != "win32":
-        return False
-    with open(f"{path}:Zone.Identifier", "w", encoding="utf-8") as stream:
-        stream.write("[ZoneTransfer]\nZoneId=3\nHostUrl=https://example.org/slides.pptx\n")
-    return True
-
-
 def make_all(out: Path) -> list[Path]:
     """Create every sample in ``out``; returns the files made."""
     out.mkdir(parents=True, exist_ok=True)
@@ -238,10 +228,6 @@ def make_all(out: Path) -> list[Path]:
     damaged(f["11-damaged.pdf"], f["01-text-report.pdf"])
     unicode_named(f["12-ملف-unicode-name.pdf"])
     long_document(f["13-long-document.pdf"])
-    downloaded = f["14-downloaded-slides.pptx"]
-    downloaded.write_bytes(f["05-slides.pptx"].read_bytes())
-    if not mark_as_downloaded(downloaded):
-        downloaded.unlink()
     made = [p for p in f.values() if p.exists()]
     readme = ["PDF Manager test documents (synthetic). What each file is for:", ""]
     readme += [f"{p.name}: {SAMPLES[p.name]}" for p in made]

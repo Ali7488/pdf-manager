@@ -9,6 +9,8 @@
 # - linux-startup:  starts the real app (Qt WebEngine via PySide6) under Xvfb in
 #                   smoke-test mode: the React UI must render and window.pywebview.api
 #                   must answer, then the window closes (decision P17).
+# - browser-mode-linux: the production interface in headless Chromium against
+#                   main.py --browser (tests/e2e), with Tesseract and LibreOffice.
 #
 # Windows packaging (PyInstaller + Inno Setup) stays a separate, manual workflow:
 # build-windows.yml.
@@ -139,6 +141,48 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: linux-startup-logs
+          path: logs/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  browser-mode-linux:
+    name: Browser mode (Linux, Chromium)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Tesseract (English) and LibreOffice Impress
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            tesseract-ocr tesseract-ocr-eng libreoffice-impress
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      # Playwright (test-only, never bundled) and a headless Chromium for it.
+      - name: Install Python dependencies with the browser-test group
+        run: |
+          uv sync --frozen --group e2e
+          uv run --frozen --no-sync playwright install --with-deps chromium
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Build the interface
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+      # The production interface in a real browser against main.py --browser: all six
+      # actions, uploads, downloads, reload, restart, lost connection, Quit.
+      - name: Browser-to-Python integration tests
+        run: uv run --frozen --no-sync pytest tests/e2e -q -p no:cacheprovider -rs
+      - name: Keep the app's log if the tests failed
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-mode-linux-logs
           path: logs/
           if-no-files-found: ignore
           retention-days: 7

@@ -11,9 +11,10 @@ import { PageHeader, Section } from "../../components/Page/Page";
 import { useApp } from "../../state/AppContext";
 import { NumberSetting } from "./NumberSetting";
 import { OcrSection } from "./OcrSection";
+import { QuitSection } from "./QuitSection";
 import styles from "./SettingsPage.module.css";
 import { ThemePicker } from "./ThemePicker";
-import { APP_LICENSE, COPYRIGHT, SOURCE_URL } from "../../lib/about";
+import { APP_LICENSE, COPYRIGHT, SOURCE_URL, sourceUrlFor } from "../../lib/about";
 
 /** The Settings page. */
 export function SettingsPage() {
@@ -65,14 +66,18 @@ export function SettingsPage() {
               <p className={styles.path} title={settings.defaultSaveFolder}>
                 {settings.defaultSaveFolder}
               </p>
+            ) : api.saveMode === "download" ? (
+              <p className={styles.help}>Results go to your browser's downloads.</p>
             ) : (
               <p className={styles.help}>Not set. You'll choose a folder each time you save.</p>
             )}
           </div>
           <div className={styles.buttons}>
-            <Button icon="folder" onClick={chooseFolder}>
-              Choose folder
-            </Button>
+            {api.saveMode === "folder" && (
+              <Button icon="folder" onClick={chooseFolder}>
+                Choose folder
+              </Button>
+            )}
             {settings.defaultSaveFolder && (
               <Button variant="ghost" onClick={() => void updateSettings({ defaultSaveFolder: null })}>
                 Clear
@@ -110,6 +115,8 @@ export function SettingsPage() {
         </div>
       </Section>
 
+      {api.mode === "browser" && <QuitSection />}
+
       <Section title="About">
         <p>
           PDF Manager {appInfo ? `version ${appInfo.version}` : ""} · {COPYRIGHT}
@@ -120,11 +127,18 @@ export function SettingsPage() {
         </p>
         <p>
           It includes third-party components, each under its own licence: among them PyMuPDF and MuPDF
-          ({APP_LICENSE}) and, on Windows, Microsoft's WebView2 SDK files. The author's own
+          ({APP_LICENSE}){api.mode === "browser" ? "" : ", and, on Windows, Microsoft's WebView2 SDK files"}. The author's own
           source code is also available under the MIT License. The full licence texts, the third-party notices
           and the build instructions come with the app; the third-party source code is attached to each release.
         </p>
-        <p>Complete source code: {SOURCE_URL}</p>
+        <p>
+          Complete source code:{" "}
+          {appInfo?.sourceRevision
+            ? `${sourceUrlFor(appInfo.sourceRevision)} (the exact source of this build${
+                appInfo.sourceModified ? ", which also has local changes not in that commit" : ""
+              })`
+            : SOURCE_URL}
+        </p>
         <div>
           <Button
             icon="folder"

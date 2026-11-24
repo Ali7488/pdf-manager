@@ -28,7 +28,9 @@ For each release, the complete corresponding source is:
 - **The third-party source bundle attached to the release** (`PDF-Manager-third-party-sources`), made by `scripts/collect_sources.py` from those exact versions, with `SOURCES.md` and `SHA256SUMS`:
   - the source distribution of every bundled Python package (pywin32's GitHub source archive, as it publishes none);
   - **MuPDF's source release**, because PyMuPDF's own source distribution doesn't contain MuPDF (it downloads it at build time);
-  - the CPython source of the bundled Python runtime, and the PyInstaller source (its bootloader is in the app's `.exe`);
+  - the CPython source of the bundled Python runtime, plus the libraries the python.org Windows build compiles in or ships as DLLs from outside that tarball: OpenSSL 3.5.9, libffi 3.4.4, bzip2 1.0.8, xz 5.2.5, mpdecimal 4.0.0 and zlib 1.3.1, from the `python/cpython-source-deps` tags CPython's `PCbuild/get_externals.bat` names;
+  - the PyInstaller source (its bootloader is in the app's `.exe`);
+  - the app's own source as a `git archive` of the exact commit the build was made from (`app/`, with `SOURCE_REVISION`);
   - the npm package of every interface package inlined into the app.
 
 The same files stay available from their original publishers (PyPI, npm, mupdf.com, python.org), which the bundle lists. The only bundled code whose source isn't included is Microsoft's (see the open questions below).
@@ -42,6 +44,17 @@ See [`packaging/README.md`](packaging/README.md). In short, on Windows with uv, 
 ```
 
 This builds the interface, installs the locked Python dependencies, bundles the app with PyInstaller and compiles the installer.
+
+## The browser-mode ZIP
+
+The browser-mode ZIP ([docs/BROWSER_MODE.md](docs/BROWSER_MODE.md)) is the same app without the desktop window's toolkit (pywebview, pythonnet, Qt, the WebView2 SDK) and without the installer. It is also distributed under the AGPL-3.0.
+
+- **Notices:** [`THIRD_PARTY_NOTICES-browser.md`](THIRD_PARTY_NOTICES-browser.md), shipped as `THIRD_PARTY_NOTICES.md`, with exactly the licence texts of what the ZIP contains. Its build fails if a desktop-only file is bundled, or a licence text is missing or extra.
+- **Sources:** its third-party sources are gathered with `scripts/collect_sources.py --platform windows --build browser`.
+- **The browser:** it runs in the user's own browser, which is never shipped.
+- **AGPL-3.0 section 13:** the server listens on 127.0.0.1 only, so the only user is the person running the app, who already has the source. Settings → About also links to the source of exactly the running version. A version modified to serve other people over a network (for example a future Docker image) must offer those users its own corresponding source.
+
+**Development and test tools aren't distributed:** pytest, python-pptx, Playwright and the browser it drives, PyInstaller's build-time packages, and the frontend's build tools. Playwright (Apache-2.0) and its greenlet dependency (MIT AND Python-2.0) are in the separate `e2e` group, so they never enter a build. The PyInstaller bootloader that *is* bundled is listed in the notices.
 
 ## Notices shipped with the app
 

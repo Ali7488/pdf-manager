@@ -12,11 +12,11 @@ The repository currently contains a shared React + TypeScript frontend, a pywebv
 
 ## Architecture and files
 
-- `frontend/`: React, TypeScript, Vite, CSS Modules, UI state and Vitest/Testing Library tests. The production build is a self-contained HTML asset for a pywebview window.
-- `api/`: desktop window, Python↔JavaScript contract, settings, file handling, background jobs, progress and results.
+- `frontend/`: React, TypeScript, Vite, CSS Modules, UI state and Vitest/Testing Library tests. The production build is a self-contained HTML asset, shown in the pywebview window or served by browser mode.
+- `api/`: the Python↔JavaScript contract, settings, file handling, background jobs, progress and results. `workflow.py` is shared by the desktop window (`bridge.py`, pywebview) and browser mode (`web/`, a loopback HTTP API; docs/BROWSER_MODE.md).
 - `converter/`: pure document processing and platform adapters; no UI-specific behavior.
-- `main.py`: pywebview desktop entry point.
-- `packaging/`: Windows PyInstaller build and Inno Setup wizard.
+- `main.py`: entry point: the pywebview desktop window, or browser mode with `--browser`.
+- `packaging/`: Windows PyInstaller build, the Inno Setup wizard, and the browser-mode ZIP (`build-browser.ps1`).
 - `tests/`: Python unit, integration, portability and regression checks.
 - `docs/`: API contract, decisions, architecture, engineering review, portability and prompts log.
 
@@ -27,7 +27,8 @@ From the repository root:
 ```bash
 uv sync --frozen
 cd frontend && npm ci && npm run build && cd ..
-uv run main.py
+uv run main.py             # desktop window
+uv run main.py --browser   # browser mode
 ```
 
 Checks:
@@ -52,8 +53,8 @@ For the Windows installer, see `packaging/README.md` and `packaging/build.ps1`.
 - **Never modify originals.** Work in scratch space, validate outputs and save collision-safe new files.
 - **No real user documents or identifying data.** Synthetic fixtures only; local processing only unless expressly approved otherwise.
 - **No speaker notes.** Removed intentionally.
-- **Keep platform-specific code isolated.** Windows PowerPoint COM is optional, LibreOffice is the cross-platform renderer. Linux packages come later; don't compromise Windows v1.
-- **No unnecessary infrastructure.** No database, Docker runtime, web server, telemetry, accounts or new abstraction layers without a demonstrated requirement.
+- **Keep platform-specific code isolated.** LibreOffice Impress is the only presentation converter, on every platform (decision C17); PowerPoint is not automated. Linux packages come later; don't compromise Windows v1.
+- **No unnecessary infrastructure.** No database, Docker runtime, web server, telemetry, accounts or new abstraction layers without a demonstrated requirement. The one exception is browser mode's loopback-only server (`api/web/`, decision P33); keep it on `127.0.0.1` with its explicit operation list.
 - **Accessible UI.** Plain-language controls, visible focus, readable contrast, friendly actionable error messages, minimal installation friction.
 - **Coordinate subagents.** Check current working tree and integration contracts before parallel edits. Use focused commits and tests; do not silently change owner decisions.
 - **Documentation is evidence.** Record architecture, tradeoffs, known issues, verifiable commands/results and Windows validation gaps accurately. Do not claim agent-written code has undergone human review unless that happened.
@@ -63,4 +64,4 @@ For the Windows installer, see `packaging/README.md` and `packaging/build.ps1`.
 
 ## Current quality gate
 
-The repo contains a React frontend, API layer, conversion engine and Windows installer source. **Real Windows runtime and installer testing remains outstanding**, including PowerPoint automation, WebView2, optional component installation, upgrades and uninstall. Report the exact tests actually executed, on which platform, and their result.
+The repo contains a React frontend, API layer, conversion engine and Windows installer source. **Real Windows runtime and installer testing remains outstanding**, including LibreOffice presentation conversion, WebView2, browser-mode launch and native pickers, optional component installation, upgrades and uninstall. Report the exact tests actually executed, on which platform, and their result.

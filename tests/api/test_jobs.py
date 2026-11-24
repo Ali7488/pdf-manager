@@ -743,20 +743,18 @@ def test_unsaved_jobs_are_succeeded_results_not_yet_saved_or_delivered(make_mana
     assert manager.unsaved_jobs() == [first]
 
 
-def test_a_folder_save_or_a_delivered_copy_ends_unsaved(make_manager, recorder, tmp_path):
+def test_a_folder_save_ends_unsaved_but_a_download_copy_does_not(make_manager, recorder, tmp_path):
+    """Decision P39: only a written folder save or a discard ends the protection."""
     manager = make_manager(succeeding("a.pdf"))
     out = tmp_path / "out"
     out.mkdir()
-    saved = manager.start(Action.FLATTEN, ActionSettings(), DATA)
+    copy = manager.start(Action.FLATTEN, ActionSettings(), DATA)
     recorder.finish()
-    recorder.finished.clear()
-    manager.save(saved, out, False)
+    manager.save(copy, out, False, keep=True)  # A browser download's copy.
+    assert manager.unsaved_jobs() == [copy]
+    assert manager.save(copy, out, False, keep=True)  # Download again still works.
+    manager.save(copy, out, False)  # A folder save writes the files and ends it.
     assert manager.unsaved_jobs() == []
-    delivered = manager.start(Action.FLATTEN, ActionSettings(), DATA)
-    recorder.finish()
-    manager.save(delivered, out, False, keep=True)  # A browser download's copy.
-    assert manager.unsaved_jobs() == []
-    assert manager.save(delivered, out, False, keep=True)  # Download again still works.
 
 
 def test_failed_and_cancelled_jobs_are_never_unsaved(make_manager, recorder):

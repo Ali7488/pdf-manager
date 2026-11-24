@@ -246,7 +246,7 @@ def save_results(ctx: Context, body: Any, job_id: str) -> dict[str, Any]:
 
 
 def prepare_download(ctx: Context, body: Any, job_id: str) -> dict[str, Any]:
-    """Copy the results for downloading; they stay saved in the app for a retry.
+    """Copy the results for downloading. They stay unsaved in the app until Done (P39).
 
     Returns:
         ``{downloads: [{id, name, sizeBytes}], issue}``.
@@ -259,7 +259,8 @@ def prepare_download(ctx: Context, body: Any, job_id: str) -> dict[str, Any]:
         as_zip = request.get("asZip")
         if not isinstance(as_zip, bool):
             raise dto.invalid_request("asZip must be true or false")
-        written = ctx.workflow.jobs.save(job_id, ctx.session.download_folder(), as_zip, keep=True)
+        folder = ctx.session.download_folder(job_id)
+        written = ctx.workflow.jobs.save(job_id, folder, as_zip, keep=True)
         downloads = [ctx.session.add_download(p) for p in written]
         # How a reloaded page shows it: sent to downloads, with Download again (P36).
         outcome = dto.save_outcome_json(saved=[], folder=None)

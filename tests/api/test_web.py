@@ -675,18 +675,53 @@ def test_a_finished_unsaved_job_survives_the_idle_deadline(client, app, tmp_path
     assert result == ["idle"]
 
 
-def test_idle_shutdown_after_a_folder_save_or_a_download(client, app, tmp_path, monkeypatch):
+def test_idle_shutdown_after_a_folder_save(client, app, tmp_path, monkeypatch):
     out = tmp_path / "out"
     out.mkdir()
     monkeypatch.setattr(platforms, "ask_folder", lambda start: out)
     saved = finished_job(client, app, tmp_path, "a.pdf")
     client.result("POST", f"/api/jobs/{saved}/save", {"folder": None, "asZip": False})
-    downloaded = finished_job(client, app, tmp_path, "b.pdf")
-    client.result("POST", f"/api/jobs/{downloaded}/download", {"asZip": False})
-    assert app.ctx.workflow.jobs.unsaved_jobs() == []  # Owner question O5: downloads count.
+    assert (out / "Result 0.pdf").is_file()
+    assert app.ctx.workflow.jobs.unsaved_jobs() == []  # Written, so no longer only here.
     thread, result, stop = run_idle_wait(app)
     thread.join(2)
     assert result == ["idle"]
+
+
+def test_a_download_stays_unsaved_until_done(client, app, tmp_path):
+    """Decision P39 (audit B1): the app can't know the browser saved the file."""
+    job_id = finished_job(client, app, tmp_path)
+    prepared = client.result("POST", f"/api/jobs/{job_id}/download", {"asZip": False})
+    assert prepared["downloads"]  # Prepared, never fetched: the browser was interrupted.
+    assert app.ctx.workflow.jobs.unsaved_jobs() == [job_id] and app.busy()
+    thread, result, stop = run_idle_wait(app)
+    time.sleep(0.3)
+    assert thread.is_alive(), "idle shutdown must wait for Done"
+    held = client.result("POST", "/api/quit")
+    assert held == {"quit": False, "running": False, "unsavedResults": 1}
+    # Done (discard) ends the protection and deletes every download copy of the job.
+    copies = app.ctx.session.staging / "downloads" / job_id
+    assert copies.is_dir()
+    client.result("POST", f"/api/jobs/{job_id}/discard")
+    assert not copies.exists() and app.ctx.session._downloads == {}
+    thread.join(2)
+    assert result == ["idle"]
+
+
+def test_fetched_and_abandoned_copies_are_deleted_on_done(client, app, tmp_path):
+    job_id = finished_job(client, app, tmp_path)
+    first = client.result("POST", f"/api/jobs/{job_id}/download", {"asZip": False})
+    response, _ = client.raw(
+        "GET",
+        f"/api/downloads/{first['downloads'][0]['id']}",
+        headers={"Host": app.host, "X-PDF-Manager": "1", "Cookie": client.cookie},
+    )
+    assert response.status == 200
+    client.result("POST", f"/api/jobs/{job_id}/download", {"asZip": True})  # Again, unfetched.
+    folder = app.ctx.session.staging / "downloads" / job_id
+    assert [p for p in folder.rglob("*") if p.is_file()]
+    client.result("POST", f"/api/jobs/{job_id}/discard")
+    assert not folder.exists()
 
 
 def test_stop_ends_the_wait_at_once(client, app, tmp_path):

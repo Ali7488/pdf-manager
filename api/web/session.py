@@ -234,9 +234,14 @@ class Session:
 
     # ----- Downloads -----
 
-    def download_folder(self) -> Path:
-        """A new private folder to copy results into for downloading."""
-        folder = self.staging / "downloads" / secrets.token_hex(8)
+    def download_folder(self, job_id: str) -> Path:
+        """A new private folder to copy one job's results into for downloading.
+
+        It lives under ``downloads/<job id>/``, so :meth:`forget_job` can delete
+        every copy of that job, fetched or abandoned, when its result is
+        discarded or acknowledged (decision P40).
+        """
+        folder = self.staging / "downloads" / job_id / secrets.token_hex(8)
         folder.mkdir(parents=True)
         return folder
 
@@ -333,9 +338,21 @@ class Session:
             return {**self._status(job_id, job), "action": job.get("action")}
 
     def forget_job(self, job_id: str) -> None:
-        """Drop a job's status once its results are discarded."""
+        """Drop a job's status and delete its download copies (Done or Discard).
+
+        Copies the browser never fetched would otherwise stay until the app
+        quits. A copy being sent right now is claimed already; if Windows
+        keeps it open, it is removed with the staging folder at quit.
+        """
+        folder = self.staging / "downloads" / job_id
         with self._lock:
             self._jobs.pop(job_id, None)
+            self._downloads = {
+                key: value
+                for key, value in self._downloads.items()
+                if not value[0].is_relative_to(folder)
+            }
+        shutil.rmtree(folder, ignore_errors=True)
 
     def ocr_install_started(self) -> None:
         """An install was requested: clear the previous one's status."""

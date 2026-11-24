@@ -96,6 +96,25 @@ Evidence at `d6fe8fd`:
 
 Still open from this round: the fidelity follow-ups in docs/PRESENTATION_FIDELITY.md; owner questions O4 and O5; the interactive Windows 11 checks in docs/BROWSER_MODE.md.
 
+## Prerelease audit fixes (2026-11-23)
+
+The local prerelease audit at `fbf3c7d` (prompts log item 43) put both Windows artifacts on HOLD. Its findings, and the owner's artifact review, were fixed as follows (item 44; agent-written, not human-reviewed):
+
+| Finding | Fix | Evidence |
+| --- | --- | --- |
+| **B1 (P1):** preparing a browser download counted the result as delivered, so an interrupted download could be deleted by idle shutdown or an unconfirmed Quit. | Downloads stay unsaved until Done or Discard (P39); a folder save clears the protection only after writing every file. | `test_a_download_stays_unsaved_until_done`, job manager tests. |
+| **B2 (P2):** results evicted from the session's 20-entry list were unreachable, undiscardable and blocked idle shutdown forever. | One recoverable result at a time, enforced by `JobManager.start` (`RESULT_PENDING`). Recovery, idle shutdown and Quit use the job manager's pending result; Done always reaches the job manager and deletes download copies (P40). | API tests, the frontend's Show the results, e2e with two windows and a reload. |
+| **B3 (P2):** simultaneous launches started two servers on one profile. | Per-profile instance lock (P41). | Real-process test: two simultaneous launches reach one server; a killed owner recovers. |
+| **S1 (P2, pre-existing):** closing the desktop window deleted unsaved results without asking. | `closing` handler asks; Cancel keeps the window and the results (P41). | Bridge tests with a fake window; the real dialog is on the VM checklist. |
+| **L4:** the ZIP's `READ ME FIRST.txt` was out of date. | Updated (idle rule, Quit, LibreOffice). | — |
+| **Setuptools and vendored modules** in the desktop exe, not in the notices; **packaging** (Linux-only in the notices) in the Windows build. | Excluded in `pdf-manager.spec`. `check_licenses.py bundle --python-distributions` fails on any bundled pure-Python distribution not listed for the build and platform. | `tests/test_licensing.py`; CI's Windows build. |
+| **OpenSSL and libffi** (and bzip2, xz, mpdecimal, zlib) in the Python runtime, without their source. | Pinned `cpython-source-deps` archives in both source bundles. | Manifest and generator tests; the sources job. |
+
+Left open on purpose:
+- **O1:** WebView2 SDK files; the statically linked MSVC runtime in the PyInstaller bootloader.
+- **Follow-ups:** the CLI save race, the frontend mock and the duplicate CI triggers.
+- **An unidentified intermittent Python test failure:** 1 in 8 full local runs, under load. It hasn't come back in 12 stressed runs of the browser-mode and job tests.
+
 ## Open work
 
 1. Resolve P1 audit issues **R1–R3** and verify a real Windows 11 build and installed application (**R10**), including downloaded-file provenance, COM ownership, renderer fallback, cancel/timeout behavior, WebView2, OCR, native file dialogs, installation, upgrade and uninstall.

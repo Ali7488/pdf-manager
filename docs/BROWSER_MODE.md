@@ -26,9 +26,10 @@ So app mode **expects Edge or a Chromium-based browser as the default**. With an
 | End users (Windows) | Unzip `PDF-Manager-<version>-browser-windows-x64.zip` and double-click `PDF Manager.exe`. `READ ME FIRST.txt` explains the Visual C++ Redistributable prerequisite. |
 
 - Browser mode needs only PyMuPDF (and pywin32 on Windows): `uv sync --no-group desktop`. It never imports pywebview, Qt or pythonnet (a test enforces this).
-- **Repeat start:** starting it again while it runs opens a new window onto the same instance.
+- **One instance per profile (decision P41):** each start first takes an exclusive lock (`browser-mode.lock` next to the settings; `flock` on Linux, `msvcrt.locking` on Windows). Starting it again, even twice at the same moment, opens a new window onto the one running instance. The system releases the lock when an instance dies, so after a crash or a killed process the next start simply runs a new one.
 - **Quitting:** use **Settings → Quit PDF Manager**, Ctrl+C or a termination signal. If a conversion is running or a finished result isn't saved yet, Quit says so and asks before deleting it (decision P35).
-- **Idle shutdown:** it quits by itself after an hour without requests, but only while nothing is running and no finished result is unsaved. Results saved to a folder, or sent to the browser's downloads, don't hold it open (open question O5). The loop is `launch.wait_for_stop`.
+- **Idle shutdown:** it quits by itself after an hour without requests, but only while nothing is running and no finished result is unsaved. A result saved to a folder no longer counts once its files are written. A result sent to the browser's downloads stays unsaved until **Done** or **Discard** (decision P39), because the app can't know the browser saved it. The loop is `launch.wait_for_stop`.
+- **One result at a time (decision P40):** while a finished result is unsaved, a new conversion is refused with `RESULT_PENDING`; the Convert window explains why and offers **Show the results**, which opens it (in its own tab) for Save, Download or Discard. The job manager's one pending result is what a reload shows, what idle shutdown waits for and what Quit asks about. Done or Discard also deletes the job's download copies, fetched or not.
 - **Closing the window doesn't quit it.** A browser may hand the window to an already running process, or keep running itself, so the app doesn't rely on the browser exiting.
 
 ## Files, saving and Office

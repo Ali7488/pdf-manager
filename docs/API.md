@@ -11,7 +11,8 @@ The desktop app is a **pywebview** window (Edge WebView2 on Windows 11) showing 
 - the page polls job and OCR-install status instead of receiving events, and dispatches the same events itself;
 - dropped files are uploaded, each under its own new ID (decision P34);
 - `quit` answers `{ quit, running, unsavedResults }` and doesn't quit while a job runs or results are unsaved unless called with `discardUnsaved: true` (decision P35);
-- `latestJob` (after a reload) also says how the job's results were saved (`saved`, `savedAsZip`), so a saved job never comes back with a Save that fails (decision P36).
+- `startJob` is refused with a `RESULT_PENDING` issue while a finished result is unsaved (decision P40, both modes).
+- `latestJob` (after a reload) returns the job manager's pending result first, and also says how the job's results were saved (`saved`, `savedAsZip`), so a saved job never comes back with a Save that fails (decision P36).
 
 See [BROWSER_MODE.md](BROWSER_MODE.md). The rest of this page describes the desktop transport; the calls, models and rules apply to both.
 

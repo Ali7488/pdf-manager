@@ -637,6 +637,43 @@ def check_bundle(report: Report, app: Path, installed: bool, build: str = "deskt
         report.check(not extra, f"Stale licence files in the installed app: {extra[:5]}")
 
 
+def check_python_distributions(report: Report, listing: Path, build: str) -> None:
+    """Check the bundled pure-Python modules' distributions against the notices.
+
+    Pure modules sit inside the exe's archive, so :func:`check_bundle` can't see
+    them by file name. ``pdf-manager.spec`` records which installed distribution
+    each one came from (``build/bundle-python-<build>.json``). Each must be listed
+    for this build and platform at the same version, and every module must belong
+    to some distribution: that catches build tooling such as setuptools and its
+    vendored copies (the owner's artifact review).
+
+    Args:
+        report: Collects the failures.
+        listing: The spec's JSON listing.
+        build: ``"desktop"`` or ``"browser"``.
+    """
+    data = json.loads(listing.read_text(encoding="utf-8"))
+    report.check(data.get("build") == build, f"{listing} is for the {data.get('build')} build")
+    platform = "windows" if sys.platform == "win32" else "linux"
+    listed = {
+        _norm(c["name"]): c
+        for c in components_for(load_manifest(), build)
+        if c["group"] == "python" and platform in c.get("platforms", ["windows", "linux"])
+    }
+    for name, version in sorted(data["distributions"].items()):
+        component = listed.get(_norm(name))
+        if component is None:
+            report.fail(
+                f"Bundled Python distribution {name} {version} isn't in the {build} "
+                f"notices for {platform}; exclude it in pdf-manager.spec or list it"
+            )
+        elif component["version"] != version:
+            report.fail(f"Bundled {name} is {version}, but the notices list {component['version']}")
+    for top in data["unowned"]:
+        report.fail(f"Bundled module {top!r} belongs to no installed distribution")
+    print("Bundled Python distributions:", json.dumps(data["distributions"], sort_keys=True))
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     sub = parser.add_subparsers(dest="mode", required=True)
@@ -647,12 +684,19 @@ def main(argv: list[str] | None = None) -> int:
     bundle.add_argument(
         "--build", choices=BUILDS, default="desktop", help="which build the folder is"
     )
+    bundle.add_argument(
+        "--python-distributions",
+        type=Path,
+        help="the spec's build/bundle-python-<build>.json, to check pure-Python modules",
+    )
     args = parser.parse_args(argv)
     report = Report()
     if args.mode == "repo":
         check_repo(report)
         return report.finish("repository")
     check_bundle(report, args.app, args.installed, args.build)
+    if args.python_distributions:
+        check_python_distributions(report, args.python_distributions, args.build)
     return report.finish(f"app at {args.app}")
 
 

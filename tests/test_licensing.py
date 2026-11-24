@@ -575,3 +575,45 @@ def test_the_python_runtimes_own_libraries_have_pinned_source():
     generator = (ROOT / "scripts" / "collect_licenses.py").read_text(encoding="utf-8")
     for item in items:
         assert item["sha256"] in generator, "manifest and generator disagree"
+
+
+def _listing(tmp_path, build, distributions, unowned=()):
+    path = tmp_path / f"bundle-python-{build}.json"
+    path.write_text(
+        json.dumps({"build": build, "distributions": distributions, "unowned": list(unowned)})
+    )
+    return path
+
+
+@pytest.mark.parametrize(
+    "distributions,unowned,problem",
+    [
+        ({"pymupdf": "1.28.2"}, (), None),
+        ({"pymupdf": "1.28.2", "setuptools": "80.9.0"}, (), "setuptools 80.9.0 isn't in"),
+        ({"pymupdf": "1.28.1"}, (), "the notices list 1.28.2"),
+        ({"pymupdf": "1.28.2"}, ("jaraco",), "'jaraco' belongs to no installed distribution"),
+        ({"pywebview": "6.2.1"}, (), "pywebview 6.2.1 isn't in the browser notices"),
+    ],
+)
+def test_bundled_python_distributions_must_be_in_the_notices(
+    tmp_path, capsys, distributions, unowned, problem
+):
+    report = check.Report()
+    check.check_python_distributions(
+        report, _listing(tmp_path, "browser", distributions, unowned), "browser"
+    )
+    if problem is None:
+        assert report.failures == []
+    else:
+        assert any(problem in failure for failure in report.failures), report.failures
+
+
+def test_packaging_is_listed_for_the_linux_desktop_build_only(tmp_path, monkeypatch):
+    """packaging comes with qtpy (Linux); on Windows it would be an unlisted extra."""
+    for platform, listed in (("linux", True), ("win32", False)):
+        monkeypatch.setattr(check.sys, "platform", platform)
+        report = check.Report()
+        listing = _listing(tmp_path, "desktop", {"packaging": "26.3"})
+        check.check_python_distributions(report, listing, "desktop")
+        flagged = any("packaging 26.3 isn't in" in failure for failure in report.failures)
+        assert flagged is not listed, (platform, report.failures)

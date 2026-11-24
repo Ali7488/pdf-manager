@@ -140,7 +140,7 @@ try {
     Write-Step 'Checking the bundle against the licence notices'
     Invoke-Native 'Licence check (repository)' { & uv run --frozen --no-sync python scripts\check_licenses.py repo }
     Invoke-Native 'Licence check (browser bundle)' {
-        & uv run --frozen --no-sync python scripts\check_licenses.py bundle $appDir --build browser
+        & uv run --frozen --no-sync python scripts\check_licenses.py bundle $appDir --build browser --python-distributions build\bundle-python-browser.json
     }
 
     Write-Step 'Adding the licences (exactly those of what it ships)'

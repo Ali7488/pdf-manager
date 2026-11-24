@@ -27,6 +27,7 @@ so this spec only adds what the hooks can't know: the frontend, the backend choi
 the exclusions and the Windows version resource.
 """
 
+import json
 import os
 import platform
 import re
@@ -184,6 +185,15 @@ excludes = [
     "pptx",  # python-pptx is a test-only dependency (tests, scripts/make_samples.py).
     "pydoc_data",
     "ensurepip",
+    # Setuptools isn't a runtime dependency: it comes from PyInstaller's own build
+    # environment, pulled in only because cffi (pythonnet's clr_loader) imports it
+    # inside functions that compile C code, which the app never calls. Bundling it also
+    # brought its vendored copies (jaraco, more_itertools, packaging, tomli, wheel, ...),
+    # none of them in the notices (the owner's artifact review).
+    "setuptools",
+    "pkg_resources",
+    "_distutils_hack",
+    "distutils",
     "webview.platforms.qt",
     "webview.platforms.gtk",
     "webview.platforms.cocoa",
@@ -280,6 +290,34 @@ a = Analysis(
 
 a.datas = [entry for entry in a.datas if not _unneeded(entry[0])]
 a.binaries = [entry for entry in a.binaries if not _unneeded(entry[0])]
+
+# Which Python distribution every bundled pure-Python module comes from, for
+# scripts/check_licenses.py (it fails the build when one isn't in the notices for this
+# build). Pure modules live inside the exe's archive, where the bundle check can't see
+# them by file name.
+def _bundled_distributions(pure) -> dict:
+    import importlib.metadata as metadata
+
+    owners = metadata.packages_distributions()
+    ours = {"api", "converter", "main", "browser_main"}
+    distributions: dict[str, str] = {}
+    unowned: list[str] = []
+    for top in sorted({entry[0].split(".")[0] for entry in pure}):
+        # The runtime's own modules, including CPython's generated _sysconfigdata_*.
+        runtime = top in sys.stdlib_module_names or top.startswith("_sysconfigdata")
+        if runtime or top in ours or top.startswith(("pyi", "_pyi")):
+            continue
+        found = owners.get(top)
+        if not found:
+            unowned.append(top)
+        for name in found or ():
+            distributions[name] = metadata.version(name)
+    return {"build": BUILD, "distributions": distributions, "unowned": unowned}
+
+
+BUNDLE_PYTHON = REPO / "build" / f"bundle-python-{BUILD}.json"
+BUNDLE_PYTHON.write_text(json.dumps(_bundled_distributions(a.pure), indent=2) + "\n")
+print(f"[pdf-manager.spec] Bundled Python distributions: {BUNDLE_PYTHON}")
 
 pyz = PYZ(a.pure)
 

@@ -18,6 +18,7 @@ import shutil
 import subprocess
 from collections.abc import Iterator
 from pathlib import Path
+from typing import BinaryIO
 
 from .. import service
 from ..service import Issue, ocr_install_failed
@@ -380,3 +381,25 @@ def ask_folder(start: str) -> Path | None:
         return Path(shell.SHGetPathFromIDListW(pidl)) if pidl else None
     finally:
         pythoncom.CoUninitialize()
+
+
+def lock_instance(path: Path) -> BinaryIO | None:
+    """Take this user's browser-mode instance lock, or return ``None`` if it is held.
+
+    Locks the first byte of ``path`` (created if needed) with
+    ``msvcrt.locking(LK_NBLCK)``. The returned file must stay open for as long
+    as the instance runs: Windows releases the lock when it is closed or when
+    the process ends, so a killed instance never leaves a stale lock
+    (decision P41).
+    """
+    import msvcrt
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    handle = open(path, "a+b")
+    try:
+        handle.seek(0)
+        msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+    except OSError:
+        handle.close()
+        return None
+    return handle

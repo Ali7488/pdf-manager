@@ -13,6 +13,7 @@ from pathlib import Path
 
 from ..service import Issue, ocr_install_failed
 from ._common import FILE_FILTERS, XDG_APP_FOLDER, DefaultBrowser, xdg_dir
+from .linux import lock_instance  # noqa: F401  (POSIX flock, the same on macOS)
 
 LOGS_FOLDER = "logs"
 

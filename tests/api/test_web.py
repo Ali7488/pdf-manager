@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import http.client
 import json
+import os
 import subprocess
 import sys
 import threading
@@ -850,6 +851,88 @@ def test_a_second_start_reuses_the_running_instance(app, monkeypatch, tmp_path):
     assert launch._running_instance_url() is None
     state.write_text("not json")
     assert launch._running_instance_url() is None
+
+
+def test_the_instance_lock_is_exclusive_and_released_on_close(tmp_path):
+    lock = platforms.lock_instance(tmp_path / "profile" / "browser-mode.lock")
+    assert lock is not None
+    assert platforms.lock_instance(tmp_path / "profile" / "browser-mode.lock") is None
+    lock.close()
+    again = platforms.lock_instance(tmp_path / "profile" / "browser-mode.lock")
+    assert again is not None
+    again.close()
+
+
+LAUNCHER = """
+import sys
+sys.path.insert(0, sys.argv[1])
+from api import platforms
+from api.web import launch
+platforms.dialogs_available = lambda: False
+def opened(url):
+    with open(sys.argv[2], "a") as f:
+        f.write(url + "\\n")
+    return "tab"
+launch.open_in_browser = opened
+sys.exit(launch.main([]))
+"""
+
+
+def _launch(home: Path, opened: Path) -> subprocess.Popen:
+    env = {
+        **os.environ,
+        "XDG_CONFIG_HOME": str(home / "config"),
+        "XDG_STATE_HOME": str(home / "state"),
+        "LOCALAPPDATA": str(home / "local"),
+    }
+    return subprocess.Popen(
+        [sys.executable, "-c", LAUNCHER, str(ROOT), str(opened)],
+        env=env,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+
+def _ports(opened: Path, count: int, timeout: float = 30) -> list[str]:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        lines = opened.read_text().split() if opened.is_file() else []
+        if len(lines) >= count:
+            return [urlsplit(line).port for line in lines]
+        time.sleep(0.1)
+    raise AssertionError(f"expected {count} opened link(s), got {opened.read_text()!r}")
+
+
+def test_simultaneous_launches_reach_one_server_and_a_killed_owner_recovers(tmp_path):
+    """Decision P41 (audit B3), with real processes sharing one clean profile."""
+    opened = tmp_path / "opened.txt"
+    first, second = _launch(tmp_path, opened), _launch(tmp_path, opened)
+    try:
+        ports = _ports(opened, 2)
+        assert ports[0] == ports[1], "both launches must reach the same server"
+        # One of them joined and exited; the other owns the profile and keeps running.
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline and first.poll() is None and second.poll() is None:
+            time.sleep(0.1)
+        joined, owner = (first, second) if first.poll() is not None else (second, first)
+        assert joined.wait(5) == 0 and owner.poll() is None
+        # Kill the owner without any clean-up: its lock dies with it, its state file stays.
+        owner.kill()
+        owner.wait(10)
+        third = _launch(tmp_path, opened)
+        try:
+            new_port = _ports(opened, 3)[2]
+            assert new_port != ports[0] and third.poll() is None
+            fourth = _launch(tmp_path, opened)
+            assert _ports(opened, 4)[3] == new_port and fourth.wait(30) == 0
+        finally:
+            third.kill()
+            third.wait(10)
+    finally:
+        for proc in (first, second):
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait(10)
 
 
 def test_browser_mode_never_imports_the_desktop_toolkits():

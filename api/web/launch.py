@@ -1,7 +1,9 @@
 """Start and stop browser mode: ``uv run main.py --browser``.
 
-1. If PDF Manager is already running in browser mode for this user, ask it
-   for a new link, open that in the browser and exit (one instance per user).
+1. Take this profile's instance lock (``platforms.lock_instance``). If another
+   launch holds it, ask that instance for a new link, open it and exit, so
+   simultaneous launches reach one server (decision P41). The system releases
+   the lock when an instance dies, so a killed instance never blocks the next.
 2. Otherwise start the server on ``127.0.0.1`` with a port the system picks,
    and wait (briefly) until it answers.
 3. Open the link in the default browser: in app mode (``--app=<url>``: its
@@ -34,8 +36,10 @@ import secrets
 import signal
 import sys
 import threading
+import time
 import urllib.request
 from pathlib import Path
+from typing import Any
 
 from .. import paths, platforms
 from ..logging_setup import configure_logging
@@ -48,6 +52,9 @@ from .session import Session
 log = logging.getLogger(__name__)
 
 STATE_FILE = "browser-mode.json"
+LOCK_FILE = "browser-mode.lock"
+# How long a second launch waits for the instance that holds the lock to answer.
+JOIN_TIMEOUT_SEC = 20
 READY_TIMEOUT_SEC = 10
 REUSE_TIMEOUT_SEC = 3
 IDLE_SHUTDOWN_SEC = 60 * 60
@@ -56,6 +63,37 @@ SHUTDOWN_GRACE_SEC = 10
 
 def _state_path() -> Path:
     return paths.settings_path().parent / STATE_FILE
+
+
+def _lock_path() -> Path:
+    return paths.settings_path().parent / LOCK_FILE
+
+
+def _join_or_lock() -> tuple[str | None, Any]:
+    """Become this profile's one instance, or find the one that already is (P41).
+
+    The instance lock decides atomically, so two launches at the same moment
+    can't both start a server. A launch that doesn't get it asks the owner
+    for a link, waiting while the owner is still starting. If the owner goes
+    away meanwhile (it quit, or was killed, which releases the lock), this
+    launch takes the lock itself.
+
+    Returns:
+        ``(url, None)`` to open the running instance, ``(None, lock)`` to start
+        a new one (keep ``lock`` open while it runs), or ``(None, None)`` if
+        neither worked within ``JOIN_TIMEOUT_SEC``.
+    """
+    deadline = time.monotonic() + JOIN_TIMEOUT_SEC
+    while True:
+        lock = platforms.lock_instance(_lock_path())
+        if lock is not None:
+            return None, lock
+        url = _running_instance_url()
+        if url:
+            return url, None
+        if time.monotonic() > deadline:
+            return None, None
+        time.sleep(0.2)
 
 
 def _write_private(path: Path, text: str) -> None:
@@ -140,12 +178,28 @@ def main(argv: list[str] | None = None) -> int:
     """Run browser mode until it is told to stop. Returns the process exit code."""
     args = _parse(argv)
     configure_logging()
-    if not args.no_browser:
-        url = _running_instance_url()
-        if url:
-            log.info("PDF Manager is already running; opening it again")
+    url, lock = _join_or_lock()
+    if url:
+        log.info("PDF Manager is already running; opening it again")
+        if args.url_file:
+            _write_private(args.url_file, url)
+        if args.no_browser:
+            print(f"PDF Manager is already running. Open this link once: {url}", flush=True)
+        else:
             open_in_browser(url)
-            return 0
+        return 0
+    if lock is None:
+        log.error("Another PDF Manager holds this profile but didn't answer")
+        print("PDF Manager is already starting or closing. Try again in a moment.", flush=True)
+        return 1
+    try:
+        return _serve(args)
+    finally:
+        lock.close()  # Released only after the state file is gone (see _shut_down).
+
+
+def _serve(args: argparse.Namespace) -> int:
+    """Run this profile's one instance (the caller holds the instance lock)."""
     store = SettingsStore(paths.settings_path())
     store.load()
     session = Session()

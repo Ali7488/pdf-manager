@@ -29,6 +29,7 @@ import shlex
 import shutil
 import subprocess
 from pathlib import Path
+from typing import BinaryIO
 
 from ..service import Issue, IssueCode, Severity
 from ._common import (
@@ -427,3 +428,23 @@ def ask_folder(start: str) -> Path | None:
         return None
     chosen = _run_picker(folder_command(*picker, start))
     return Path(chosen[0]) if chosen else None
+
+
+def lock_instance(path: Path) -> BinaryIO | None:
+    """Take this user's browser-mode instance lock, or return ``None`` if it is held.
+
+    An exclusive, non-blocking ``flock`` on ``path`` (created if needed). The
+    returned file must stay open for as long as the instance runs: the lock
+    is released when it is closed, or by the system when the process dies,
+    so a killed instance never leaves a stale lock (decision P41).
+    """
+    import fcntl
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    handle = open(path, "a+b")
+    try:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        handle.close()
+        return None
+    return handle

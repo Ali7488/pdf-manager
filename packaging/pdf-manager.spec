@@ -190,10 +190,11 @@ excludes = [
     # inside functions that compile C code, which the app never calls. Bundling it also
     # brought its vendored copies (jaraco, more_itertools, packaging, tomli, wheel, ...),
     # none of them in the notices (the owner's artifact review).
+    # (distutils itself isn't excluded: Python 3.13 has none, and excluding the name
+    # clashes with PyInstaller's own distutils hook.)
     "setuptools",
     "pkg_resources",
     "_distutils_hack",
-    "distutils",
     "webview.platforms.qt",
     "webview.platforms.gtk",
     "webview.platforms.cocoa",
@@ -298,21 +299,30 @@ a.binaries = [entry for entry in a.binaries if not _unneeded(entry[0])]
 def _bundled_distributions(pure) -> dict:
     import importlib.metadata as metadata
 
+    # Each module is attributed to the installed distribution whose files include
+    # the file PyInstaller collected. That also covers packages such as pywin32, whose
+    # loose top-level modules (win32con, winerror, ...) aren't in top_level.txt.
+    by_file: dict[str, str] = {}
+    for dist in metadata.distributions():
+        for record in dist.files or ():
+            by_file[os.path.normcase(str(dist.locate_file(record)))] = dist.metadata["Name"]
     owners = metadata.packages_distributions()
     ours = {"api", "converter", "main", "browser_main"}
     distributions: dict[str, str] = {}
-    unowned: list[str] = []
-    for top in sorted({entry[0].split(".")[0] for entry in pure}):
+    unowned: set[str] = set()
+    for entry in pure:
+        name, source = entry[0], entry[1]
+        top = name.split(".")[0]
         # The runtime's own modules, including CPython's generated _sysconfigdata_*.
         runtime = top in sys.stdlib_module_names or top.startswith("_sysconfigdata")
         if runtime or top in ours or top.startswith(("pyi", "_pyi")):
             continue
-        found = owners.get(top)
-        if not found:
-            unowned.append(top)
-        for name in found or ():
-            distributions[name] = metadata.version(name)
-    return {"build": BUILD, "distributions": distributions, "unowned": unowned}
+        found = [by_file[key]] if (key := os.path.normcase(str(source))) in by_file else []
+        for dist in found or owners.get(top, ()):
+            distributions[dist] = metadata.version(dist)
+        if not found and not owners.get(top):
+            unowned.add(top)
+    return {"build": BUILD, "distributions": distributions, "unowned": sorted(unowned)}
 
 
 BUNDLE_PYTHON = REPO / "build" / f"bundle-python-{BUILD}.json"

@@ -126,6 +126,7 @@ export type IssueCode =
   | "SAVE_FAILED"
   | "SETTINGS_SAVE_FAILED"
   | "JOB_ALREADY_RUNNING"
+  | "RESULT_PENDING"
   | "UNEXPECTED_ERROR";
 
 /** One row of the tool-check modal. */

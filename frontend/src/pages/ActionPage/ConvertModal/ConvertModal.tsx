@@ -249,6 +249,23 @@ export function ConvertModal({
     else if (result.issue) setPopupIssue(result.issue);
   };
 
+  /**
+   * RESULT_PENDING (decision P40): open the unsaved result again, in its own tab,
+   * the same way a reload does, so it can be saved, downloaded or discarded.
+   */
+  const showPendingResult = async () => {
+    const job = await api.latestJob().catch(() => null); // Not answering: reported separately.
+    if (!job?.action) return;
+    onClose();
+    dispatch({
+      type: "jobRecovered",
+      jobId: job.jobId,
+      action: job.action,
+      saved: job.saved ?? null,
+      savedAsZip: job.savedAsZip === true,
+    });
+  };
+
   const openSettings = () => {
     dispatch({ type: "navigate", page: "settings" });
     onClose();
@@ -318,7 +335,15 @@ export function ConvertModal({
     title = "The job couldn't start";
     closable = true;
     body = <IssueView issue={phase.issue} />;
-    footer = (
+    const pending = phase.issue.code === "RESULT_PENDING" && api.mode !== "desktop";
+    footer = pending ? (
+      <>
+        <Button onClick={onClose}>Close</Button>
+        <Button variant="primary" onClick={() => void showPendingResult()}>
+          Show the results
+        </Button>
+      </>
+    ) : (
       <Button variant="primary" onClick={onClose}>
         Close
       </Button>

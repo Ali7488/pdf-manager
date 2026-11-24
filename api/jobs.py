@@ -45,6 +45,7 @@ from .service import (
     OutputFile,
     ProgressEvent,
     job_already_running,
+    result_pending,
     safe_destination,
     save_failed,
     unexpected_error,
@@ -234,6 +235,16 @@ class JobManager:
         with self._lock:
             return next((j.id for j in self._jobs.values() if j.status == RUNNING), None)
 
+    def pending_result(self) -> str | None:
+        """The finished, unsaved result waiting for Save, Download or Discard, if any.
+
+        There is at most one (decision P40: :meth:`start` refuses while it
+        exists). Browser mode recovers it after a reload; idle shutdown and
+        Quit protect it (through :meth:`unsaved_jobs`).
+        """
+        unsaved = self.unsaved_jobs()
+        return unsaved[0] if unsaved else None
+
     def unsaved_jobs(self) -> list[str]:
         """Ids of finished jobs whose results exist only in scratch (decisions P35, P39).
 
@@ -244,11 +255,12 @@ class JobManager:
         cancelled jobs have nothing to lose.
         """
         with self._lock:
-            return [
-                job.id
-                for job in self._jobs.values()
-                if job.status == dto.SUCCEEDED and job.outputs and job.state in (READY, SAVING)
-            ]
+            return [job.id for job in self._jobs.values() if self._unsaved(job)]
+
+    @staticmethod
+    def _unsaved(job: _Job) -> bool:
+        """Whether a job's results exist only in scratch (lock held by the caller)."""
+        return job.status == dto.SUCCEEDED and bool(job.outputs) and job.state in (READY, SAVING)
 
     def start(self, action: Action, settings: ActionSettings, data: ActionData) -> str:
         """Start a job on a worker thread.
@@ -270,6 +282,10 @@ class JobManager:
                 raise ConversionError(unexpected_error("The app is closing."))
             if any(j.status == RUNNING for j in self._jobs.values()):
                 raise ConversionError(job_already_running())
+            # One recoverable result at a time (decision P40): a finished,
+            # unsaved result must be saved or discarded before a new job starts.
+            if any(self._unsaved(j) for j in self._jobs.values()):
+                raise ConversionError(result_pending())
             try:
                 scratch = Path(tempfile.mkdtemp(prefix=SCRATCH_PREFIX, dir=self._temp_dir))
             except OSError as exc:

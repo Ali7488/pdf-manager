@@ -324,6 +324,14 @@ class Session:
             job = self._jobs.get(job_id)
             return None if job is None else self._status(job_id, job)
 
+    def recoverable(self, job_id: str) -> dict[str, Any] | None:
+        """A job's status for a reloaded page, with its action; ``None`` if unknown."""
+        with self._lock:
+            job = self._jobs.get(job_id)
+            if job is None:
+                return None
+            return {**self._status(job_id, job), "action": job.get("action")}
+
     def latest_job(self) -> dict[str, Any] | None:
         """The newest job not yet discarded, for a page that was refreshed.
 

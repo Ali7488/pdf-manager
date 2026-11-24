@@ -209,7 +209,18 @@ def job_status(ctx: Context, body: Any, job_id: str) -> dict[str, Any] | None:
 
 
 def latest_job(ctx: Context, body: Any) -> dict[str, Any]:
-    """The newest job not yet discarded (after a page refresh), or ``{job: null}``."""
+    """The job a refreshed page shows again, or ``{job: null}``.
+
+    The job manager decides (decision P40): its one unsaved result comes
+    first, so recovery, idle shutdown and Quit agree on it. Otherwise the
+    newest job not yet closed with Done (running, failed, or already saved,
+    so the page can show how).
+    """
+    pending = ctx.workflow.jobs.pending_result()
+    if pending is not None:
+        job = ctx.session.recoverable(pending)
+        if job is not None:
+            return {"job": job}
     return {"job": ctx.session.latest_job()}
 
 
@@ -276,9 +287,10 @@ def prepare_download(ctx: Context, body: Any, job_id: str) -> dict[str, Any]:
 
 
 def discard_results(ctx: Context, body: Any, job_id: str) -> None:
-    if ctx.session.job_status(job_id) is not None:
-        ctx.workflow.discard_results(job_id)
-        ctx.session.forget_job(job_id)
+    """Done or Discard. Always reaches the job manager, so no result it holds is
+    ever left without a way to discard it (audit B2); unknown IDs are ignored."""
+    ctx.workflow.discard_results(job_id)
+    ctx.session.forget_job(job_id)
 
 
 # ----- OCR -----

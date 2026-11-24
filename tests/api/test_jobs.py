@@ -227,7 +227,13 @@ def test_only_one_job_at_a_time(make_manager, recorder):
     assert manager.running_job() == first
     release.set()
     recorder.finish()
-    # Once finished, a new job can start (finished results don't block).
+    # Its unsaved result blocks a new job (decision P40) until it is discarded.
+    with pytest.raises(ConversionError) as info:
+        manager.start(Action.MERGE, ActionSettings(), DATA)
+    assert info.value.issue.code == IssueCode.RESULT_PENDING
+    assert manager.pending_result() == first
+    manager.discard(first)
+    assert manager.pending_result() is None
     assert manager.start(Action.MERGE, ActionSettings(), DATA) != first
 
 
@@ -242,8 +248,9 @@ def test_each_job_gets_its_own_scratch(make_manager, recorder):
     manager = make_manager(run)
     for _ in range(2):
         recorder.finished.clear()
-        manager.start(Action.MERGE, ActionSettings(), DATA)
+        job_id = manager.start(Action.MERGE, ActionSettings(), DATA)
         recorder.finish()
+        manager.discard(job_id)  # Done, so the next one may start (P40).
     assert len(set(seen)) == 2
     assert all(path.name.startswith("pdf-manager-") for path in seen)
 
@@ -433,9 +440,17 @@ def test_new_stage_values_pass_through(make_manager, recorder):
     assert recorder.named("jobProgress")[-1]["stage"] == expected
 
 
+def test_shutdown_cleans_up_a_finished_result(make_manager, recorder, tmp_path):
+    """shutdown removes the scratch folder of a result nobody saved."""
+    manager, _ = finished_job(make_manager, recorder, "a.pdf")
+    assert list(tmp_path.glob("pdf-manager-*"))
+    manager.shutdown(timeout=5)
+    assert not list(tmp_path.glob("pdf-manager-*"))
+
+
 def test_shutdown_cancels_and_cleans_up(make_manager, recorder, tmp_path):
     """shutdown cancels the running job and removes every scratch folder."""
-    manager, _ = finished_job(make_manager, recorder, "a.pdf")
+    manager = make_manager(succeeding("a.pdf"))
     started = threading.Event()
 
     def run(action, settings, data, *, scratch, progress=None, cancel=None):
@@ -765,3 +780,24 @@ def test_failed_and_cancelled_jobs_are_never_unsaved(make_manager, recorder):
     manager.start(Action.FLATTEN, ActionSettings(), DATA)
     recorder.finish()
     assert manager.unsaved_jobs() == []
+
+
+def test_failed_and_saved_results_never_block_a_new_job(make_manager, recorder, tmp_path):
+    """Only an unsaved success holds the next job back (decision P40)."""
+
+    def failing(action, settings, data, *, scratch, progress=None, cancel=None):
+        raise service.ConversionError(service.unexpected_error("boom"))
+
+    manager = make_manager(failing)
+    manager.start(Action.FLATTEN, ActionSettings(), DATA)
+    recorder.finish()
+    recorder.finished.clear()
+    manager._run_action = succeeding("a.pdf")
+    saved = manager.start(Action.FLATTEN, ActionSettings(), DATA)  # After a failure: fine.
+    recorder.finish()
+    recorder.finished.clear()
+    out = tmp_path / "out"
+    out.mkdir()
+    manager.save(saved, out, False)  # Written to a folder: no longer pending.
+    assert manager.pending_result() is None
+    assert manager.start(Action.FLATTEN, ActionSettings(), DATA)

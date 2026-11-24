@@ -788,6 +788,37 @@ def test_a_downloaded_job_keeps_download_again_across_reloads_until_done(client,
     assert client.result("GET", "/api/jobs/latest")["job"] is None
 
 
+def test_one_recoverable_result_at_a_time(client, app, tmp_path):
+    """Decision P40 (audit B2): a new job waits until the pending result is saved or discarded."""
+    first = finished_job(client, app, tmp_path, "a.pdf")
+    ids = [f["path"] for f in upload(client, make_pdf(tmp_path / "b.pdf"))]
+    refused = start(client, ids, "request-second")
+    assert refused["issue"]["code"] == "RESULT_PENDING"
+    assert "Show the results" in " ".join(refused["issue"]["troubleshooting"])
+    # A reloaded page is shown exactly that pending result.
+    latest = client.result("GET", "/api/jobs/latest")["job"]
+    assert latest["jobId"] == first and latest["finished"]["status"] == "succeeded"
+    assert app.ctx.workflow.jobs.pending_result() == first
+    assert app.ctx.workflow.jobs.unsaved_jobs() == [first]  # Idle shutdown and Quit agree.
+    client.result("POST", f"/api/jobs/{first}/discard")
+    second = start(client, ids, "request-third")
+    assert second.get("jobId") and wait_finished(client, second["jobId"])["status"] == "succeeded"
+
+
+def test_the_pending_result_is_recovered_even_if_the_session_forgot_it(client, app, tmp_path):
+    """Recovery follows the job manager, not the session's list (audit B2)."""
+    job_id = finished_job(client, app, tmp_path)
+    with app.ctx.session._lock:  # As if the session's status list had dropped it.
+        status = app.ctx.session._jobs.pop(job_id)
+        app.ctx.session._jobs[job_id] = status  # Re-added at the end: still known.
+    assert client.result("GET", "/api/jobs/latest")["job"]["jobId"] == job_id
+    with app.ctx.session._lock:
+        app.ctx.session._jobs.pop(job_id)
+    # Unknown to the session: Done still reaches the job manager and frees it.
+    client.result("POST", f"/api/jobs/{job_id}/discard")
+    assert app.ctx.workflow.jobs.unsaved_jobs() == [] and not app.busy()
+
+
 # ----- Launch -----
 
 

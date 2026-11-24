@@ -155,4 +155,41 @@ describe("ConvertModal in browser mode", () => {
     expect(save).toHaveBeenCalledWith(jobId, { folder: null, asZip: true });
     expect(within(dialog()).getByRole("button", { name: "Done" })).toBeInTheDocument();
   });
+
+  it("explains a pending result and opens it again for Save or Discard", async () => {
+    const api: PdfManagerApi = { ...createMockApi({ tickMs: 1 }), mode: "browser", saveMode: "download" };
+    const jobId = "c".repeat(32);
+    vi.spyOn(api, "startJob").mockResolvedValue({
+      issue: {
+        code: "RESULT_PENDING",
+        severity: "error",
+        title: "Your last results aren't saved yet",
+        message: "PDF Manager keeps one finished result at a time. Save or discard it before starting a new conversion.",
+        troubleshooting: ["Click Show the results to open them again."],
+        details: null,
+        logFile: null,
+        command: null,
+        file: null,
+      },
+    });
+    const user = await renderWith(api, { page: Action.Merge, files: pdfs });
+    // The pending result belongs to a Split job; recovery finds it through latestJob.
+    vi.spyOn(api, "latestJob").mockResolvedValue({
+      jobId,
+      action: Action.Split,
+      progress: null,
+      finished: finished(jobId),
+      saved: null,
+      savedAsZip: false,
+    });
+    await user.click(screen.getByRole("button", { name: "Convert" }));
+    await screen.findByRole("heading", { name: "The job couldn't start" });
+    expect(within(dialog()).getByText("Your last results aren't saved yet")).toBeInTheDocument();
+    await user.click(within(dialog()).getByRole("button", { name: "Show the results" }));
+    act(() => emitEvent("jobFinished", finished(jobId)));
+    await screen.findByRole("heading", { name: "Done" });
+    expect(screen.getByRole("heading", { level: 1, name: "Split" })).toBeInTheDocument();
+    expect(within(dialog()).getByRole("button", { name: "Download" })).toBeInTheDocument();
+    expect(within(dialog()).getByRole("button", { name: "Discard" })).toBeInTheDocument();
+  });
 });

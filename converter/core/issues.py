@@ -36,6 +36,7 @@ class IssueCode(StrEnum):
     SAVE_FAILED = "SAVE_FAILED"
     SETTINGS_SAVE_FAILED = "SETTINGS_SAVE_FAILED"
     JOB_ALREADY_RUNNING = "JOB_ALREADY_RUNNING"
+    RESULT_PENDING = "RESULT_PENDING"
     UNEXPECTED_ERROR = "UNEXPECTED_ERROR"
 
 
@@ -380,6 +381,22 @@ def job_already_running() -> Issue:
         "Another conversion is still running",
         "Only one conversion can run at a time.",
         ("Wait for it to finish, or cancel it, then try again.",),
+    )
+
+
+def result_pending() -> Issue:
+    """A finished result isn't saved yet, so a new conversion can't start (decision P40)."""
+    return Issue(
+        IssueCode.RESULT_PENDING,
+        Severity.ERROR,
+        "Your last results aren't saved yet",
+        "PDF Manager keeps one finished result at a time. Save or discard it before "
+        "starting a new conversion.",
+        (
+            "Click Show the results to open them again.",
+            "Then click Save (or Download) to keep them, or Discard if you don't need them.",
+            "After that, click Convert again.",
+        ),
     )
 
 

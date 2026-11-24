@@ -26,6 +26,7 @@ from converter.core.issues import (
     job_already_running,
     ocr_install_failed,
     ocr_missing,
+    result_pending,
     save_failed,
     settings_save_failed,
     unexpected_error,

@@ -463,3 +463,33 @@ def test_about_links_to_the_exact_commit_of_this_build(page):
     about = page.get_by_role("region", name="About")
     about.get_by_text(f"/tree/{expected}", exact=False).wait_for()
     assert f"https://github.com/Ali7488/pdf-manager/tree/{expected}" in about.inner_text()
+
+
+def test_one_pending_result_can_be_reopened_and_discarded(page, inputs, server, tmp_path):
+    """Decision P40: a second window can't start a job while a result is unsaved."""
+    other = page.context.new_page()  # Open before the job finishes.
+    other.downloads = []
+    other.on("download", lambda item: other.downloads.append(item))
+    other.goto(server.origin + "/")
+    other.get_by_role("navigation", name="Main").wait_for()
+    go(page, "Flatten")
+    add(page, inputs["b"])
+    convert(page)  # Finished, not saved.
+    go(other, "Merge")
+    add(other, inputs["a"])
+    other.get_by_role("button", name="Convert").click()
+    dialog = other.get_by_role("dialog")
+    dialog.get_by_text("Your last results aren't saved yet").wait_for()
+    dialog.get_by_role("button", name="Show the results").click()
+    other.get_by_role("heading", name="Done").wait_for()
+    other.get_by_role("heading", level=1, name="Flatten").wait_for()
+    other.get_by_role("dialog").get_by_role("button", name="Discard").click()
+    other.get_by_role("dialog").get_by_role("button", name="Discard").click()  # Confirm.
+    other.get_by_role("dialog").wait_for(state="detached")
+    go(other, "Merge")
+    convert(other)  # Nothing pending any more.
+    (result,) = download(other, tmp_path)
+    assert pages(result) == pages(inputs["a"])
+    page.reload()  # The first window now recovers the new, unsaved Merge result.
+    page.get_by_role("heading", name="Done").wait_for()
+    page.get_by_role("heading", level=1, name="Merge").wait_for()

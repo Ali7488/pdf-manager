@@ -83,13 +83,19 @@ PDF Manager in your web browser
      (http://127.0.0.1:...). Everything still stays on this PC.
    It needs no internet connection. Your files never leave this PC.
 
-4. PDF Manager keeps running after you close the window, so it opens again quickly.
-   To stop it, use Settings > Quit PDF Manager. It also stops by itself after an hour
-   without use.
+4. PowerPoint files (.pptx and .ppt) need the free LibreOffice, from libreoffice.org.
+   PDF files and pictures work without it. PDF Manager tells you if it's missing.
+   For slides that must look exactly as in PowerPoint, save them as a PDF from
+   PowerPoint and add that PDF instead.
+
+5. PDF Manager keeps running after you close the window, so it opens again quickly.
+   To stop it, use Settings > Quit PDF Manager; it asks first if results aren't saved.
+   It also stops by itself after an hour without use, but never while a conversion is
+   running or a result is waiting to be saved, downloaded or discarded.
 
 Licences: LICENSING.md, THIRD_PARTY_NOTICES.md and the licenses folder. The app as a
-whole is under the GNU AGPL-3.0 (it includes PyMuPDF); the complete source code is at
-https://github.com/Ali7488/pdf-manager
+whole is under the GNU AGPL-3.0 (it includes PyMuPDF). Settings > About links to the
+exact source code of this copy; the project is at https://github.com/Ali7488/pdf-manager
 '@
 
 Push-Location $RepoRoot

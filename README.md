@@ -2,7 +2,7 @@
 
 A lightweight, offline app for preparing PDFs and PowerPoint documents. The portable build opens in your default browser. The desktop test build uses pywebview. Both use the same React interface and Python conversion engine.
 
-The [v0.5.0-rc.1 test build](https://github.com/Ali7488/pdf-manager/releases/tag/v0.5.0-rc.1) is available. The owner confirmed that PDF workflows passed on a Windows 11 VM. See the [v0.5.0 release notes](docs/releases/v0.5.0.md) for the planned stable release and validation scope.
+The [v0.5.0-rc.1 test build](https://github.com/Ali7488/pdf-manager/releases/tag/v0.5.0-rc.1) is available. The owner ran `PDF Manager.exe` from the GitHub portable ZIP on a Windows 11 VM and confirmed that Merge, Split, Compress, and Flatten passed. See the [v0.5.0 release notes](docs/releases/v0.5.0.md) for the planned stable release and validation scope.
 
 ## What it does
 
@@ -126,7 +126,7 @@ main.py                Desktop application entry point
 
 ## Verification status
 
-CI runs Python, frontend, browser integration, and Windows packaging checks. The owner reported passing Windows 11 VM PDF workflows on RC1. Windows presentation fidelity, OCR, and installer acceptance need separate results. Report problems via [Issues](https://github.com/Ali7488/pdf-manager/issues).
+CI runs Python, frontend, browser integration, and Windows packaging checks. On Windows 11, the owner confirmed Merge, Split, Compress, and Flatten using the RC1 portable build. Windows presentation fidelity, OCR, and installer acceptance need separate results. Report problems via [Issues](https://github.com/Ali7488/pdf-manager/issues).
 
 ## Privacy and contributions
 

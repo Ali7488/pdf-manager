@@ -86,7 +86,7 @@ Python's job status is the source of truth.
 
 Set `PDF_MANAGER_E2E_BROWSER` to use an installed Chromium-family browser, and `PDF_MANAGER_E2E_APP` to test a built app instead of the source.
 
-The owner reported passing PDF workflows on a Windows 11 VM using RC1. The report did not enumerate individual scenarios. These checks remain without a recorded result for the exact release candidate:
+The owner ran `PDF Manager.exe` from `PDF-Manager-0.5.0-browser-windows-x64.zip` downloaded from GitHub RC1 on a Windows 11 VM. Merge, Split, Compress, and Flatten passed. The following checks remain without a recorded VM result:
 
 - **Default browser and app mode:** a real app-mode launch from the user's default browser (Edge, Chrome, Brave), a cold and an already running browser, and a Firefox default (a tab). Also whether a firewall prompt appears; none is expected for loopback.
 - **Native pickers:** whether they come to the front of the browser window, cancel cleanly and return focus.

@@ -198,4 +198,4 @@ A short, summarized record of each request made to the coding agent, and what ca
     - [ ] ZIP readme.
     - [ ] Artifact licensing: setuptools, packaging source, OpenSSL and libffi source.
     - [ ] CI, Windows build, artifact verification, prerelease.
-45. **Repeat the license and code audit before a stable GitHub release and correct stale documentation.** The owner reported passing Windows PDF workflows. Use v0.5.0 as the release target. Individual workflow results, Windows presentation and OCR acceptance, and unresolved third-party distribution questions remain separate from the reported PDF pass.
+45. **Repeat the license and code audit before a stable GitHub release and correct stale documentation.** Use v0.5.0 as the release target. The owner ran `PDF Manager.exe` from the GitHub RC1 portable ZIP on a Windows 11 VM and confirmed Merge, Split, Compress, and Flatten. Windows presentation and OCR acceptance and third-party distribution questions remain open.

@@ -86,11 +86,12 @@ Python's job status is the source of truth.
 
 Set `PDF_MANAGER_E2E_BROWSER` to use an installed Chromium-family browser, and `PDF_MANAGER_E2E_APP` to test a built app instead of the source.
 
-**Not yet verified on a real Windows 11 PC.** The runner can't show interactive dialogs or open the user's default browser. These need a person:
+The owner reported passing PDF workflows on a Windows 11 VM using RC1. The report did not enumerate individual scenarios. These checks remain without a recorded result for the exact release candidate:
 
 - **Default browser and app mode:** a real app-mode launch from the user's default browser (Edge, Chrome, Brave), a cold and an already running browser, and a Firefox default (a tab). Also whether a firewall prompt appears; none is expected for loopback.
 - **Native pickers:** whether they come to the front of the browser window, cancel cleanly and return focus.
 - **Presentations:** conversion with LibreOffice installed (dropped and picked with **Add files**), and the explanation shown when it is missing (as soon as a presentation is added, and in the Convert window). Run `scripts/check_slide_fidelity.py` there too (docs/PRESENTATION_FIDELITY.md).
+- **OCR:** install Tesseract and confirm that the text from a scanned PDF is searchable and selectable.
 - **The ZIP on a clean PC:** without the Visual C++ Redistributable, run as a standard user.
 - **Not tested at all:** Linux desktops other than this development PC (KDE/kdialog, Ubuntu/zenity), and macOS.
 

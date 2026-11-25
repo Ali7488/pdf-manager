@@ -198,3 +198,4 @@ A short, summarized record of each request made to the coding agent, and what ca
     - [ ] ZIP readme.
     - [ ] Artifact licensing: setuptools, packaging source, OpenSSL and libffi source.
     - [ ] CI, Windows build, artifact verification, prerelease.
+45. **Repeat the license and code audit before a stable GitHub release and correct stale documentation.** The owner reported passing Windows PDF workflows. Use v0.5.0 as the release target. Individual workflow results, Windows presentation and OCR acceptance, and unresolved third-party distribution questions remain separate from the reported PDF pass.

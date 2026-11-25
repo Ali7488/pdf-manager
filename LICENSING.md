@@ -5,7 +5,7 @@ PDF Manager is free, open-source software. This page explains which licence appl
 | What | Licence |
 | --- | --- |
 | The original source code in this repository (© 2026 Mohannad Ali) | [MIT License](LICENSE) |
-| The distributed application (the Windows installer, and the Linux packages from v0.75), which combines that code with PyMuPDF and other components | [GNU Affero General Public License v3.0](LICENSE-AGPL-3.0.txt) (AGPL-3.0) |
+| The distributed application (the Windows installer and portable ZIP), which combines that code with PyMuPDF and other components | [GNU Affero General Public License v3.0](LICENSE-AGPL-3.0.txt) (AGPL-3.0) |
 | Each bundled third-party component | Its own licence: see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and the [`licenses/`](licenses) folder |
 
 For a component-by-component list of dependency uses, upstream license websites, verified source packages, and unresolved redistribution questions, see the [dependency license review](docs/DEPENDENCY_LICENSE_REVIEW_2026-11-23.md). The original license texts remain in the installed `licenses/` folder.
@@ -20,9 +20,9 @@ The original code stays available under the MIT License as well: MIT is compatib
 
 You may use, study, share and change PDF Manager. If you distribute it, or a modified version, you must do so under the AGPL-3.0: keep the copyright and licence notices, and make the complete corresponding source code available to the people you give it to. PDF Manager comes with **absolutely no warranty**, to the extent permitted by law (sections 15 and 16 of the AGPL-3.0).
 
-## Complete corresponding source
+## Sources supplied with the Windows builds
 
-For each release, the complete corresponding source is:
+The RC1 source bundles contain the following material. The open questions below describe the remaining source and redistribution review.
 
 - **This repository at the release's tag** (for example `v0.5.0`) at <https://github.com/Ali7488/pdf-manager>: the app's own code, the user interface source, the build scripts (`packaging/`, `scripts/`), and the lockfiles that pin every third-party version: [`uv.lock`](uv.lock) (Python packages) and [`frontend/package-lock.json`](frontend/package-lock.json) (interface packages). The Python runtime, PyInstaller and Inno Setup versions are pinned in `scripts/collect_licenses.py`, `packaging/build.ps1` and `.github/workflows/build-windows.yml`.
 - **The third-party source bundle attached to the release** (`PDF-Manager-third-party-sources`), made by `scripts/collect_sources.py` from those exact versions, with `SOURCES.md` and `SHA256SUMS`:
@@ -33,7 +33,7 @@ For each release, the complete corresponding source is:
   - the app's own source as a `git archive` of the exact commit the build was made from (`app/`, with `SOURCE_REVISION`);
   - the npm package of every interface package inlined into the app.
 
-The same files stay available from their original publishers (PyPI, npm, mupdf.com, python.org), which the bundle lists. The only bundled code whose source isn't included is Microsoft's (see the open questions below).
+The bundles record upstream download locations and hashes. The npm tarballs are the exact frontend build inputs. Some contain distribution builds instead of the upstream development tree. Verify coverage of each component's preferred source form before describing a bundle as complete.
 
 ## Building it yourself
 
@@ -66,8 +66,8 @@ The installer puts these next to the app: `LICENSE.txt` (MIT, the original code)
 
 These aren't settled, and this page doesn't claim they are:
 
-1. **Microsoft files inside the Windows app.** The app carries Microsoft binaries whose source isn't published: the **WebView2 SDK files** inside pywebview (`Microsoft.Web.WebView2.Core.dll`, `Microsoft.Web.WebView2.WinForms.dll`, `WebView2Loader.dll`), licensed by Microsoft under BSD-3-Clause-style terms, The AGPL-3.0 excludes "System Libraries" from the source it requires, but the GNU FAQ says runtime libraries shipped *with* the program no longer count as System Libraries. (The **Visual C++ runtime** DLLs aren't shipped: the app uses Microsoft's separately installed Visual C++ Redistributable, which the installer checks for; decision P32.) Whether these files are acceptable in an AGPL-3.0 distribution of PyMuPDF hasn't been confirmed by Artifex (PyMuPDF's copyright holder) or a lawyer.
-2. **Visual Studio's redistribution terms** limit redistribution of the C++ runtime files to licensed Visual Studio users. The installer contains none of those files (P32); users install Microsoft's redistributable from Microsoft.
+1. **WebView2 SDK and legacy interop in the desktop installer.** The desktop app carries Microsoft WebView2 SDK binaries and their license and notice. The desktop source bundle does not include the SDK source. The pywebview source archive also carries prebuilt legacy WebBrowserInterop DLLs whose matching source has not been established.
+2. **Microsoft CRT in both Windows launchers.** Windows installs the Visual C++ Redistributable separately (P32). PyInstaller's MSVC bootloader statically links Microsoft CRT code into the launcher. Document the redistribution and corresponding-source treatment for that code under decision O1 before publishing stable Windows binaries.
 
 Details and options: [`docs/LICENSING_AUDIT_2026-11-23.md`](docs/LICENSING_AUDIT_2026-11-23.md).
 

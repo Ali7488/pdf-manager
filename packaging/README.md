@@ -60,9 +60,10 @@ Settings → About links to the exact Git commit a build was made from (decision
 
 ## Releasing (only with the owner's approval)
 
-1. Bump the version in `pyproject.toml`; regenerate the notices if dependencies changed (`uv run --with pip python scripts/collect_licenses.py`) and commit.
-2. Tag the commit (`v<version>`) and run the workflow on the tag.
-3. Create the GitHub pre-release from the tag and attach the installer, `SHA256SUMS.txt` (the installer's SHA-256) and the source bundle (as one archive).
+1. Confirm the intended artifact, release version, test scope, and open licensing questions in [LICENSING.md](../LICENSING.md). Update the source version and notices if they have changed.
+2. Build from the exact release commit. Verify its workflow run, the embedded revision in each selected binary, and the revision and contents of its matching source archive.
+3. Tag that commit as `v<version>`. Attach the approved binaries, their matching source archives, and a `SHA256SUMS.txt` covering every attached binary and archive. Verify the downloads and use the matching notes from [docs/releases](../docs/releases/).
+4. The proposed stable v0.5.0 scope is the Windows x64 portable ZIP. Resolve the desktop-specific WebView2 and legacy interop questions and validate the interactive installer before adding it.
 
 ## What the install wizard does
 
@@ -83,7 +84,7 @@ Setup also checks for the **Microsoft Edge WebView2 Runtime**, which the app win
 The app doesn't ship Microsoft's Visual C++ runtime DLLs (decision P32). The Python runtime, PyMuPDF, pywin32 and cffi need `vcruntime140.dll`, `vcruntime140_1.dll` and `msvcp140.dll` (and pywin32's unused `win32ui` needs `mfc140u.dll`), so the app uses the system-wide **Microsoft Visual C++ Redistributable (x64), version 14.44 or newer**: Microsoft's recommended central deployment, serviced by Windows Update.
 
 - **Detection.** Setup looks for those four DLLs in the 64-bit `System32` and reads their file versions; each must be 14.44 or newer (Microsoft requires the redistributable to be at least as new as the MSVC toolset that built the app; the newest toolset in the bundle is 14.44). The redistributable's registry entry (`HKLM\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64`, 32-bit view) is written to the setup log, but the files decide, because they are what Windows loads.
-- **When it's missing or too old.** Setup explains, says installing it needs administrator permission, and offers to open Microsoft's permalink `https://aka.ms/vc14/vc_redist.x64.exe` in the browser; the welcome page mentions it too. Setup continues either way, asks again after installing, and hides the **Launch** box until it's there. Setup never downloads or runs the redistributable itself, and nothing Microsoft's goes into the installer.
+- **When it's missing or too old.** Setup explains, says installing it needs administrator permission, and offers to open Microsoft's permalink `https://aka.ms/vc14/vc_redist.x64.exe` in the browser. Setup continues and hides **Launch** until the prerequisite is installed. The redistributable installer is a separate download. See [LICENSING.md](../LICENSING.md) for the Windows SDK and launcher components that require review.
 - **If the app is started without it.** Windows can't load `python313.dll`, and PyInstaller's launcher shows "Failed to load Python DLL '…\_internal\python313.dll'" with a LoadLibrary error. Installing the redistributable fixes it.
 - **Keeping it out.** `packaging/pdf-manager.spec` excludes every Visual C++ runtime DLL wherever PyInstaller collects it. `scripts/check_licenses.py bundle` fails if one is bundled again, reads every bundled binary's imports, and fails unless `installer.iss` checks for each runtime DLL they import (`VCRuntimeFiles`) and requires at least the newest linker version among them (`VCRuntimeMinMajor`/`VCRuntimeMinMinor`). Upgrades delete the old `_internal` folder first, so the DLLs an earlier build shipped don't survive an upgrade.
 - **Testing.** GitHub's Windows runner already has the redistributable, so the workflow's smoke test only shows the app works with the system-wide copy. It also simulates a missing runtime with `/VCRUNTIMEDIR=<folder>` (a testing-only setup parameter that replaces `System32` in the detection) and checks that setup reports it. Neither is a clean PC: test the missing-runtime path in Windows Sandbox or on a Windows 11 PC without the redistributable (see below).

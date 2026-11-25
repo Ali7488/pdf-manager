@@ -1,13 +1,13 @@
 # PDF Manager frontend
 
-The React user interface of PDF Manager. In the desktop app it runs inside a pywebview window and talks to the Python backend directly (no web server). The contract between the two is in [`../docs/API.md`](../docs/API.md) and [`src/api/types.ts`](src/api/types.ts).
+The React interface runs in a pywebview window in desktop mode and in the user's default browser in portable mode. Both use the same Python backend. Browser mode uses a local HTTP API on `127.0.0.1`. The contract is described in the [API guide](../docs/API.md) and [TypeScript types](src/api/types.ts).
 
 Stack: Vite, React, TypeScript, CSS Modules, dnd-kit (drag to reorder), Segoe UI where Windows provides it, else bundled Open Sans (works offline), Vitest and React Testing Library.
 
 ## Commands
 
 ```bash
-npm install          # once
+npm ci               # install the locked dependencies
 npm run dev          # browser preview at http://localhost:5173 with the mock backend
 npm test             # run the tests once (npm run test:watch to keep watching)
 npm run lint         # ESLint
@@ -23,9 +23,9 @@ The desktop app opens `dist/index.html` straight from disk as a `file://` URL (n
 - Font: Segoe UI is used where Windows provides it (it's proprietary, so it isn't bundled). The fallback is Open Sans (OFL), a variable font inlined as data URIs (see `src/styles/fonts.css`): woff2, Latin and Latin Extended only.
 - The small inline script in `index.html` that picks light or dark before the first paint stays as it is.
 
-The result is about 450 kB (about 186 kB gzipped). Don't add anything the page has to fetch at runtime (fonts from a CDN, lazy-loaded chunks, images by URL); it would break in the desktop app.
+Keep fonts, scripts, and other assets inside the build so both modes work offline.
 
-To check a build, open `dist/index.html` directly in a Chromium-based browser (double-click it, or use `file://` in the address bar). It should show the Home page with no console errors. Without Python, the page waits for pywebview, so settings don't load.
+To check a production build with the real service, run `uv run main.py --browser` from the repository root. The app serves the same HTML file over loopback and opens it in your default browser. See the [browser mode guide](../docs/BROWSER_MODE.md).
 
 ## Running with the mock
 
@@ -47,7 +47,7 @@ A production build never includes the mock. To use the real bridge during develo
 
 ```
 src/
-  api/          types.ts (the contract), bridge.ts (pywebview), mock.ts (dev mock), client.ts (picks one)
+  api/          types.ts (contract), bridge.ts (desktop), http.ts (portable), mock.ts (dev)
   components/   shared components, each with its .module.css and tests
                 (Button, InfoTip, FileList, Modal, Issue, Sidebar, DropOverlay, Field, ...)
   pages/        one folder per page: HomePage, ActionPage (+ ConvertModal), SettingsPage

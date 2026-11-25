@@ -1,8 +1,8 @@
 # PDF Manager
 
-A lightweight, offline desktop application for converting, preparing and organizing PDF and PowerPoint documents. The interface is **React + TypeScript**, the document engine is **Python**, and **pywebview** gives it a native desktop window.
+A lightweight, offline app for preparing PDFs and PowerPoint documents. The portable build opens in your default browser. The desktop test build uses pywebview. Both use the same React interface and Python conversion engine.
 
-> **⚠️ Pre-release for testing (v0.5).** This version is for testing only. The installer is **unsigned** and has **not yet been verified on a real Windows 11 PC**. Don't use it as your only copy of important documents. The full v1.0 release will follow after manual verification of the functions, code and features.
+The [v0.5.0-rc.1 test build](https://github.com/Ali7488/pdf-manager/releases/tag/v0.5.0-rc.1) is available. The owner confirmed that PDF workflows passed on a Windows 11 VM. See the [v0.5.0 release notes](docs/releases/v0.5.0.md) for the planned stable release and validation scope.
 
 ## What it does
 
@@ -17,29 +17,13 @@ A lightweight, offline desktop application for converting, preparing and organiz
 
 Also: drag and drop, drag to reorder, optional **OCR** (Tesseract) on every tool except Compress, progress and Cancel, an optional default save folder, four colour themes, and plain-language error messages with troubleshooting steps.
 
-**Your files are safe:** originals are only read, never changed. Work happens in a temporary folder and results are saved as new files; existing files are never overwritten. Everything runs on your computer: no account, no cloud.
+The app reads originals and writes results to new files. Work happens in a temporary folder on your computer. The app runs without an account or cloud service.
 
 ## Install
 
-### Windows 11
+### Windows 11 x64 portable ZIP
 
-> No release has been published yet; the first testing pre-release (v0.5) is being prepared. Until then, see [Development](#development) to run it from source.
-
-1. Open the [Releases page](https://github.com/Ali7488/pdf-manager/releases) and download **`PDF-Manager-Setup-<version>.exe`** from the latest pre-release. Optionally, check it in PowerShell with `Get-FileHash` against the SHA-256 shown next to the file.
-2. **Double-click it.** Because the installer isn't signed yet, Windows SmartScreen may say "Windows protected your PC". Only for a file from this repository's Releases page: click **More info → Run anyway**.
-3. Follow the short wizard. It installs for your user only (no administrator rights needed) and can optionally install:
-   - **Tesseract OCR**, to make pages searchable (Windows may ask for permission);
-   - **LibreOffice**, needed only for PowerPoint files (PDFs and images work without it).
-4. PDF Manager needs the free **Microsoft Visual C++ Redistributable (x64)**, version 14.44 or newer, which many Windows programs already installed. If it's missing, the wizard says so and offers Microsoft's download (`https://aka.ms/vc14/vc_redist.x64.exe`); run `vc_redist.x64.exe` to install it. That step needs administrator permission.
-5. Start **PDF Manager** from the Start menu or the desktop icon.
-
-If PDF Manager shows **"Failed to load Python DLL"** when it starts, the Microsoft Visual C++ Redistributable is missing or out of date: install it from the link above, then start PDF Manager again.
-
-You can install OCR later from the app's **Settings**. Logs are written to a `logs` folder next to the installed app (open it from Settings); settings are in `%LOCALAPPDATA%\PDFManager`.
-
-### Windows 11: in your web browser (portable ZIP, being tested)
-
-The same app, without the installer or the desktop window: it opens in your own web browser ([details](docs/BROWSER_MODE.md)).
+Download `PDF-Manager-0.5.0-browser-windows-x64.zip` from [GitHub Releases](https://github.com/Ali7488/pdf-manager/releases). Compare its PowerShell `Get-FileHash` output with the checksum in `SHA256SUMS.txt`.
 
 1. Install the **Microsoft Visual C++ Redistributable (x64)**, version 14.44 or newer, if you don't have it (`https://aka.ms/vc14/vc_redist.x64.exe`; it needs administrator permission).
 2. Unzip **`PDF-Manager-<version>-browser-windows-x64.zip`** and double-click **`PDF Manager.exe`** in the folder.
@@ -49,13 +33,17 @@ The same app, without the installer or the desktop window: it opens in your own 
    - Either way it works offline, and your files never leave your computer.
 4. Closing the window leaves PDF Manager running, so it reopens quickly. Quit it from **Settings → Quit PDF Manager**. It also quits by itself after an hour without use, but never while a result is waiting to be saved.
 
+### Windows desktop installer test build
+
+The unsigned desktop installer is available on the [RC1 test release](https://github.com/Ali7488/pdf-manager/releases/tag/v0.5.0-rc.1). Installer acceptance and WebView2 licensing review are still open. See the [packaging guide](packaging/README.md).
+
 ### Linux (Ubuntu/Debian, Arch)
 
 Linux packages are planned for **v0.75**. Until then, run it from source (see *Development* below).
 
 ## Testing without the window (CLI)
 
-A command-line tool runs every function through the same engine as the app, on Windows and Linux. With the source checked out and [uv](https://docs.astral.sh/uv/) installed:
+A command-line tool runs every function through the same engine as the app, on Windows and Linux. Use a dedicated output directory for each concurrent CLI process. With the source checked out and [uv](https://docs.astral.sh/uv/) installed:
 
 ```bash
 uv sync
@@ -138,7 +126,7 @@ main.py                Desktop application entry point
 
 ## Verification status
 
-The Python suite (449 tests on Linux; on Windows CI, tests needing OCR or LibreOffice skip) and the frontend suite (95 tests) pass in CI. The packaged app, the installer, Microsoft PowerPoint automation and real-user workflows **still need testing on a real Windows 11 PC**; that's what this pre-release is for. Report problems via [Issues](https://github.com/Ali7488/pdf-manager/issues).
+CI runs Python, frontend, browser integration, and Windows packaging checks. The owner reported passing Windows 11 VM PDF workflows on RC1. Windows presentation fidelity, OCR, and installer acceptance need separate results. Report problems via [Issues](https://github.com/Ali7488/pdf-manager/issues).
 
 ## Privacy and contributions
 

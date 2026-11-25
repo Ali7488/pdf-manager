@@ -752,6 +752,36 @@ def frontend_sources() -> list[dict]:
     return out
 
 
+def frontend_upstream_sources(packages: list[dict]) -> list[dict]:
+    """Pin editable source for frontend packages that publish only build output."""
+    versions = {item["component"]: item["version"] for item in packages}
+    # npm's version metadata identifies each source revision in gitHead.
+    archives = [
+        (
+            {"react": "19.3.1", "react-dom": "19.3.1"},
+            "61aa00df822d0eb76d0362eb8b6fdd3527693efe",
+            "df6b860384f0be8bf6e3ca6ce970226c6be70be2f2cf1cb5ed0c7567b8e4dede",
+        ),
+        (
+            {"scheduler": "0.28.0"},
+            "1d34f91dfde6bba84d08b683aaba164c7194dacb",
+            "ef34c2ad2fe4af769cdc8a067d827fbba8fde677d83f5befaa8a8cc5c3a8c6be",
+        ),
+    ]
+    for pins, _, _ in archives:
+        for name, version in pins.items():
+            if versions.get(name) != version:
+                raise SystemExit(f"Review the upstream source pin for {name} {versions.get(name)}.")
+    return [
+        {
+            "component": ", ".join(f"{name} {version}" for name, version in pins.items()),
+            "url": f"https://github.com/react/react/archive/{revision}.tar.gz",
+            "sha256": sha256,
+        }
+        for pins, revision, sha256 in archives
+    ]
+
+
 def _pypi_sdist(name: str, version: str) -> dict:
     """URL and SHA-256 of a package's source distribution on PyPI."""
     with urllib.request.urlopen(f"https://pypi.org/pypi/{name}/{version}/json", timeout=60) as r:
@@ -952,6 +982,8 @@ copy of the Tesseract library into PyMuPDF (listed above), which PDF Manager doe
 
 
 def main() -> int:
+    npm_sources = frontend_sources()
+    upstream_sources = frontend_upstream_sources(npm_sources)
     if LICENSES.exists():
         shutil.rmtree(LICENSES)
     packages = runtime_python_packages()
@@ -988,7 +1020,8 @@ def main() -> int:
             "webview2_sdk": {"version": WEBVIEW2_SDK_VERSION, "sha256": webview2_hashes},
             "sources": {
                 "python": python_sources(packages),
-                "frontend": frontend_sources(),
+                "frontend": npm_sources,
+                "frontend_upstream": upstream_sources,
                 "mupdf": mupdf_source,
                 "python_runtime": {
                     "url": f"https://www.python.org/ftp/python/{PYTHON_WINDOWS_VERSION}/"

@@ -276,6 +276,18 @@
         ]
       }
     ],
+    "frontend_upstream": [
+      {
+        "component": "react 19.3.1, react-dom 19.3.1",
+        "url": "https://github.com/react/react/archive/61aa00df822d0eb76d0362eb8b6fdd3527693efe.tar.gz",
+        "sha256": "df6b860384f0be8bf6e3ca6ce970226c6be70be2f2cf1cb5ed0c7567b8e4dede"
+      },
+      {
+        "component": "scheduler 0.28.0",
+        "url": "https://github.com/react/react/archive/1d34f91dfde6bba84d08b683aaba164c7194dacb.tar.gz",
+        "sha256": "ef34c2ad2fe4af769cdc8a067d827fbba8fde677d83f5befaa8a8cc5c3a8c6be"
+      }
+    ],
     "mupdf": {
       "url": "https://mupdf.com/downloads/archive/mupdf-1.28.2-source.tar.gz",
       "sha256": "44075a84e329db55b9bef5f342a70fd26d69e48ad1d33cb89d9664581c641156"

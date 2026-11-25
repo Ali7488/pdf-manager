@@ -31,9 +31,11 @@ The RC1 source bundles contain the following material. The open questions below 
   - the CPython source of the bundled Python runtime, plus the libraries the python.org Windows build compiles in or ships as DLLs from outside that tarball: OpenSSL 3.5.9, libffi 3.4.4, bzip2 1.0.8, xz 5.2.5, mpdecimal 4.0.0 and zlib 1.3.1, from the `python/cpython-source-deps` tags CPython's `PCbuild/get_externals.bat` names;
   - the PyInstaller source (its bootloader is in the app's `.exe`);
   - the app's own source as a `git archive` of the exact commit the build was made from (`app/`, with `SOURCE_REVISION`);
-  - the npm package of every interface package inlined into the app.
+  - the npm package of every interface package inlined into the app;
+  - the editable React, React DOM and Scheduler source archives, pinned by upstream
+    Git revision from the corresponding npm release metadata and verified by SHA-256.
 
-The bundles record upstream download locations and hashes. The npm tarballs are the exact frontend build inputs. Some contain distribution builds instead of the upstream development tree. Verify coverage of each component's preferred source form before describing a bundle as complete.
+The bundles record upstream download locations and hashes. The npm tarballs are the exact frontend build inputs. The extra upstream archives cover the React packages whose npm tarballs contain distribution builds without the editable source. These archives are planned for the next build. The published v0.5.0-rc.1 source bundles predate this addition.
 
 ## Building it yourself
 

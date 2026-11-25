@@ -468,6 +468,18 @@ def test_every_bundled_python_package_has_a_source_location():
     assert json.dumps(manifest["sources"]["mupdf"]).count("mupdf.com") == 1
 
 
+def test_frontend_upstream_source_pins_match_the_lockfile():
+    npm_sources = collect.frontend_sources()
+    archives = collect.frontend_upstream_sources(npm_sources)
+    assert archives == check.load_manifest()["sources"]["frontend_upstream"]
+    assert len(archives) == 2
+
+    react = next(item for item in npm_sources if item["component"] == "react")
+    react["version"] = "0.0.0"
+    with pytest.raises(SystemExit, match="Review the upstream source pin for react 0.0.0"):
+        collect.frontend_upstream_sources(npm_sources)
+
+
 # ----- The browser-mode ZIP (browser build) -----
 
 stage = _load("stage_licenses")

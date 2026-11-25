@@ -16,7 +16,8 @@ the exact versions listed in ``licenses/manifest.json`` (which
 * MuPDF's source release (PyMuPDF's own source distribution doesn't contain it);
 * the CPython source release of the bundled interpreter;
 * the PyInstaller source distribution (its bootloader is in the app's .exe);
-* each interface package's npm tarball (checked against package-lock.json's integrity).
+* each interface package's npm tarball (checked against package-lock.json's integrity);
+* the editable upstream source archives for React, React DOM and Scheduler.
 
 It writes ``SOURCES.md`` (what each file is and where it came from) and ``SHA256SUMS``
 into the output folder. Any download or checksum failure fails the script, so a
@@ -157,6 +158,9 @@ def main(argv: list[str] | None = None) -> int:
     for s in sources["frontend"]:
         path = fetch(s["url"], out / "frontend", integrity=s["integrity"])
         add(f"{s['component']} {s['version']}", s["url"], path)
+    for item in sources["frontend_upstream"]:
+        path = fetch(item["url"], out / "frontend", sha256=item["sha256"])
+        add(f"{item['component']} (upstream source)", item["url"], path)
     print("MuPDF, CPython and PyInstaller")
     mupdf = sources["mupdf"]
     add(
@@ -211,7 +215,8 @@ def main(argv: list[str] | None = None) -> int:
         "**Provenance note:** pywin32 b312 is fetched by its pinned upstream "
         "Git commit (2a277cb5552756c2b4d42b524dc36d25e0bb6354). "
         "The other listed Windows Python and runtime "
-        "source archives use their pinned SHA-256 digests; npm archives use the "
+        "source archives and the editable frontend source archives use their pinned "
+        "SHA-256 digests; npm archives use the "
         "lockfile integrity values. The generated SHA256SUMS records every "
         "downloaded file, but does not independently authenticate an upstream "
         "archive that has no pre-published digest.",
